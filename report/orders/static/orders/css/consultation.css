@@ -1,0 +1,519 @@
+/* Couleurs MTN */
+:root {
+    --mtn-yellow: #ffcc00;
+    --mtn-black: #000000;
+    --mtn-dark-gray: #333333;
+    --mtn-light-gray: #f8f9fa;
+}
+
+.bg-mtn-yellow {
+    background-color: var(--mtn-yellow) !important;
+    color: var(--mtn-black) !important;
+}
+
+.bg-mtn-black {
+    background-color: var(--mtn-black) !important;
+    color: white !important;
+}
+
+.text-mtn-yellow {
+    color: var(--mtn-yellow) !important;
+}
+
+.border-mtn-yellow {
+    border-color: var(--mtn-yellow) !important;
+}
+
+/* Styles de la page */
+.page-header {
+    border-bottom: 3px solid var(--mtn-yellow);
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+}
+
+.table th {
+    background-color: var(--mtn-black);
+    color: var(--mtn-yellow);
+    border-color: var(--mtn-yellow);
+}
+
+.table-bordered {
+    border: 1px solid var(--mtn-yellow);
+}
+
+.table-bordered td {
+    border: 1px solid #dee2e6;
+}
+
+.btn-mtn {
+    background-color: var(--mtn-yellow);
+    color: var(--mtn-black);
+    font-weight: bold;
+    border: 2px solid var(--mtn-black);
+}
+
+.btn-mtn:hover {
+    background-color: var(--mtn-black);
+    color: var(--mtn-yellow);
+    border-color: var(--mtn-yellow);
+}
+
+.select2-container--bootstrap4 .select2-selection--single {
+    height: calc(1.5em + 0.75rem + 2px) !important;
+    border: 1px solid var(--mtn-yellow);
+}
+
+.select2-container--bootstrap4.select2-container--focus .select2-selection {
+    border-color: var(--mtn-yellow);
+    box-shadow: 0 0 0 0.2rem rgba(255, 204, 0, 0.25);
+}
+
+.loading-spinner {
+    display: none;
+    text-align: center;
+    margin: 1rem 0;
+}
+
+.spinner-border.text-mtn-yellow {
+    color: var(--mtn-yellow) !important;
+    border-color: var(--mtn-yellow) transparent var(--mtn-yellow) transparent;
+}
+
+.alert-mtn {
+    background-color: var(--mtn-light-gray);
+    border-left: 4px solid var(--mtn-yellow);
+    color: var(--mtn-dark-gray);
+}
+
+/* Styles pour la section de carte thermique */
+.analytics-section {
+    margin: 40px 0;
+    padding-bottom: 20px;
+}
+
+.section-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--mtn-dark-gray);
+    margin-bottom: 20px;
+}
+
+/* Styles pour le séparateur de section */
+.section-divider {
+    position: relative;
+    text-align: center;
+    margin: 40px 0;
+    height: 20px;
+}
+
+.divider-line {
+    margin: 0;
+    border: 0;
+    height: 1px;
+    background-image: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0));
+}
+
+.divider-icon {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: white;
+    padding: 0 15px;
+    color: var(--mtn-yellow);
+    font-size: 1.2rem;
+}
+
+/* Styles pour la carte thermique */
+.heatmap-container {
+    margin: 20px 0;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.heatmap-title {
+    font-size: 1.3rem;
+    margin-bottom: 18px;
+    color: #333;
+    font-weight: 600;
+}
+
+.heatmap-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.heatmap-data-type {
+    width: 220px;
+}
+
+#heatmap-chart {
+    height: 350px;
+    width: 100%;
+    margin-bottom: 20px;
+    overflow: visible;
+    border: 1px solid #eaeaea;
+    border-radius: 6px;
+    padding: 10px;
+}
+
+/* Amélioration de l'apparence des cellules de la heatmap */
+#heatmap-chart .apexcharts-heatmap-rect {
+    stroke: rgba(255, 255, 255, 0.4) !important;
+    stroke-width: 1px !important;
+}
+
+/* Amélioration de la visibilité des étiquettes */
+#heatmap-chart .apexcharts-xaxis-label,
+#heatmap-chart .apexcharts-yaxis-label {
+    font-weight: 600 !important;
+    fill: #333 !important;
+}
+
+/* Style des tooltips de la heatmap */
+.apexcharts-tooltip-heatmap {
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 5px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    border-left: 4px solid #666;
+    font-family: inherit;
+    min-width: 150px;
+}
+
+.apexcharts-tooltip-heatmap .apexcharts-tooltip-title {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 5px;
+}
+
+.apexcharts-tooltip-heatmap .apexcharts-tooltip-hour {
+    font-size: 13px;
+    color: #555;
+    margin-bottom: 5px;
+}
+
+.apexcharts-tooltip-heatmap .apexcharts-tooltip-value {
+    font-size: 14px;
+}
+
+/* Classes d'intensité pour les tooltips */
+.apexcharts-tooltip-heatmap.very-low { border-left-color: #ffffcc; }
+.apexcharts-tooltip-heatmap.low { border-left-color: #c7e9b4; }
+.apexcharts-tooltip-heatmap.medium { border-left-color: #7fcdbb; }
+.apexcharts-tooltip-heatmap.high { border-left-color: #41b6c4; }
+.apexcharts-tooltip-heatmap.very-high { border-left-color: #225ea8; }
+
+.heatmap-card {
+    margin-top: 20px;
+    margin-bottom: 40px;
+    clear: both;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.heatmap-summary {
+    margin-top: 20px;
+    padding: 12px 15px;
+    background-color: #f5f7fa;
+    border-radius: 6px;
+    font-size: 1rem;
+    color: #444;
+    border-left: 4px solid #ffb300;
+    font-weight: 500;
+}
+
+/* Styles pour les tooltips de la carte thermique */
+.apexcharts-tooltip-custom {
+    background-color: rgba(255, 255, 255, 0.95);
+    border-radius: 6px;
+    padding: 10px 14px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    min-width: 180px;
+}
+
+/* Couleurs des tooltips selon l'intensité */
+.apexcharts-tooltip-custom.intensity-none {
+    border-left: 4px solid #F5F5F5;
+}
+
+.apexcharts-tooltip-custom.intensity-very-low {
+    border-left: 4px solid #9BE9A8;
+}
+
+.apexcharts-tooltip-custom.intensity-low {
+    border-left: 4px solid #40C463;
+}
+
+.apexcharts-tooltip-custom.intensity-medium {
+    border-left: 4px solid #FCA636;
+}
+
+.apexcharts-tooltip-custom.intensity-high {
+    border-left: 4px solid #FF5733;
+}
+
+.apexcharts-tooltip-custom.intensity-very-high {
+    border-left: 4px solid #C70039;
+}
+
+.apexcharts-tooltip-title {
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #333;
+    font-size: 1.05rem;
+}
+
+.tooltip-hour-range {
+    font-size: 0.9rem;
+    color: #666;
+    font-weight: normal;
+}
+
+.apexcharts-tooltip-value {
+    color: #444;
+    font-size: 1rem;
+    padding-top: 5px;
+}
+
+.apexcharts-tooltip-value b {
+    color: #000;
+    font-weight: 700;
+    font-size: 1.1rem;
+    border-bottom-color: rgba(255, 255, 255, 0.95) !important;
+}
+
+.apexcharts-heatmap-rect {
+    transition: all 0.3s ease;
+}
+
+.apexcharts-heatmap-rect:hover {
+    stroke-width: 2px;
+    stroke: #fff;
+}
+
+.heatmap-controls {
+    display: flex;
+    align-items: center;
+}
+
+.heatmap-controls select {
+    border-radius: 4px;
+    border: 1px solid #ddd;
+    padding: 4px 8px;
+    background-color: #fff;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.heatmap-controls select:focus {
+    border-color: #ffcc00;
+    box-shadow: 0 0 0 2px rgba(255, 204, 0, 0.25);
+    outline: none;
+}
+
+/* Styles pour les cartes de statistiques améliorées */
+.hover-zoom {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    border: 1px solid rgba(0, 0, 0, 0.05) !important;
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.hover-zoom:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.08) !important;
+}
+
+.icon-shape {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon-shape.icon-lg {
+    width: 48px;
+    height: 48px;
+}
+
+.bg-soft-yellow {
+    background-color: rgba(255, 204, 0, 0.15) !important;
+}
+
+.text-yellow {
+    color: var(--mtn-yellow) !important;
+}
+
+.bg-yellow {
+    background-color: var(--mtn-yellow) !important;
+}
+
+.fw-semibold {
+    font-weight: 600 !important;
+}
+
+/* Ajustements pour les titres et valeurs */
+.card h3 {
+    letter-spacing: 0.5px;
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin-bottom: 0;
+}
+
+.card h2 {
+    font-size: 1.75rem;
+    color: #333;
+    line-height: 1.2;
+    margin-bottom: 0;
+}
+
+/* Style pour la progression */
+.progress {
+    background-color: #f0f0f0;
+    border-radius: 100px;
+    height: 6px;
+    overflow: visible;
+}
+
+.progress-bar {
+    border-radius: 100px;
+    position: relative;
+    transition: width 0.6s ease;
+}
+
+/* Effet de vague sur les barres de progression */
+.progress-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, 
+        rgba(255,255,255,0.2) 0%, 
+        rgba(255,255,255,0.6) 30%, 
+        rgba(255,255,255,0.2) 60%, 
+        rgba(255,255,255,0.6) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite linear;
+    border-radius: 100px;
+    opacity: 0.5;
+}
+
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+/* Animation au chargement des cartes */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Appliquer l'animation à chaque carte avec un délai progressif */
+.col-md-6.col-xl-3:nth-child(1) .card {
+    animation: fadeInUp 0.4s ease-out forwards;
+}
+
+.col-md-6.col-xl-3:nth-child(2) .card {
+    animation: fadeInUp 0.6s ease-out forwards;
+}
+
+.col-md-6.col-xl-3:nth-child(3) .card {
+    animation: fadeInUp 0.8s ease-out forwards;
+}
+
+.col-md-6.col-xl-3:nth-child(4) .card {
+    animation: fadeInUp 1s ease-out forwards;
+}
+
+/* Amélioration de la réactivité */
+@media (max-width: 768px) {
+    .col-md-6 {
+        margin-bottom: 1rem;
+    }
+    
+    .card h2 {
+        font-size: 1.5rem;
+    }
+    
+    .icon-shape.icon-lg {
+        width: 40px;
+        height: 40px;
+    }
+}
+
+/* Styles pour les lignes cliquables */
+.clickable-row {
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.clickable-row:hover {
+    background-color: #f8f9fa;
+}
+
+/* Styles pour la table d'historique des réceptions */
+#reception-history-table {
+    margin-top: 20px;
+    font-size: 0.9em;
+}
+
+#reception-history-table th {
+    background-color: #f8f9fa;
+}
+
+/* Styles pour les corrections négatives */
+.correction-row {
+    background-color: #fff3cd !important; /* Fond jaune clair pour les corrections */
+    border-left: 4px solid #ffc107; /* Bordure jaune à gauche */
+}
+
+.correction-row:hover {
+    background-color: #ffeaa7 !important; /* Fond jaune plus foncé au survol */
+}
+
+/* Ajouter une icône de correction dans la première cellule */
+.correction-row td:first-child::before {
+    content: "⚠️ ";
+    margin-right: 5px;
+    font-size: 0.9em;
+}
+
+/* Style pour les tooltips explicatifs des corrections */
+.correction-tooltip {
+    position: relative;
+    cursor: help;
+}
+
+.correction-tooltip::after {
+    content: "Correction d'erreur";
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #333;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    z-index: 1000;
+}
+
+.correction-tooltip:hover::after {
+    opacity: 1;
+}

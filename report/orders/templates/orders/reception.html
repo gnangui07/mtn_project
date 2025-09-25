@@ -1,0 +1,447 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Reception - MTN Purchase Orders{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Variables pour les couleurs MTN */
+    :root {
+        --mtn-yellow: #FFCC00;
+        --mtn-black: #000000;
+        --mtn-dark-gray: #222222;
+        --mtn-light-gray: #f5f5f5;
+    }
+    
+    /* Style global */
+    body {
+        background: linear-gradient(135deg, var(--mtn-light-gray) 0%, #ffffff 100%);
+        min-height: 100vh;
+    }
+    
+    /* Conteneur principal avec effet de vague */
+    .wave-container {
+        position: relative;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        overflow: hidden;
+    }
+    
+    /* Fond statique avec couleurs MTN */
+    .background-gradient {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        z-index: -1;
+        background: linear-gradient(135deg, var(--mtn-black) 0%, rgba(0,0,0,0.7) 50%, var(--mtn-yellow) 100%);
+        opacity: 0.1;
+        border-radius: 10px;
+    }
+    
+    /* Animation pour le select et autres éléments interactifs */
+    @keyframes mtn-highlight {
+        0% { border-color: var(--mtn-black); }
+        50% { border-color: var(--mtn-yellow); }
+        100% { border-color: var(--mtn-black); }
+    }
+    
+    /* Animation de pulsation pour le logo */
+    @keyframes pulse-glow {
+        0% { box-shadow: 0 0 5px 0px var(--mtn-yellow); }
+        50% { box-shadow: 0 0 20px 5px var(--mtn-yellow); }
+        100% { box-shadow: 0 0 5px 0px var(--mtn-yellow); }
+    }
+    
+    /* Carte principale avec effet de verre */
+    .glass-card {
+        background: rgba(255, 255, 255, 0.7);
+        border-radius: 20px;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        padding: 0;
+        max-width: 400px;
+        width: 100%;
+        overflow: visible; /* allow dropdown to overflow */
+        transition: all 0.3s ease;
+    }
+    
+    .glass-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+    }
+    
+    /* En-tête avec dégradé */
+    .card-header {
+        background: linear-gradient(135deg, var(--mtn-black) 0%, var(--mtn-dark-gray) 100%);
+        color: var(--mtn-yellow);
+        padding: 20px;
+        position: relative;
+        overflow: hidden;
+        text-align: center;
+        border-bottom: none;
+    }
+    
+    /* Cercles décoratifs dans l'en-tête avec couleurs MTN */
+    .header-circle {
+        position: absolute;
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+    }
+    
+    .circle-1 {
+        top: -30px;
+        right: -30px;
+        background: rgba(255, 204, 0, 0.15);
+        animation: pulse-circle 8s infinite alternate;
+    }
+    
+    .circle-2 {
+        bottom: -50px;
+        left: -20px;
+        width: 80px;
+        height: 80px;
+        background: rgba(0, 0, 0, 0.2);
+        animation: pulse-circle 6s infinite alternate-reverse;
+    }
+    
+    @keyframes pulse-circle {
+        0% { transform: scale(1); opacity: 0.1; }
+        100% { transform: scale(1.3); opacity: 0.2; }
+    }
+    
+    /* Logo MTN avec effet de lumière aux couleurs MTN */
+    .logo-container {
+        position: relative;
+        display: inline-block;
+        margin-bottom: 15px;
+        border-radius: 50%;
+        padding: 5px;
+        animation: pulse-glow 3s infinite;
+    }
+    
+    .mtn-logo {
+        width: 80px;
+        height: auto;
+        filter: drop-shadow(0 0 8px var(--mtn-yellow));
+        transition: all 0.3s ease;
+    }
+    
+    @keyframes pulse {
+        0% { filter: drop-shadow(0 0 8px rgba(255, 204, 0, 0.6)); }
+        50% { filter: drop-shadow(0 0 12px rgba(255, 204, 0, 0.8)); }
+        100% { filter: drop-shadow(0 0 8px rgba(255, 204, 0, 0.6)); }
+    }
+    
+    /* Titre avec effet spécial */
+    .card-title {
+        font-weight: 600;
+        margin: 0;
+        letter-spacing: 0.5px;
+        position: relative;
+        display: inline-block;
+    }
+    
+    /* Corps de la carte */
+    .card-body {
+        padding: 25px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    /* Conteneur de sélection stylisé */
+    .select-container {
+        position: relative;
+        width: 100%;
+        margin: 10px 0;
+    }
+    
+    /* Icône personnalisée avant la sélection */
+    .select-icon {
+        position: absolute;
+        left: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--mtn-black);
+        z-index: 10;
+        pointer-events: none;
+    }
+    
+    /* Style de sélection personnalisé aux couleurs MTN */
+    .custom-select {
+        width: 100%;
+        padding: 15px 20px 15px 45px;
+        border: 2px solid var(--mtn-black);
+        border-radius: 12px;
+        background-color: white;
+        font-size: 16px;
+        color: var(--mtn-dark-gray);
+        transition: all 0.3s;
+        cursor: pointer;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23FFCC00' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 15px center;
+        background-size: 16px;
+        animation: mtn-highlight 4s infinite;
+    }
+
+    /* Overrides for the search input so it behaves like a text field */
+    .select-container input.custom-select {
+        cursor: text;
+        background-image: none;
+    }
+    
+    /* États de la sélection */
+    .custom-select:hover {
+        border-color: var(--mtn-yellow);
+        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    .custom-select:focus {
+        border-color: var(--mtn-yellow);
+        box-shadow: 0 0 0 3px rgba(255, 204, 0, 0.2);
+        outline: none;
+    }
+    
+    /* Animation pour les options de sélection */
+    .custom-select option {
+        padding: 10px;
+    }
+    
+    /* Conception réactive */
+    @media (max-width: 576px) {
+        .glass-card {
+            max-width: 90%;
+            margin: 0 15px;
+        }
+    }
+</style>
+
+{% if messages %}
+<div class="container mt-3">
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'warning' %}alert-warning{% elif message.tags == 'success' %}alert-success{% else %}alert-info{% endif %} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div class="wave-container">
+    <!-- Fond statique en arrière-plan -->
+    <div class="background-gradient"></div>
+    
+    <!-- Carte avec effet de verre -->
+    <div class="glass-card">
+        <!-- En-tête stylisé -->
+        <div class="card-header">
+            <!-- Cercles décoratifs -->
+            <div class="header-circle circle-1"></div>
+            <div class="header-circle circle-2"></div>
+            
+            <!-- Logo MTN avec effet lumineux -->
+            <div class="logo-container">
+                <img src="{% static 'logo_mtn.jpeg' %}" alt="MTN Logo" class="mtn-logo">
+            </div>
+            
+            <!-- Titre avec effet spécial -->
+            <h5 class="card-title">Register Delivery</h5>
+        </div>
+        
+        <!-- Corps de la carte avec effet de verre -->
+        <div class="card-body">
+            <form id="form-bon-commande" action="{% url 'orders:search_bon' %}" method="GET">
+                <div class="select-container">
+                    <!-- Icône devant l'input/select -->
+                    <i class="fas fa-search select-icon"></i>
+                    
+                    <!-- Input de recherche avec autocomplétion -->
+                    <input type="text" id="bon-commande-input" class="custom-select" placeholder="Type a purchase order number (full or partial)" autocomplete="off" autofocus style="margin-bottom:8px;" />
+                    <!-- Conteneur des suggestions (sera déplacé dans <body>) -->
+                    <div id="suggestions" class="list-group" style="max-height:220px; overflow-y:auto; display:none;"></div>
+                    
+                    <div style="height:8px"></div>
+                    
+                    <!-- Select personnalisé -->
+                    <select id="bon-commande" name="order_number" class="custom-select" data-dropup="false" required>
+                        <option value="" disabled selected>-- Choose a purchase order number --</option>
+                        {% for bon in numeros_bons %}
+                            <option value="{{ bon.numero }}">{{ bon.numero }}</option>
+                        {% empty %}
+                            <option disabled>No purchase order available</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Soumission auto pour le select existant
+        $('#bon-commande').change(function() {
+            if ($(this).val()) {
+                $('#form-bon-commande').submit();
+            }
+        });
+
+        // Autocomplétion pour l'input
+        const $input = $('#bon-commande-input');
+        // Move suggestions container to body to avoid clipping
+        const $suggestions = $('#suggestions').appendTo('body').css({ position: 'absolute', zIndex: 2000, display: 'none' });
+        let debounceTimer = null;
+        let activeIndex = -1; // index de l'élément actif dans la liste
+        let isSelecting = false; // évite de masquer la liste pendant un clic
+
+        function positionSuggestions() {
+            const off = $input.offset();
+            if (!off) return;
+            const top = off.top + $input.outerHeight();
+            const left = off.left;
+            const width = $input.outerWidth();
+            $suggestions.css({ top: top + 'px', left: left + 'px', width: width + 'px' });
+        }
+
+        function fetchSuggestions(q) {
+            if (!q || q.trim().length === 0) {
+                $suggestions.hide().empty();
+                return;
+            }
+            $.getJSON('{% url "orders:search_bon" %}', { q: q, limit: 20 })
+              .done(function(res) {
+                  const list = (res && res.status === 'success') ? res.data : [];
+                  renderSuggestions(list);
+              })
+              .fail(function() { $suggestions.hide().empty(); });
+        }
+
+        function renderSuggestions(items) {
+            if (!items || items.length === 0) { $suggestions.hide().empty(); return; }
+            const html = items.map(function(it) {
+                const num = it.numero || '';
+                const fid = it.fichier_id || '';
+                return '<a href="#" class="list-group-item list-group-item-action suggestion-item" data-numero="' + num + '" data-fichier-id="' + fid + '">' + num + '</a>';
+            }).join('');
+            $suggestions.html(html);
+            positionSuggestions();
+            $suggestions.show();
+            activeIndex = -1; // reset à chaque rendu
+        }
+
+        $input.on('input', function() {
+            const val = $(this).val();
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(function() { fetchSuggestions(val); }, 200);
+        });
+
+        $input.on('focus', function() {
+            if ($suggestions.children().length > 0) {
+                positionSuggestions();
+                $suggestions.show();
+            }
+        }).on('blur', function() {
+            // léger délai pour permettre la sélection à la souris (mousedown)
+            setTimeout(function(){ if (!isSelecting) { $suggestions.hide(); } }, 250);
+        });
+
+        $input.on('keydown', function(e) {
+            const $items = $suggestions.find('.suggestion-item');
+            if (e.key === 'ArrowDown' && $items.length) {
+                e.preventDefault();
+                activeIndex = (activeIndex + 1) % $items.length;
+                $items.removeClass('active');
+                $items.eq(activeIndex).addClass('active');
+                scrollItemIntoView($items.eq(activeIndex));
+            } else if (e.key === 'ArrowUp' && $items.length) {
+                e.preventDefault();
+                activeIndex = (activeIndex <= 0 ? $items.length - 1 : activeIndex - 1);
+                $items.removeClass('active');
+                $items.eq(activeIndex).addClass('active');
+                scrollItemIntoView($items.eq(activeIndex));
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                const $target = (activeIndex >= 0 && $items.eq(activeIndex).length) ? $items.eq(activeIndex) : $items.first();
+                if ($target.length) {
+                    navigateToSelection($target.data('numero'), $target.data('fichier-id'));
+                } else if ($input.val().trim() !== '') {
+                    // fallback: soumettre comme avant
+                    addHiddenAndSubmit($input.val().trim());
+                }
+            } else if (e.key === 'Escape') {
+                $suggestions.hide();
+            }
+        });
+
+        function scrollItemIntoView($el) {
+            try {
+                const el = $el.get(0);
+                if (!el) return;
+                const parent = $suggestions.get(0);
+                const elTop = el.offsetTop;
+                const elBottom = elTop + el.offsetHeight;
+                const viewTop = parent.scrollTop;
+                const viewBottom = viewTop + parent.clientHeight;
+                if (elTop < viewTop) parent.scrollTop = elTop;
+                else if (elBottom > viewBottom) parent.scrollTop = elBottom - parent.clientHeight;
+            } catch(_) {}
+        }
+
+        // Utiliser mousedown pour éviter la course avec blur
+        $suggestions.on('mousedown', '.suggestion-item', function(e) {
+            isSelecting = true;
+            e.preventDefault();
+            navigateToSelection($(this).data('numero'), $(this).data('fichier-id'));
+        });
+        $suggestions.on('mouseup', '.suggestion-item', function() {
+            // libérer le flag après la sélection
+            setTimeout(function(){ isSelecting = false; }, 0);
+        });
+
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('.select-container').length) { $suggestions.hide(); }
+        });
+
+        $(window).on('scroll resize', function(){
+            if ($suggestions.is(':visible')) positionSuggestions();
+        });
+
+        function addHiddenAndSubmit(orderNumber) {
+            const $form = $('#form-bon-commande');
+            // supprimer d'éventuels anciens champs
+            $form.find('input[name="order_number"]').remove();
+            $('<input type="hidden" name="order_number" />').val(orderNumber).appendTo($form);
+            $form.submit();
+        }
+
+        function navigateToSelection(numero, fichierId) {
+            // Tenter de synchroniser le <select> comme un changement natif
+            const $select = $('#bon-commande');
+            if ($select.find('option[value="' + numero + '"]').length) {
+                $select.val(numero).trigger('change');
+                return;
+            }
+            if (fichierId) {
+                window.location = '/orders/bons/' + fichierId + '/?selected_order_number=' + encodeURIComponent(numero);
+            } else {
+                addHiddenAndSubmit(numero);
+            }
+        }
+    });
+</script>
+{% endblock %}

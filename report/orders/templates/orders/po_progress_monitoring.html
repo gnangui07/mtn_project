@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}PO Progress Monitoring{% endblock %}
+
+{% block extra_css %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header pb-0">
+                    <h6>PO Progress Monitoring</h6>
+                </div>
+                <div class="card-body">
+                    <p>Generate a report Excel containing a summary of each PO.</p>
+                    
+                    <div class="text-center mt-4">
+                        <a href="{% url 'orders:export_po_progress_monitoring' %}" class="btn btn-primary">
+                            <i class="fas fa-file-excel me-2"></i>Export PO Progress Monitoring
+                        </a>
+                    </div>
+                    
+                    {% if messages %}
+                    <div class="mt-4">
+                        {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

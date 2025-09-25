@@ -1,0 +1,311 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Accueil{% endblock %}
+
+{% block extra_css %}
+<!-- Styles spécifiques à la page d'accueil: variables, mise en page et cartes -->
+<style>
+    :root {
+        --mtn-yellow: #FFCC00;
+        --mtn-black: #000000;
+        --mtn-gray: #666666;
+        --mtn-light: #f8f8f8;
+    }
+    
+    /* Conteneur principal de la page d'accueil */
+    .search-page {
+        background-color: var(--mtn-light);
+        min-height: calc(100vh - 56px);
+        display: flex;
+        align-items: center;
+        padding: 2rem 0;
+    }
+    
+    /* Carte cliquable pour chaque option (Consultation / Réception) */
+    .option-card {
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+        height: 100%;
+    }
+    
+    .option-card:hover, .option-card.active {
+        border-color: var(--mtn-yellow);
+        box-shadow: 0 4px 12px rgba(255, 204, 0, 0.2);
+        transform: translateY(-5px);
+    }
+    
+    .option-icon {
+        color: var(--mtn-yellow);
+        margin-bottom: 1rem;
+    }
+    
+    .search-container {
+        max-width: 800px;
+        margin: 0 auto;
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+    }
+    
+    /* Bandeau jaune en tête du bloc central */
+    .search-header {
+        background: linear-gradient(135deg, var(--mtn-yellow) 0%, #e6b800 100%);
+        padding: 1.5rem;
+        color: var(--mtn-black);
+        position: relative;
+    }
+    
+    .search-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+    
+    .search-subtitle {
+        font-size: 0.9rem;
+        opacity: 0.8;
+    }
+    
+    /* Corps: messages flash + choix d'options */
+    .search-form-container {
+        padding: 1.5rem;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .search-input-group {
+        position: relative;
+        margin-bottom: 1rem;
+    }
+    
+    .search-input {
+        width: 100%;
+        padding: 0.75rem 1rem 0.75rem 3rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 1rem;
+        transition: all 0.2s;
+    }
+    
+    .search-input:focus {
+        outline: none;
+        border-color: var(--mtn-yellow);
+        box-shadow: 0 0 0 3px rgba(255, 204, 0, 0.15);
+    }
+    
+    .search-icon {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--mtn-yellow);
+    }
+    
+    .search-button {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        background: linear-gradient(to right, var(--mtn-yellow), #e6b800);
+        border: none;
+        border-radius: 4px;
+        color: var(--mtn-black);
+        font-weight: 600;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .search-button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        background: linear-gradient(to right, #e6b800, var(--mtn-yellow));
+    }
+    
+    .search-button i {
+        margin-right: 0.5rem;
+    }
+    
+    .results-container {
+        padding: 1.5rem;
+    }
+    
+    .results-title {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--mtn-gray);
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+    }
+    
+    .results-title i {
+        color: var(--mtn-yellow);
+        margin-right: 0.5rem;
+    }
+    
+    .results-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    
+    .result-item {
+        padding: 0.75rem;
+        border-radius: 4px;
+        margin-bottom: 0.5rem;
+        transition: all 0.2s;
+        border-left: 3px solid transparent;
+    }
+    
+    .result-item:hover {
+        background-color: var(--mtn-light);
+        border-left-color: var(--mtn-yellow);
+    }
+    
+    .result-link {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        text-decoration: none;
+        color: var(--mtn-black);
+    }
+    
+    .result-number {
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+    }
+    
+    .result-number i {
+        color: var(--mtn-yellow);
+        margin-right: 0.5rem;
+        font-size: 0.9rem;
+    }
+    
+    .result-date {
+        font-size: 0.8rem;
+        color: var(--mtn-gray);
+        background-color: rgba(0, 0, 0, 0.05);
+        padding: 0.25rem 0.5rem;
+        border-radius: 20px;
+    }
+    
+    .similar-results {
+        border-top: 1px solid #eee;
+        padding-top: 1rem;
+        margin-top: 1rem;
+    }
+    
+    .alert {
+        padding: 0.75rem 1rem;
+        margin-bottom: 1rem;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+    }
+    
+    .alert i {
+        margin-right: 0.5rem;
+    }
+    
+    .alert-danger {
+        background-color: #fef2f2;
+        color: #b91c1c;
+        border-left: 3px solid #ef4444;
+    }
+    
+    .alert-success {
+        background-color: #f0fdf4;
+        color: #166534;
+        border-left: 3px solid #22c55e;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 1.5rem;
+        color: var(--mtn-gray);
+    }
+    
+    .empty-state i {
+        font-size: 2rem;
+        color: #ddd;
+        margin-bottom: 1rem;
+        display: block;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="search-page">
+    <div class="container">
+        <div class="search-container">
+            <!-- En-tête de recherche (titre + sous-titre) -->
+            <div class="search-header">
+                <h1 class="search-title">CAPEX Works Valuation Tool</h1>
+                <p class="search-subtitle">Choose one of the following options</p>
+            </div>
+            
+            <!-- Corps principal: messages + options -->
+            <div class="search-form-container">
+                <!-- Messages flash (erreurs, infos) -->
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-info{% endif %}">
+                            <i class="fas {% if message.tags == 'error' %}fa-exclamation-circle{% else %}fa-info-circle{% endif %}"></i>
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+                
+                <div class="row">
+                    <!-- Option 1: Consultation des bons de commande -->
+                    <div class="col-md-6 mb-3">
+                        <a href="{% url 'orders:consultation' %}" class="text-decoration-none">
+                            <div class="card h-100 option-card">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-clipboard-list fa-4x mb-3 option-icon"></i>
+                                    <h4>Delivery Overview </h4>
+                                    <p class="text-muted">View order forms</p>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                    <!-- Option 2: Réception des bons de commande -->
+                    <div class="col-md-6 mb-3">
+                        <a href="{% url 'orders:reception' %}" class="text-decoration-none">
+                            <div class="card h-100 option-card">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-search fa-4x mb-3 option-icon"></i>
+                                    <h4>Register Delivery</h4>
+                                    <p class="text-muted">perform acceptances</p>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- JS léger pour l'interaction visuelle des cartes -->
+<script>
+    $(document).ready(function() {
+        // Effet de survol pour les cartes d'options
+        $('.option-card').hover(function() {
+            $(this).addClass('active');
+        }, function() {
+            $(this).removeClass('active');
+        });
+    });
+</script>
+{% endblock %}

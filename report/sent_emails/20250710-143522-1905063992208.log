@@ -1,0 +1,32 @@
+Content-Type: text/plain; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+Subject: Activation de votre compte
+From: aimegnangui02@gmail.com
+To: aimegnangui02@gmail.com
+Date: Thu, 10 Jul 2025 14:35:22 -0000
+Message-ID: <175215812260.15752.13862363529020320220@TONTON-AIME>
+
+Bonjour aimé,
+
+Votre compte a été créé avec succès.
+
+Voici vos informations de connexion :
+
+- Nom d'utilisateur : mtn
+- Mot de passe temporaire : None
+
+Pour activer votre compte et définir votre mot de passe personnel, veuillez cliquer sur le lien suivant :
+
+http://localhost:8000/users/activation/?username=mtn
+
+---
+
+Si le lien ci-dessus ne fonctionne pas, vous pouvez le copier et le coller dans votre navigateur.
+
+Ce lien est valable pendant 7 jours. Après cette période, vous devrez demander un nouveau lien d'activation.
+
+Cordialement,
+aimé Gnangui
+Administrateur du système
+-------------------------------------------------------------------------------

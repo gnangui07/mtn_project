@@ -1,0 +1,342 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Activation de compte - Gestion des Acceptances{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --mtn-yellow: #FFCC00;
+        --mtn-dark: #111827;
+        --mtn-black: #000000;
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
+        background: linear-gradient(135deg, var(--mtn-black), #222, var(--mtn-dark), var(--mtn-yellow));
+        background-size: 400% 400%;
+        animation: gradientFlow 15s ease infinite;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: 'Segoe UI', sans-serif;
+        overflow-x: hidden;
+        color: #fff;
+        /* Désactive le padding-top du fichier base.html */
+        padding-top: 0 !important;
+    }
+    
+    @keyframes gradientFlow {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+    
+    .activation-container {
+        width: 100%;
+        max-width: 500px;
+        padding: 2rem;
+        background-color: #1a1a1a;
+        border-radius: 10px;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+        position: relative;
+        overflow: hidden;
+        z-index: 1;
+    }
+    
+    .activation-container::before {
+        content: '';
+        position: absolute;
+        top: -5px;
+        left: -5px;
+        right: -5px;
+        bottom: -5px;
+        background: linear-gradient(45deg, var(--mtn-yellow), var(--mtn-dark), var(--mtn-yellow));
+        z-index: -1;
+        border-radius: 15px;
+        animation: borderGlow 3s ease-in-out infinite alternate;
+    }
+    
+    @keyframes borderGlow {
+        0% { filter: blur(10px); opacity: 0.8; }
+        100% { filter: blur(20px); opacity: 1; }
+    }
+
+    .login-container {
+        width: 100%;
+        max-width: 380px;
+        padding: 1rem;
+        z-index: 10;
+        /* Centrage du conteneur */
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }
+
+    .login-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(8px);
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .login-header {
+        text-align: center;
+        background: linear-gradient(145deg, var(--mtn-dark), var(--mtn-black));
+        padding: 1rem;
+        border-radius: 12px;
+        margin-bottom: 1rem;
+        border-bottom: 3px solid var(--mtn-yellow);
+    }
+
+    .login-logo {
+        width: 60px;
+        margin-bottom: 0.5rem;
+    }
+
+    .login-title {
+        color: white;
+        font-size: 1.2rem;
+        font-weight: bold;
+    }
+
+    .login-subtitle {
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 0.85rem;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+        position: relative;
+    }
+
+    .input-field {
+        width: 100%;
+        padding: 10px 35px 10px 40px;
+        border: 1.5px solid #ccc;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.9);
+        font-size: 14px;
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .input-field:focus {
+        outline: none;
+        border-color: var(--mtn-yellow);
+        box-shadow: 0 0 0 3px rgba(255, 204, 0, 0.3);
+    }
+
+    .form-icon {
+        position: absolute;
+        top: 50%;
+        left: 12px;
+        transform: translateY(-50%);
+        color: #888;
+        font-size: 1rem;
+    }
+
+    .input-label {
+        position: absolute;
+        left: 40px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #666;
+        pointer-events: none;
+        transition: 0.3s ease;
+        font-size: 0.85rem;
+    }
+
+    .input-field:focus ~ .input-label,
+    .input-field:not(:placeholder-shown) ~ .input-label {
+        top: -8px;
+        left: 10px;
+        font-size: 0.7rem;
+        background: white;
+        padding: 0 4px;
+        color: var(--mtn-yellow);
+    }
+
+    .password-toggle {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        cursor: pointer;
+        color: #999;
+    }
+
+    .submit-btn {
+        width: 100%;
+        padding: 10px;
+        background: linear-gradient(to right, var(--mtn-yellow), #ffd700);
+        border: none;
+        border-radius: 10px;
+        font-weight: bold;
+        font-size: 1rem;
+        color: var(--mtn-black);
+        cursor: pointer;
+        transition: background 0.3s ease, transform 0.2s ease;
+    }
+
+    .submit-btn:hover {
+        background: linear-gradient(to right, #ffd700, var(--mtn-yellow));
+        transform: translateY(-2px);
+    }
+
+    .alert-danger {
+        background-color: #fef2f2;
+        color: #b91c1c;
+        border: 1px solid #fca5a5;
+        padding: 10px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        font-size: 0.85rem;
+        display: flex;
+        align-items: center;
+    }
+
+    .alert-danger i {
+        margin-right: 8px;
+    }
+    
+    /* Style du pied de page */
+    .login-footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        padding: 10px 0;
+        text-align: center;
+        background-color: rgba(0, 0, 0, 0.7);
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 0.8rem;
+        z-index: 5;
+    }
+    
+    .login-footer p {
+        margin: 0;
+    }
+    
+    .security-icons {
+        margin-bottom: 5px;
+    }
+    
+    .security-icons i {
+        margin: 0 8px;
+        color: var(--mtn-yellow);
+    }
+</style>
+</head>
+<body>
+<!-- Conteneur principal qui prend toute la hauteur et largeur disponible pour le centrage -->
+<div style="height: 100vh; width: 100%; display: flex; justify-content: center; align-items: center;">
+    <div class="activation-container">
+        <div class="text-center mb-4">
+            <img src="{% static 'logo_mtn.jpeg' %}" alt="Logo MTN" style="width: 120px; height: auto; margin-bottom: 1rem;">
+            <h2 style="color: var(--mtn-yellow); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0;">Activation de compte</h2>
+            <div style="width: 50px; height: 4px; background-color: var(--mtn-yellow); margin: 15px auto;"></div>
+            
+            {% if activation_info %}
+            <div style="background-color: rgba(255, 204, 0, 0.1); border-left: 4px solid var(--mtn-yellow); padding: 15px; margin-bottom: 20px; border-radius: 4px;">
+                <i class="fas fa-info-circle" style="color: var(--mtn-yellow);"></i> 
+                <span style="color: #fff;">{{ activation_info }}</span>
+            </div>
+            {% endif %}
+            
+            {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                <div style="background-color: {% if message.tags == 'error' %}rgba(220, 53, 69, 0.1); border-left: 4px solid #dc3545{% elif message.tags == 'success' %}rgba(40, 167, 69, 0.1); border-left: 4px solid #28a745{% else %}rgba(255, 204, 0, 0.1); border-left: 4px solid var(--mtn-yellow){% endif %}; padding: 15px; margin-bottom: 15px; border-radius: 4px;">
+                    <i class="fas {% if message.tags == 'error' %}fa-exclamation-circle{% elif message.tags == 'success' %}fa-check-circle{% else %}fa-info-circle{% endif %}" style="color: {% if message.tags == 'error' %}#dc3545{% elif message.tags == 'success' %}#28a745{% else %}var(--mtn-yellow){% endif %};"></i>
+                    <span style="color: #fff;">{{ message }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <p style="text-align: center; margin-bottom: 20px; color: #999; font-size: 0.9rem;">
+                <i class="fas fa-key" style="color: var(--mtn-yellow); margin-right: 5px;"></i>
+                <strong style="color: var(--mtn-yellow);">Important :</strong> Le mot de passe temporaire vous a été communiqué par email.
+            </p>
+            
+            {% if form.non_field_errors %}
+            <div style="background-color: rgba(220, 53, 69, 0.1); border-left: 4px solid #dc3545; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
+                <i class="fas fa-exclamation-circle" style="color: #dc3545;"></i>
+                <span style="color: #fff;">{{ form.non_field_errors }}</span>
+            </div>
+            {% endif %}
+            
+            <form method="post">
+                {% csrf_token %}
+                
+                <div style="margin-bottom: 25px; position: relative;">
+                    <div style="position: relative; margin-bottom: 5px;">
+                        <i class="fas fa-user" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--mtn-yellow);"></i>
+                        <input 
+                            type="text" 
+                            style="width: 100%; padding: 15px 15px 15px 45px; background-color: #2a2a2a; border: 1px solid #3a3a3a; border-radius: 5px; color: #fff; font-size: 16px; transition: all 0.3s ease;" 
+                            placeholder="Nom d'utilisateur" 
+                            name="username" 
+                            id="id_username"
+                            value="{{ form.username.value|default:'' }}"
+                            required>
+                    </div>
+                    {% if form.username.errors %}
+                    <div style="color: #dc3545; font-size: 0.85rem; margin-top: 5px;">
+                        {{ form.username.errors }}
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div style="margin-bottom: 25px; position: relative;">
+                    <div style="position: relative; margin-bottom: 5px;">
+                        <i class="fas fa-lock" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--mtn-yellow);"></i>
+                        <input 
+                            type="password" 
+                            style="width: 100%; padding: 15px 15px 15px 45px; background-color: #2a2a2a; border: 1px solid #3a3a3a; border-radius: 5px; color: #fff; font-size: 16px; transition: all 0.3s ease;" 
+                            placeholder="Mot de passe temporaire" 
+                            name="mot_de_passe_temporaire" 
+                            id="id_mot_de_passe_temporaire"
+                            required>
+                        <i id="togglePassword" class="fas fa-eye password-toggle" title="Afficher/Masquer le mot de passe" aria-label="Afficher/Masquer le mot de passe"></i>
+                    </div>
+                    {% if form.mot_de_passe_temporaire.errors %}
+                    <div style="color: #dc3545; font-size: 0.85rem; margin-top: 5px;">
+                        {{ form.mot_de_passe_temporaire.errors }}
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div style="text-align: center; margin-top: 30px;">
+                    <button type="submit" style="background-color: var(--mtn-yellow); color: var(--mtn-black); border: none; padding: 15px 30px; border-radius: 5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 5px 15px rgba(255, 204, 0, 0.3);" onmouseover="this.style.backgroundColor='#e6b800'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 20px rgba(255, 204, 0, 0.4)';" onmouseout="this.style.backgroundColor='var(--mtn-yellow)'; this.style.transform='translateY(0)'; this.style.boxShadow='0 5px 15px rgba(255, 204, 0, 0.3)';">
+                        <i class="fas fa-check-circle" style="margin-right: 8px;"></i>Activer mon compte
+                    </button>
+                </div>
+                
+
+            </form>
+        </div>
+    </div>
+</div>
+
+
+
+<script>
+    const togglePassword = document.querySelector('#togglePassword');
+    const passwordField = document.querySelector('#id_mot_de_passe_temporaire');
+
+    if (togglePassword && passwordField) {
+        togglePassword.addEventListener('click', function () {
+            const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordField.setAttribute('type', type);
+            this.classList.toggle('fa-eye');
+            this.classList.toggle('fa-eye-slash');
+        });
+    }
+</script>
+{% endblock %}

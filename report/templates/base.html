@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>{% block title %}CAPEX Works Valuation Tool {% endblock %}</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome local pour les icônes -->
+    <link rel="stylesheet" href="{% static 'css/all.min.css' %}">
+    <style>
+        :root {
+            --mtn-yellow: #FFCC00;
+            --mtn-yellow-light: #FFE066;
+            --mtn-yellow-dark: #E6B800;
+            --mtn-black: #000000;
+            --mtn-dark: #222222;
+            --mtn-gray: #F2F2F2;
+            --mtn-gray-dark: #666666;
+            --mtn-text: #222222;
+            --danger: #D32F2F;
+            --success: #388E3C;
+            --info: #1976D2;
+            --warning: #FFC107;
+            --primary: #222222;
+            --secondary: #666666;
+        }
+        
+        @keyframes gradientBackground {
+            0% { background-position: 0% 0%; }
+            100% { background-position: 100% 100%; }
+        }
+        
+        body {
+            padding-top: 56px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            font-family: 'Segoe UI', sans-serif;
+            color: var(--mtn-text);
+            background: linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%);
+            background-size: 400% 400%;
+            animation: gradientBackground 60s ease infinite alternate;
+            position: relative;
+        }
+        
+        /* Motif diagonal subtil */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0.03;
+            background-image: repeating-linear-gradient(
+                45deg,
+                var(--mtn-yellow) 0,
+                var(--mtn-yellow) 1px,
+                transparent 0,
+                transparent 50px
+            );
+            z-index: 0;
+        }
+        
+        /* Style des icônes */
+        .fas, .far, .fab, .fa {
+            color: var(--mtn-dark);
+            opacity: 0.9;
+        }
+        
+        .btn .fas, .btn .far, .btn .fab, .btn .fa,
+        .nav-link .fas, .nav-link .far, .nav-link .fab, .nav-link .fa {
+            color: inherit;
+        }
+        
+        .navbar-dark .fas, .navbar-dark .far, .navbar-dark .fab, .navbar-dark .fa,
+        .bg-dark .fas, .bg-dark .far, .bg-dark .fab, .bg-dark .fa,
+        .card-header .fas, .card-header .far, .card-header .fab, .card-header .fa {
+            color: white;
+        }
+        
+        .btn-warning .fas, .btn-warning .far, .btn-warning .fab, .btn-warning .fa {
+            color: var(--mtn-black);
+        }
+        
+        .input-group-text .fas, .input-group-text .far, .input-group-text .fab, .input-group-text .fa {
+            color: white;
+        }
+        
+        .content {
+            flex: 1;
+            margin-top: 20px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .footer {
+            margin-top: auto;
+            padding: 1rem 0;
+            background-color: var(--mtn-dark);
+            color: white;
+            border-top: 3px solid var(--mtn-yellow);
+        }
+        
+        .navbar-brand {
+            font-weight: bold;
+        }
+        
+        .navbar-dark.bg-primary {
+            background: var(--mtn-black) !important;
+            border-bottom: 3px solid var(--mtn-yellow);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+        
+        .navbar-brand img {
+            height: 30px;
+            margin-right: 10px;
+        }
+        
+        .navbar-dark .navbar-nav .nav-link {
+            color: rgba(255, 255, 255, 0.85);
+        }
+        
+        .navbar-dark .navbar-nav .nav-link:hover {
+            color: var(--mtn-yellow);
+        }
+        
+        .btn-primary {
+            background-color: var(--mtn-black);
+            border-color: var(--mtn-black);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--mtn-dark);
+            border-color: var(--mtn-dark);
+            color: var(--mtn-yellow);
+        }
+        
+        .btn-danger {
+            background-color: var(--danger);
+            border-color: var(--danger);
+        }
+        
+        .btn-success {
+            background-color: var(--success);
+            border-color: var(--success);
+        }
+        
+        .btn-warning {
+            background-color: var(--mtn-yellow);
+            border-color: var(--mtn-yellow);
+            color: var(--mtn-black);
+            font-weight: bold;
+        }
+        
+        .btn-warning:hover {
+            background-color: var(--mtn-yellow-dark);
+            border-color: var(--mtn-yellow-dark);
+            color: var(--mtn-black);
+        }
+        
+        .card-header.bg-primary {
+            background: var(--mtn-black) !important;
+            color: white;
+            border-bottom: 3px solid var(--mtn-yellow);
+        }
+        
+        .card {
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.1);
+            border: none;
+            background-color: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            position: relative;
+            z-index: 2;
+        }
+        
+        .card::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, var(--mtn-dark) 0%, var(--mtn-yellow) 100%);
+            opacity: 0.4;
+        }
+        
+        .table-hover tbody tr:hover {
+            background-color: rgba(255, 204, 0, 0.1);
+        }
+        
+        /* En-têtes de tableau */
+        .table thead th {
+            background-color: var(--mtn-dark);
+            color: white;
+            border-bottom: 2px solid var(--mtn-yellow);
+        }
+        
+        .progress {
+            height: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            background-color: #e9ecef;
+        }
+        
+        .progress-bar.bg-success {
+            background-color: var(--success) !important;
+        }
+        
+        .progress-bar.bg-warning {
+            background-color: var(--mtn-yellow) !important;
+            color: var(--mtn-black);
+        }
+        
+        .progress-bar.bg-danger {
+            background-color: var(--danger) !important;
+        }
+        
+        .progress-bar {
+            background-color: var(--mtn-black) !important;
+        }
+        
+        .btn-action {
+            white-space: nowrap;
+        }
+        
+        .alert-success {
+            background-color: rgba(0, 153, 0, 0.2);
+            border-color: var(--success);
+            color: var(--success);
+        }
+        
+        .alert-danger {
+            background-color: rgba(230, 0, 0, 0.2);
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+        
+        .alert-info {
+            background-color: rgba(17, 24, 39, 0.1);
+            border-color: var(--mtn-dark);
+            color: var(--mtn-dark);
+        }
+        
+        .alert-warning {
+            background-color: rgba(255, 204, 0, 0.2);
+            border-color: var(--mtn-yellow);
+            color: var(--mtn-black);
+        }
+        
+        .mtn-gradient-border {
+            border-bottom: 3px solid var(--mtn-yellow);
+        }
+        
+        /* Styles spécifiques des sections */
+        .section-heading {
+            color: var(--mtn-dark);
+            border-left: 4px solid var(--mtn-yellow);
+            padding-left: 10px;
+        }
+        
+        /* Style des badges */
+        .badge.bg-primary {
+            background-color: var(--mtn-black) !important;
+        }
+        
+        .badge.bg-warning {
+            background-color: var(--mtn-yellow) !important;
+            color: var(--mtn-black);
+        }
+        
+        /* Style pour les badges de progression */
+        .progress-badge {
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        
+        /* Style des formulaires */
+        .form-control:focus {
+            border-color: var(--mtn-yellow);
+            box-shadow: 0 0 0 0.25rem rgba(255, 204, 0, 0.25);
+        }
+        /* Avatar badge for user dropdown */
+        .avatar-badge {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            background: var(--mtn-yellow);
+            color: var(--mtn-black);
+        }
+        /* Modern navbar look */
+        .navbar.navbar-modern {
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+            backdrop-filter: saturate(130%) blur(6px);
+        }
+        .navbar.navbar-modern .navbar-brand img { height: 28px; }
+        .navbar.navbar-modern .nav-link {
+            border-radius: 999px;
+            color: #fff;
+            opacity: 0.9;
+        }
+        .navbar.navbar-modern .nav-link:hover {
+            background: rgba(255,255,255,0.12);
+            opacity: 1;
+        }
+        .navbar.navbar-modern .nav-link.active {
+            background: rgba(255,255,255,0.2);
+            font-weight: 600;
+        }
+        .navbar.navbar-modern .dropdown-menu {
+            border-radius: .75rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        @media (min-width: 992px){
+            .primary-nav .nav-link { padding: .35rem .75rem; }
+            .utilities-nav .nav-link { padding: .35rem .5rem; }
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body id="app"
+      data-auth="{% if user.is_authenticated %}true{% else %}false{% endif %}"
+      data-username="{{ user.get_full_name|default:user.username|escapejs }}">
+    <!-- Barre de navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top navbar-modern">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center" href="{% url 'core:accueil' %}">
+                <img src="{% static 'logo_mtn.jpeg' %}" alt="Logo MTN">
+                <span class="ms-2">CAPEX Works Valuation Tool </span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarNav">
+                {% if user.is_authenticated %}
+                <!-- Primary links -->
+                <ul class="navbar-nav primary-nav mx-lg-auto ms-lg-5 gap-lg-3">
+                    <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'accueil' %}active{% endif %}" href="{% url 'core:accueil' %}"><i class="fas fa-home me-1"></i> Home</a></li>
+                    <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'reception' %}active{% endif %}" href="{% url 'orders:reception' %}"><i class="fas fa-truck me-1"></i> Delivery</a></li>
+                    <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'consultation' %}active{% endif %}" href="{% url 'orders:consultation' %}"><i class="fas fa-search me-1"></i> Overview</a></li>
+                    <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'msrn_archive' %}active{% endif %}" href="{% url 'orders:msrn_archive' %}"><i class="fas fa-file-pdf me-1"></i> Overview_MSRN </a></li>
+                    <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'po_progress_monitoring' %}active{% endif %}" href="{% url 'orders:po_progress_monitoring' %}"><i class="fas fa-chart-line me-1"></i> PO Progress</a></li>
+                </ul>
+                <!-- Utilities on the right -->
+                <ul class="navbar-nav utilities-nav ms-auto align-items-lg-center gap-lg-2 mt-2 mt-lg-0">
+                    <li class="nav-item">
+                        <button type="button" id="btn-replay-welcome" class="nav-link btn btn-link px-lg-2" title="Réécouter le message de bienvenue">
+                            <i class="fas fa-volume-up me-1"></i><span class="d-lg-none"> Réécouter</span>
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button type="button" id="btn-stop-welcome" class="nav-link btn btn-link px-lg-2" title="Arrêter la note vocale">
+                            <i class="fas fa-stop me-1"></i><span class="d-lg-none"> Stop</span>
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button type="button" id="btn-voice-settings" class="nav-link btn btn-link px-lg-2" title="Paramètres de la voix d'accueil" data-bs-toggle="modal" data-bs-target="#voiceSettingsModal">
+                            <i class="fas fa-cog me-1"></i><span class="d-lg-none"> Voix d'accueil</span>
+                        </button>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center px-lg-2" href="#" id="userMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <span class="avatar-badge">{{ user.username|default:'U'|slice:':1'|upper }}</span>
+                            <span class="ms-2 d-none d-xl-inline">{{ user.get_full_name|default:user.username }}</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
+                            <li class="px-3 py-2 small text-muted">Connected as<br><strong>{{ user.get_full_name|default:user.username }}</strong></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <form method="post" action="{% url 'deconnexion' %}" class="px-3 py-2">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-dark w-100"><i class="fas fa-sign-out-alt me-2"></i> Logout</button>
+                                </form>
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
+                {% else %}
+                
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+    
+
+    <!-- Contenu principal -->
+    <div class="content container py-4">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Pied de page -->
+   
+
+    <!-- Voice Settings Modal -->
+    <div class="modal fade" id="voiceSettingsModal" tabindex="-1" aria-labelledby="voiceSettingsLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="voiceSettingsLabel">Paramètres de la voix d'accueil</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" id="welcomeEnabled">
+              <label class="form-check-label" for="welcomeEnabled">Activer la voix d'accueil</label>
+            </div>
+            <div class="mb-3">
+              <label for="welcomeLang" class="form-label">Langue</label>
+              <select id="welcomeLang" class="form-select">
+                <option value="fr-FR">Français (France)</option>
+                <option value="fr-CA">Français (Canada)</option>
+                <option value="en-US">English (US)</option>
+                <option value="en-GB">English (UK)</option>
+                <option value="es-ES">Español (España)</option>
+                <option value="es-MX">Español (México)</option>
+                <option value="de-DE">Deutsch (Deutschland)</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label for="welcomeVoice" class="form-label">Voix</label>
+              <select id="welcomeVoice" class="form-select">
+                <option value="">Automatique</option>
+              </select>
+              <div class="form-text">Les voix disponibles dépendent du navigateur et du système.</div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+            <button type="button" id="saveVoicePrefs" class="btn btn-primary">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- jQuery (doit être chargé avant Bootstrap) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Welcome Voice (separé) -->
+    <script src="{% static 'js/welcome_voice.js' %}"></script>
+    
+    <!-- Lecture vocale globale après connexion (une seule fois par onglet) -->
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        // Empêcher tout autre script de jouer la voix si ce global est présent
+        window.__WELCOME_TTS_GLOBAL__ = true;
+        const body = document.getElementById('app');
+        const IS_AUTH = body?.dataset?.auth === 'true';
+        const USERNAME = body?.dataset?.username || '';
+
+        // Clefs par utilisateur pour lecture et reprise
+        const PLAY_KEY = `welcomePlayed_${USERNAME || 'anonymous'}`;
+        const RESUME_KEY = `welcomeResume_${USERNAME || 'anonymous'}`;
+        // Ne jouer qu'une fois par onglet (par utilisateur)
+        const alreadyPlayed = sessionStorage.getItem(PLAY_KEY) === 'true';
+        // Reprendre si la voix a été interrompue par une navigation
+        try { window.WelcomeVoice && window.WelcomeVoice.resumeIfNeeded && window.WelcomeVoice.resumeIfNeeded(USERNAME); } catch {}
+        // Si non authentifié, nettoyer toutes les clefs welcome pour éviter les blocages au prochain login
+        if (!IS_AUTH) {
+          try {
+            const toDelete = [];
+            for (let i = 0; i < sessionStorage.length; i++) {
+              const k = sessionStorage.key(i);
+              if (k && (k.startsWith('welcomePlayed_') || k.startsWith('welcomeResume_'))) toDelete.push(k);
+            }
+            toDelete.forEach(k => sessionStorage.removeItem(k));
+            // Réinitialiser le flag runtime
+            try { delete window.__WELCOME_TTS_SPOKEN__; } catch {}
+          } catch {}
+        }
+
+        // Fonction utilitaire pour le CSRF
+        function getCookie(name) {
+          const value = `; ${document.cookie}`;
+          const parts = value.split(`; ${name}=`);
+          if (parts.length === 2) return parts.pop().split(';').shift();
+          return '';
+        }
+
+        // Toast utilitaire
+        function createToast(message) {
+          try {
+            const toast = document.createElement('div');
+            toast.textContent = message;
+            toast.style.position = 'fixed';
+            toast.style.right = '16px';
+            toast.style.bottom = '16px';
+            toast.style.background = 'rgba(17,24,39,0.9)';
+            toast.style.color = '#fff';
+            toast.style.padding = '10px 14px';
+            toast.style.borderRadius = '6px';
+            toast.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+            toast.style.zIndex = '9999';
+            toast.style.fontSize = '0.9rem';
+            document.body.appendChild(toast);
+            setTimeout(() => {
+              toast.style.transition = 'opacity 400ms ease';
+              toast.style.opacity = '0';
+              setTimeout(() => toast.remove(), 450);
+            }, 2000);
+          } catch(e) { console.log(message); }
+        }
+
+        // Préférences (localStorage par utilisateur)
+        const PREFS_KEY = (u) => `welcome_prefs_${u || 'anonymous'}`;
+        function getPrefs() {
+          try {
+            const raw = localStorage.getItem(PREFS_KEY(USERNAME));
+            const parsed = raw ? JSON.parse(raw) : null;
+            return Object.assign({ enabled: true, lang: 'fr-FR', voiceName: '' }, parsed || {});
+          } catch { return { enabled: true, lang: 'fr-FR', voiceName: '' }; }
+        }
+        function savePrefs(p) {
+          try { localStorage.setItem(PREFS_KEY(USERNAME), JSON.stringify(p)); } catch {}
+        }
+
+        function playWelcomeSound(username) {
+          if (window.__WELCOME_TTS_SPOKEN__) return;
+          if (!window.WelcomeVoice || !window.WelcomeVoice.play) return;
+          window.WelcomeVoice.play(username);
+        }
+
+        // Initialiser UI et lecture auto
+        function initVoiceUI() {
+          const prefs = getPrefs();
+          const enabledEl = document.getElementById('welcomeEnabled');
+          const langEl = document.getElementById('welcomeLang');
+          const voiceEl = document.getElementById('welcomeVoice');
+          if (enabledEl) enabledEl.checked = !!prefs.enabled;
+          if (langEl && prefs.lang) langEl.value = prefs.lang;
+          // Remplir les voix selon la langue choisie
+          function populateVoices() {
+            if (!voiceEl) return;
+            const selLang = (langEl && langEl.value) || prefs.lang || 'fr-FR';
+            const vs = window.speechSynthesis.getVoices();
+            const filtered = vs.filter(v => v.lang && v.lang.toLowerCase().includes(selLang.toLowerCase()));
+            voiceEl.innerHTML = '<option value="">Automatique</option>' + filtered.map(v => `<option value="${v.name}">${v.name} (${v.lang})</option>`).join('');
+            if (prefs.voiceName) voiceEl.value = prefs.voiceName;
+          }
+          populateVoices();
+          if (window.speechSynthesis && typeof window.speechSynthesis.onvoiceschanged !== 'undefined') {
+            window.speechSynthesis.onvoiceschanged = populateVoices;
+          }
+          if (langEl) langEl.addEventListener('change', populateVoices);
+          const saveBtn = document.getElementById('saveVoicePrefs');
+          if (saveBtn) {
+            saveBtn.addEventListener('click', () => {
+              const newPrefs = {
+                enabled: enabledEl ? enabledEl.checked : true,
+                lang: langEl ? langEl.value : 'fr-FR',
+                voiceName: voiceEl ? voiceEl.value : ''
+              };
+              savePrefs(newPrefs);
+              // Push to server if authenticated
+              if (IS_AUTH) {
+                try {
+                  fetch('/users/voice-prefs/set/', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({
+                      enabled: newPrefs.enabled,
+                      lang: newPrefs.lang,
+                      voiceName: newPrefs.voiceName
+                    })
+                  }).catch(() => {});
+                } catch (e) {}
+              }
+              createToast('Préférences de voix enregistrées');
+            });
+          }
+        }
+
+        // Télécharger les préférences serveur et fusionner dans localStorage
+        async function syncPrefsFromServer() {
+          if (!IS_AUTH) return;
+          try {
+            const res = await fetch('/users/voice-prefs/', { headers: { 'Cache-Control': 'no-cache' } });
+            if (!res.ok) return;
+            const srv = await res.json();
+            const merged = Object.assign(getPrefs(), {
+              enabled: typeof srv.enabled === 'boolean' ? srv.enabled : getPrefs().enabled,
+              lang: srv.lang || getPrefs().lang,
+              voiceName: srv.voiceName || getPrefs().voiceName
+            });
+            savePrefs(merged);
+          } catch {}
+        }
+
+        (async () => {
+          await syncPrefsFromServer();
+          initVoiceUI();
+        })();
+
+        // Lecture automatique après login si activée et pas encore jouée
+        if (IS_AUTH && !alreadyPlayed) {
+          const prefs = getPrefs();
+          if (prefs.enabled) {
+            setTimeout(() => {
+              try { playWelcomeSound(USERNAME); } catch (e) {}
+              try {
+                fetch('/users/play-welcome-sound/', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                  },
+                  body: JSON.stringify({})
+                }).catch(() => {});
+              } catch (e) {}
+              sessionStorage.setItem(PLAY_KEY, 'true');
+            }, 800);
+          }
+        }
+
+        // Bouton Réécouter (ne dépend pas de welcomePlayed)
+        const replayBtn = document.getElementById('btn-replay-welcome');
+        if (replayBtn) {
+          replayBtn.addEventListener('click', () => {
+            const prefs = getPrefs();
+            if (!prefs.enabled) {
+              createToast("La voix d'accueil est désactivée dans les préférences");
+              return;
+            }
+            // Permettre une réécoute même si déjà joué automatiquement
+            try { delete window.__WELCOME_TTS_SPOKEN__; } catch {}
+            // Enlever le drapeau d'arrêt pour autoriser une nouvelle lecture
+            try { sessionStorage.removeItem(`welcomeStop_${USERNAME || 'anonymous'}`); } catch {}
+            try { playWelcomeSound(USERNAME); } catch (e) {}
+          });
+        }
+
+        // Bouton Stop voix
+        const stopBtn = document.getElementById('btn-stop-welcome');
+        if (stopBtn) {
+          stopBtn.addEventListener('click', () => {
+            try { window.WelcomeVoice && window.WelcomeVoice.stop && window.WelcomeVoice.stop(USERNAME); } catch {}
+            try { createToast('Lecture arrêtée'); } catch {}
+          });
+        }
+      });
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

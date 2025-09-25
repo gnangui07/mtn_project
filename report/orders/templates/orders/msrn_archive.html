@@ -1,0 +1,188 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}MSRN Archive{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'orders/css/msrn_archive.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4 msrn-archive">
+  <h2>MSRN Archive</h2>
+
+  <!-- Barre de recherche et filtres -->
+  <form method="get" class="row g-2 align-items-end mb-3">
+    <div class="col-sm-4">
+      <label for="q" class="form-label">Search</label>
+      <input type="text" id="q" name="q" value="{{ q }}" class="form-control" placeholder="MSRN Number, PO...">
+    </div>
+    <div class="col-sm-3">
+      <label for="with_retention" class="form-label">Retention</label>
+      <select name="with_retention" id="with_retention" class="form-select">
+        <option value="" {% if not with_retention %}selected{% endif %}>All</option>
+        <option value="1" {% if with_retention == '1' %}selected{% endif %}>With Payment Retention </option>
+        <option value="0" {% if with_retention == '0' %}selected{% endif %}>Without Payment Retention</option>
+      </select>
+    </div>
+    <div class="col-sm-2">
+      <button type="submit" class="btn btn-primary w-100">Filter</button>
+    </div>
+    <div class="col-sm-3 text-end">
+      <a href="{% url 'orders:msrn_archive' %}" class="btn btn-outline-secondary">Reset</a>
+    </div>
+  </form>
+
+  <!-- Tableau des rapports -->
+  <div class="table-responsive">
+    <table class="table table-striped table-hover align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>MSRN Number </th>
+          <th>Purchase order</th>
+          <th>Delivery Rate </th>
+          <th>Payment Retention rate</th>
+          <th>Created</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if reports and reports.object_list %}
+          {% for r in reports.object_list %}
+          <tr>
+            <td>{{ r.report_number }}</td>
+            <td>{% if r.bon_commande %}{{ r.bon_commande.numero }}{% else %}—{% endif %}</td>
+            <td>
+              {% if r.progress_rate_snapshot %}
+                {{ r.progress_rate_snapshot|floatformat:'2' }}%
+              {% else %}
+                0.00%
+              {% endif %}
+            </td>
+            <td>
+              {% if r.retention_rate %}
+                <span class="badge bg-info">{{ r.retention_rate }}%</span>
+                {% if r.retention_cause %}
+                  <span class="d-none retention-cause">{{ r.retention_cause }}</span>
+                  <i class="fas fa-info-circle text-muted" data-bs-toggle="tooltip" title="{{ r.retention_cause }}"></i>
+                {% endif %}
+              {% else %}
+                <span class="badge bg-secondary">0%</span>
+              {% endif %}
+            </td>
+            <td>{{ r.created_at|date:'Y-m-d H:i' }}</td>
+            <td class="actions-col">
+              <div class="btn-group btn-group-sm" role="group">
+                <button type="button"
+                        class="btn btn-outline-primary download-msrn"
+                        data-report-id="{{ r.id }}">
+                  <i class="fas fa-download"></i> Download
+                </button>
+                <button type="button"
+                        class="btn btn-outline-secondary set-retention-btn"
+                        data-report-id="{{ r.id }}"
+                        data-report-number="{{ r.report_number }}"
+                        data-retention-rate="{{ r.retention_rate|default:'0' }}"
+                        data-retention-cause="{{ r.retention_cause|default:'' }}">
+                  <i class="fas fa-percentage"></i> Define Retention on Payment 
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="5" class="text-center text-muted">No MSRN found.</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if reports and reports.paginator.num_pages > 1 %}
+  <nav aria-label="Pagination">
+    <ul class="pagination justify-content-center">
+      {% if reports.has_previous %}
+      <li class="page-item">
+        <a class="page-link" href="?page={{ reports.previous_page_number }}&q={{ q }}&with_retention={{ with_retention }}" aria-label="Previous">
+          <span aria-hidden="true">&laquo;</span>
+        </a>
+      </li>
+      {% else %}
+      <li class="page-item disabled"><span class="page-link">&laquo;</span></li>
+      {% endif %}
+
+      {% for p in reports.paginator.page_range %}
+        {% if p == reports.number %}
+          <li class="page-item active" aria-current="page"><span class="page-link">{{ p }}</span></li>
+        {% else %}
+          <li class="page-item"><a class="page-link" href="?page={{ p }}&q={{ q }}&with_retention={{ with_retention }}">{{ p }}</a></li>
+        {% endif %}
+      {% endfor %}
+
+      {% if reports.has_next %}
+      <li class="page-item">
+        <a class="page-link" href="?page={{ reports.next_page_number }}&q={{ q }}&with_retention={{ with_retention }}" aria-label="Next">
+          <span aria-hidden="true">&raquo;</span>
+        </a>
+      </li>
+      {% else %}
+      <li class="page-item disabled"><span class="page-link">&raquo;</span></li>
+      {% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+
+<!-- Modal personnalisé pour définir la rétention -->
+<div class="custom-modal" id="retentionModal">
+  <div class="custom-modal-overlay"></div>
+  <div class="custom-modal-container">
+    <div class="custom-modal-header">
+      <h5 class="custom-modal-title">Define Retention on Payment for MSRN-<span id="msrn-number"></span></h5>
+      <button type="button" class="custom-modal-close" id="close-modal">&times;</button>
+    </div>
+    <div class="custom-modal-body">
+      <form id="retentionForm">
+        <input type="hidden" id="msrn-id" name="msrn_id" value="">
+        
+        <div class="form-group mb-3">
+          <label for="retention-rate" class="form-label">Payment Retention rate (%)</label>
+          <div class="input-group">
+            <input type="number" class="form-control" id="retention-rate" name="retention_rate" min="0" max="10" step="0.01" required>
+            <span class="input-group-text">%</span>
+          </div>
+          <div class="form-text">Value between 0 and 10%</div>
+        </div>
+        
+        <div class="form-group mb-3" id="retention-cause-group">
+          <label for="retention-cause" class="form-label">Retention Cause</label>
+          <textarea class="form-control" id="retention-cause" name="retention_cause" rows="3"></textarea>
+          <div class="form-text text-danger d-none" id="cause-required-message">The cause is required for a rate greater than 0%</div>
+        </div>
+        
+        <div class="alert alert-info" id="retention-info">
+          <p><strong>Informations:</strong></p>
+          <p> The modification of Payment retention rate will recalculate :</p>
+          <ul>
+            <li>Retention Amount</li>
+            <li>Payable Amount</li>
+            <li>Payable Quantity</li>
+          </ul>
+          <p>An updated MSRN will be generated.</p>
+        </div>
+      </form>
+    </div>
+    <div class="custom-modal-footer">
+      <button type="button" class="btn btn-secondary" id="cancel-modal">Cancel</button>
+      <button type="button" class="btn btn-primary" id="save-retention">Generate</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="{% static 'orders/js/msrn_archive.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,177 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Définir votre mot de passe - Gestion des Bons de Commande{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --mtn-yellow: #FFCC00;
+        --mtn-dark: #111827;
+        --mtn-black: #000000;
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
+        background: linear-gradient(135deg, var(--mtn-black), #222, var(--mtn-dark), var(--mtn-yellow));
+        background-size: 400% 400%;
+        animation: gradientFlow 15s ease infinite;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: 'Segoe UI', sans-serif;
+        overflow-x: hidden;
+        color: #fff;
+        /* Désactive le padding-top du fichier base.html */
+        padding-top: 0 !important;
+    }
+    
+    @keyframes gradientFlow {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+
+    .activation-container {
+        width: 100%;
+        max-width: 500px;
+        padding: 2rem;
+        background-color: #1a1a1a;
+        border-radius: 10px;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+        position: relative;
+        overflow: hidden;
+        z-index: 1;
+    }
+    
+    .activation-container::before {
+        content: '';
+        position: absolute;
+        top: -5px;
+        left: -5px;
+        right: -5px;
+        bottom: -5px;
+        background: linear-gradient(45deg, var(--mtn-yellow), var(--mtn-dark), var(--mtn-yellow));
+        z-index: -1;
+        border-radius: 15px;
+        animation: borderGlow 3s ease-in-out infinite alternate;
+    }
+    
+    @keyframes borderGlow {
+        0% { filter: blur(10px); opacity: 0.8; }
+        100% { filter: blur(20px); opacity: 1; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="height: 100vh; width: 100%; display: flex; justify-content: center; align-items: center;">
+    <div class="activation-container">
+        <div style="text-align: center; margin-bottom: 1.5rem;">
+            <img src="{% static 'logo_mtn.jpeg' %}" alt="Logo MTN" style="width: 120px; height: auto; margin-bottom: 1rem;">
+            <h2 style="color: var(--mtn-yellow); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0;">Définir votre mot de passe</h2>
+            <div style="width: 50px; height: 4px; background-color: var(--mtn-yellow); margin: 15px auto;"></div>
+        </div>
+
+        <div style="background-color: rgba(255, 204, 0, 0.1); border-left: 4px solid var(--mtn-yellow); padding: 15px; margin-bottom: 20px; border-radius: 4px;">
+            <i class="fas fa-info-circle" style="color: var(--mtn-yellow);"></i> 
+            <span style="color: #fff;">Veuillez choisir un nouveau mot de passe pour finaliser l'activation de votre compte.</span>
+        </div>
+        
+        {% if messages %}
+        <div class="messages">
+            {% for message in messages %}
+            <div style="background-color: {% if message.tags == 'error' %}rgba(220, 53, 69, 0.1); border-left: 4px solid #dc3545{% elif message.tags == 'success' %}rgba(40, 167, 69, 0.1); border-left: 4px solid #28a745{% else %}rgba(255, 204, 0, 0.1); border-left: 4px solid var(--mtn-yellow){% endif %}; padding: 15px; margin-bottom: 15px; border-radius: 4px;">
+                <i class="fas {% if message.tags == 'error' %}fa-exclamation-circle{% elif message.tags == 'success' %}fa-check-circle{% else %}fa-info-circle{% endif %}" style="color: {% if message.tags == 'error' %}#dc3545{% elif message.tags == 'success' %}#28a745{% else %}var(--mtn-yellow){% endif %};"></i>
+                <span style="color: #fff;">{{ message }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        
+        {% if form.non_field_errors %}
+        <div style="background-color: rgba(220, 53, 69, 0.1); border-left: 4px solid #dc3545; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
+            <i class="fas fa-exclamation-circle" style="color: #dc3545;"></i>
+            <span style="color: #fff;">{{ form.non_field_errors }}</span>
+        </div>
+        {% endif %}
+        
+        <form method="post">
+            {% csrf_token %}
+            
+            <div style="margin-bottom: 25px; position: relative;">
+                <div style="position: relative; margin-bottom: 5px;">
+                    <i class="fas fa-lock" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--mtn-yellow);"></i>
+                    <input 
+                        type="password" 
+                        style="width: 100%; padding: 15px 15px 15px 45px; background-color: #2a2a2a; border: 1px solid #3a3a3a; border-radius: 5px; color: #fff; font-size: 16px; transition: all 0.3s ease;" 
+                        placeholder="Nouveau mot de passe" 
+                        name="new_password1" 
+                        id="id_new_password1"
+                        required>
+                    <i class="fas fa-eye" id="togglePassword1" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: var(--mtn-yellow); cursor: pointer;"></i>
+                </div>
+                {% if form.new_password1.errors %}
+                <div style="color: #dc3545; font-size: 0.85rem; margin-top: 5px;">
+                    {{ form.new_password1.errors }}
+                </div>
+                {% endif %}
+                <div style="color: #999; font-size: 0.8rem; margin-top: 5px;">
+                    <p>Votre mot de passe doit contenir au moins 8 caractères.</p>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 25px; position: relative;">
+                <div style="position: relative; margin-bottom: 5px;">
+                    <i class="fas fa-lock" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--mtn-yellow);"></i>
+                    <input 
+                        type="password" 
+                        style="width: 100%; padding: 15px 15px 15px 45px; background-color: #2a2a2a; border: 1px solid #3a3a3a; border-radius: 5px; color: #fff; font-size: 16px; transition: all 0.3s ease;" 
+                        placeholder="Confirmer le mot de passe" 
+                        name="new_password2" 
+                        id="id_new_password2"
+                        required>
+                    <i class="fas fa-eye" id="togglePassword2" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: var(--mtn-yellow); cursor: pointer;"></i>
+                </div>
+                {% if form.new_password2.errors %}
+                <div style="color: #dc3545; font-size: 0.85rem; margin-top: 5px;">
+                    {{ form.new_password2.errors }}
+                </div>
+                {% endif %}
+                <div style="color: #999; font-size: 0.8rem; margin-top: 5px;">
+                    <p>Entrez le même mot de passe que précédemment, pour vérification.</p>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px;">
+                <button type="submit" style="background-color: var(--mtn-yellow); color: var(--mtn-black); border: none; padding: 15px 30px; border-radius: 5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 5px 15px rgba(255, 204, 0, 0.3);" onmouseover="this.style.backgroundColor='#e6b800'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 20px rgba(255, 204, 0, 0.4)';" onmouseout="this.style.backgroundColor='var(--mtn-yellow)'; this.style.transform='translateY(0)'; this.style.boxShadow='0 5px 15px rgba(255, 204, 0, 0.3)';">
+                    <i class="fas fa-check-circle" style="margin-right: 8px;"></i>Activer mon compte
+                </button>
+            </div>
+            
+
+        </form>
+    </div>
+</div>
+
+<script>
+    // Script pour afficher/masquer le mot de passe
+    document.getElementById('togglePassword1').addEventListener('click', function() {
+        const passwordField = document.getElementById('id_new_password1');
+        const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordField.setAttribute('type', type);
+        this.classList.toggle('fa-eye');
+        this.classList.toggle('fa-eye-slash');
+    });
+    
+    document.getElementById('togglePassword2').addEventListener('click', function() {
+        const passwordField = document.getElementById('id_new_password2');
+        const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordField.setAttribute('type', type);
+        this.classList.toggle('fa-eye');
+        this.classList.toggle('fa-eye-slash');
+    });
+</script>
+{% endblock %}
