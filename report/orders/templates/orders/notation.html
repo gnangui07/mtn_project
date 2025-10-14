@@ -1,0 +1,565 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Vendor Evaluation - {{ bon_commande.numero }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .evaluation-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .evaluation-header {
+        background: linear-gradient(135deg, #FFCC00 0%, #E6B800 100%);
+        color: #000000;
+        padding: 30px;
+        border-radius: 15px;
+        margin-bottom: 30px;
+        box-shadow: 0 10px 30px rgba(255, 204, 0, 0.3);
+    }
+    
+    .evaluation-header h1 {
+        margin: 0;
+        font-size: 2.5rem;
+        font-weight: 300;
+    }
+    
+    .po-info {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+    }
+    
+    .po-info-item {
+        background: rgba(0,0,0,0.1);
+        padding: 15px;
+        border-radius: 10px;
+        backdrop-filter: blur(10px);
+    }
+    
+    .po-info-label {
+        font-size: 0.9rem;
+        opacity: 0.8;
+        margin-bottom: 5px;
+    }
+    
+    .po-info-value {
+        font-size: 1.2rem;
+        font-weight: 500;
+    }
+    
+    .criteria-table {
+        background: white;
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        margin-bottom: 30px;
+    }
+    
+    .criteria-table-header {
+        background: #f8f9fa;
+        padding: 20px;
+        border-bottom: 2px solid #e9ecef;
+    }
+    
+    .criteria-table-header h3 {
+        margin: 0;
+        color: #495057;
+        font-weight: 600;
+    }
+    
+    .criteria-row {
+        display: grid;
+        grid-template-columns: 2fr 1fr 3fr;
+        align-items: center;
+        padding: 20px;
+        border-bottom: 1px solid #e9ecef;
+        transition: background-color 0.3s ease;
+    }
+    
+    .criteria-row:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .criteria-row:last-child {
+        border-bottom: none;
+    }
+    
+    .criteria-name {
+        font-weight: 600;
+        color: #495057;
+        font-size: 1.1rem;
+    }
+    
+    .score-selector {
+        display: flex;
+        justify-content: center;
+    }
+    
+    .score-select {
+        padding: 10px 15px;
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        background: white;
+        color: #495057;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        min-width: 80px;
+        text-align: center;
+    }
+    
+    .score-select:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .score-select:hover {
+        border-color: #667eea;
+    }
+    
+    .criteria-description {
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        font-style: italic;
+        color: #6c757d;
+        min-height: 50px;
+        display: flex;
+        align-items: center;
+        transition: all 0.3s ease;
+    }
+    
+    .criteria-description.active {
+        background: #e3f2fd;
+        color: #1976d2;
+        border-left: 4px solid #2196f3;
+    }
+    
+    .action-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        margin-top: 30px;
+    }
+    
+    .btn-save {
+        background: linear-gradient(135deg, #FFCC00 0%, #E6B800 100%);
+        border: 2px solid #000000;
+        color: #000000;
+        padding: 15px 40px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-radius: 50px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 5px 15px rgba(255, 204, 0, 0.3);
+    }
+    
+    .btn-save:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(255, 204, 0, 0.4);
+        background: linear-gradient(135deg, #E6B800 0%, #FFCC00 100%);
+    }
+    
+    .btn-cancel {
+        background: #000000;
+        border: 2px solid #FFCC00;
+        color: #FFCC00;
+        padding: 15px 40px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-radius: 50px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .btn-cancel:hover {
+        background: #222222;
+        color: #FFCC00;
+        text-decoration: none;
+        transform: translateY(-2px);
+    }
+    
+    .score-summary {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        margin-bottom: 30px;
+    }
+    
+    .score-summary h4 {
+        color: #495057;
+        margin-bottom: 20px;
+        text-align: center;
+    }
+    
+    .score-display {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+        text-align: center;
+    }
+    
+    .score-item {
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 10px;
+        border-left: 4px solid #667eea;
+    }
+    
+    .score-label {
+        font-size: 0.9rem;
+        color: #6c757d;
+        margin-bottom: 5px;
+    }
+    
+    .score-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #495057;
+    }
+    
+    
+    @media (max-width: 768px) {
+        .criteria-row {
+            grid-template-columns: 1fr;
+            gap: 15px;
+            text-align: center;
+        }
+        
+        .po-info {
+            grid-template-columns: 1fr;
+        }
+        
+        .action-buttons {
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .btn-save, .btn-cancel {
+            width: 100%;
+            max-width: 300px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="evaluation-container">
+    <!-- En-tête avec informations du bon de commande -->
+    <div class="evaluation-header">
+        <h1><i class="fas fa-star me-3"></i>Vendor Evaluation</h1>
+        <div class="po-info">
+            <div class="po-info-item">
+                <div class="po-info-label">Purchase Order Number</div>
+                <div class="po-info-value">{{ bon_commande.numero }}</div>
+            </div>
+            <div class="po-info-item">
+                <div class="po-info-label">Supplier</div>
+                <div class="po-info-value">{{ supplier }}</div>
+            </div>
+            <div class="po-info-item">
+                <div class="po-info-label">PO Amount</div>
+                <div class="po-info-value">{{ bon_commande.montant_total|floatformat:0|intcomma }} {{ bon_commande.get_currency }}</div>
+            </div>
+            <div class="po-info-item">
+                <div class="po-info-label">Delivery Rate</div>
+                <div class="po-info-value">{{ bon_commande.taux_avancement|floatformat:2 }}%</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulaire d'évaluation -->
+    <form method="post" id="evaluationForm">
+        {% csrf_token %}
+        
+        <!-- Résumé des scores -->
+        <div class="score-summary">
+            <h4><i class="fas fa-chart-bar me-2"></i>Evaluation Summary</h4>
+            <div class="score-display">
+                <div class="score-item">
+                    <div class="score-label">Total Score</div>
+                    <div class="score-value" id="totalScore">0/50</div>
+                </div>
+                <div class="score-item">
+                    <div class="score-label">Vendor Final Rating</div>
+                    <div class="score-value" id="vendorFinalRating">0.0/10</div>
+                </div>
+                <div class="score-item">
+                    <div class="score-label">Completion</div>
+                    <div class="score-value" id="completionRate">0%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tableau des critères -->
+        <div class="criteria-table">
+            <div class="criteria-table-header">
+                <h3><i class="fas fa-clipboard-list me-2"></i>Evaluation Criteria</h3>
+            </div>
+            
+            <!-- Delivery Compliance to Order -->
+            <div class="criteria-row">
+                <div class="criteria-name">Delivery Compliance to Order (Quantity & Quality)</div>
+                <div class="score-selector">
+                    <select name="delivery_compliance" class="score-select" data-criteria="delivery_compliance" required>
+                        <option value="">-</option>
+                        {% for i in "0123456789" %}
+                        <option value="{{ i }}" {% if evaluation.delivery_compliance == i|add:0 %}selected{% endif %}>{{ i }}</option>
+                        {% endfor %}
+                        <option value="10" {% if evaluation.delivery_compliance == 10 %}selected{% endif %}>10</option>
+                    </select>
+                </div>
+                <div class="criteria-description" id="desc_delivery_compliance">
+                    Sélectionnez une note pour voir la description du critère
+                </div>
+            </div>
+
+            <!-- Delivery Execution Timeline -->
+            <div class="criteria-row">
+                <div class="criteria-name">Delivery Execution Timeline</div>
+                <div class="score-selector">
+                    <select name="delivery_timeline" class="score-select" data-criteria="delivery_timeline" required>
+                        <option value="">-</option>
+                        {% for i in "0123456789" %}
+                        <option value="{{ i }}" {% if evaluation.delivery_timeline == i|add:0 %}selected{% endif %}>{{ i }}</option>
+                        {% endfor %}
+                        <option value="10" {% if evaluation.delivery_timeline == 10 %}selected{% endif %}>10</option>
+                    </select>
+                </div>
+                <div class="criteria-description" id="desc_delivery_timeline">
+                    Sélectionnez une note pour voir la description du critère
+                </div>
+            </div>
+
+            <!-- Vendor Advising Capability -->
+            <div class="criteria-row">
+                <div class="criteria-name">Vendor Advising Capability</div>
+                <div class="score-selector">
+                    <select name="advising_capability" class="score-select" data-criteria="advising_capability" required>
+                        <option value="">-</option>
+                        {% for i in "0123456789" %}
+                        <option value="{{ i }}" {% if evaluation.advising_capability == i|add:0 %}selected{% endif %}>{{ i }}</option>
+                        {% endfor %}
+                        <option value="10" {% if evaluation.advising_capability == 10 %}selected{% endif %}>10</option>
+                    </select>
+                </div>
+                <div class="criteria-description" id="desc_advising_capability">
+                    Sélectionnez une note pour voir la description du critère
+                </div>
+            </div>
+
+            <!-- After Sales Services QOS -->
+            <div class="criteria-row">
+                <div class="criteria-name">After Sales Services QOS</div>
+                <div class="score-selector">
+                    <select name="after_sales_qos" class="score-select" data-criteria="after_sales_qos" required>
+                        <option value="">-</option>
+                        {% for i in "0123456789" %}
+                        <option value="{{ i }}" {% if evaluation.after_sales_qos == i|add:0 %}selected{% endif %}>{{ i }}</option>
+                        {% endfor %}
+                        <option value="10" {% if evaluation.after_sales_qos == 10 %}selected{% endif %}>10</option>
+                    </select>
+                </div>
+                <div class="criteria-description" id="desc_after_sales_qos">
+                    Sélectionnez une note pour voir la description du critère
+                </div>
+            </div>
+
+            <!-- Vendor Relationship -->
+            <div class="criteria-row">
+                <div class="criteria-name">Vendor Relationship</div>
+                <div class="score-selector">
+                    <select name="vendor_relationship" class="score-select" data-criteria="vendor_relationship" required>
+                        <option value="">-</option>
+                        {% for i in "0123456789" %}
+                        <option value="{{ i }}" {% if evaluation.vendor_relationship == i|add:0 %}selected{% endif %}>{{ i }}</option>
+                        {% endfor %}
+                        <option value="10" {% if evaluation.vendor_relationship == 10 %}selected{% endif %}>10</option>
+                    </select>
+                </div>
+                <div class="criteria-description" id="desc_vendor_relationship">
+                    Sélectionnez une note pour voir la description du critère
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Boutons d'action -->
+        <div class="action-buttons">
+            <button type="submit" class="btn-save">
+                <i class="fas fa-save me-2"></i>Save Evaluation
+            </button>
+            {% if fichier_id %}
+            <a href="{% url 'orders:details_bon' bon_id=fichier_id %}?selected_order_number={{ bon_commande.numero }}" class="btn-cancel">
+                <i class="fas fa-times me-2"></i>Cancel
+            </a>
+            {% else %}
+            <a href="{% url 'orders:accueil' %}" class="btn-cancel">
+                <i class="fas fa-times me-2"></i>Cancel
+            </a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Critères et descriptions
+const criteriaDescriptions = {
+    'delivery_compliance': {
+        0: 'Non conforme',
+        1: 'Non conforme',
+        2: 'Conformité : 25% par rapport au besoin exprimé',
+        3: 'Conformité : 25% par rapport au besoin exprimé',
+        4: 'Conformité : 25% par rapport au besoin exprimé',
+        5: 'Conformité : 50% par rapport au besoin exprimé',
+        6: 'Conformité : 50% par rapport au besoin exprimé',
+        7: 'Conforme au besoin',
+        8: 'Conforme au besoin',
+        9: 'Conforme au besoin',
+        10: 'Supérieure / Meilleur que le besoin exprimé par MTN CI mais au même coût'
+    },
+    'delivery_timeline': {
+        0: 'Aucune livraison effectuée',
+        1: 'Aucune livraison effectuée',
+        2: 'Retard dans la livraison sans le notifier à MTN CI',
+        3: 'Retard dans la livraison sans le notifier à MTN CI',
+        4: 'Retard négocié avec MTN CI et non respect du nouveau planning avec explication donné à MTN',
+        5: 'Retard négocié avec MTN CI et non respect du nouveau planning avec explication donné à MTN',
+        6: 'Retard négocié avec MTN CI et non respect du nouveau planning avec explication donné à MTN',
+        7: 'Respect des délais',
+        8: 'Respect des délais',
+        9: 'Respect des délais',
+        10: 'En avance sur le délai de livraison prévue'
+    },
+    'advising_capability': {
+        0: 'Conseil inexistant',
+        1: 'Conseil inexistant',
+        2: 'Sur demande de MTN CI - Conseil donné mais pas utile',
+        3: 'Sur demande de MTN CI - Conseil donné mais pas utile',
+        4: 'Sur demande de MTN CI - Conseil donné utile mais incomplet',
+        5: 'Sur demande de MTN CI - Conseil donné utile mais incomplet',
+        6: 'Sur demande de MTN CI - Conseil donné utile mais incomplet',
+        7: 'Capacité à conseiller répond à nos attentes',
+        8: 'Capacité à conseiller répond à nos attentes',
+        9: 'Capacité à conseiller répond à nos attentes',
+        10: 'Transfert de compétence & formation régulière du client'
+    },
+    'after_sales_qos': {
+        0: 'SAV inexistant',
+        1: 'SAV inexistant',
+        2: 'Pas adapté à nos attentes',
+        3: 'Pas adapté à nos attentes',
+        4: 'Adapté à 50% à nos attentes sans respecter les délais',
+        5: 'Adapté à 50% à nos attentes sans respecter les délais',
+        6: 'Adapté à 50% à nos attentes sans respecter les délais',
+        7: '100% des requêtes et des plaintes résolues dans les délais',
+        8: '100% des requêtes et des plaintes résolues dans les délais',
+        9: '100% des requêtes et des plaintes résolues dans les délais',
+        10: 'Anticipation des problèmes / Aucun incident n\'est à signaler'
+    },
+    'vendor_relationship': {
+        0: 'Aucun contact',
+        1: 'Aucun contact',
+        2: 'Injoignable en dehors des visites / événements / pendant l\'exécution d\'une commande',
+        3: 'Injoignable en dehors des visites / événements / pendant l\'exécution d\'une commande',
+        4: 'Joignable après 2 ou 3 jours de relance, rappels …',
+        5: 'Joignable après 2 ou 3 jours de relance, rappels …',
+        6: 'Joignable après 2 ou 3 jours de relance, rappels …',
+        7: 'Bon contact / Prestataire réactif',
+        8: 'Bon contact / Prestataire réactif',
+        9: 'Bon contact / Prestataire réactif',
+        10: 'Bon contact / Prestataire très réactif'
+    }
+};
+
+// Fonction pour mettre à jour la description
+function updateDescription(criteria, score) {
+    const descElement = document.getElementById(`desc_${criteria}`);
+    if (score === '' || score === null) {
+        descElement.textContent = 'Sélectionnez une note pour voir la description du critère';
+        descElement.classList.remove('active');
+    } else {
+        const description = criteriaDescriptions[criteria][parseInt(score)];
+        descElement.textContent = description || `Score: ${score}`;
+        descElement.classList.add('active');
+    }
+}
+
+// Fonction pour calculer et afficher les scores
+function updateScoreSummary() {
+    const selects = document.querySelectorAll('.score-select');
+    let totalScore = 0;
+    let completedCriteria = 0;
+    
+    selects.forEach(select => {
+        const value = parseInt(select.value);
+        if (!isNaN(value)) {
+            totalScore += value;
+            completedCriteria++;
+        }
+    });
+    
+    const vendorFinalRating = completedCriteria > 0 ? (totalScore / completedCriteria) : 0;
+    const completionRate = (completedCriteria / selects.length) * 100;
+    
+    document.getElementById('totalScore').textContent = `${totalScore}/50`;
+    document.getElementById('vendorFinalRating').textContent = `${vendorFinalRating.toFixed(1)}/10`;
+    document.getElementById('completionRate').textContent = `${completionRate.toFixed(0)}%`;
+}
+
+// Initialisation
+document.addEventListener('DOMContentLoaded', function() {
+    const selects = document.querySelectorAll('.score-select');
+    
+    // Ajouter les événements de changement
+    selects.forEach(select => {
+        const criteria = select.dataset.criteria;
+        
+        // Mettre à jour la description initiale
+        updateDescription(criteria, select.value);
+        
+        // Ajouter l'événement de changement
+        select.addEventListener('change', function() {
+            updateDescription(criteria, this.value);
+            updateScoreSummary();
+        });
+    });
+    
+    // Calculer le résumé initial
+    updateScoreSummary();
+    
+    // Validation du formulaire
+    document.getElementById('evaluationForm').addEventListener('submit', function(e) {
+        const selects = document.querySelectorAll('.score-select');
+        let allCompleted = true;
+        
+        selects.forEach(select => {
+            if (select.value === '') {
+                allCompleted = false;
+                select.style.borderColor = '#dc3545';
+            } else {
+                select.style.borderColor = '#dee2e6';
+            }
+        });
+        
+        if (!allCompleted) {
+            e.preventDefault();
+            alert('Veuillez compléter toutes les évaluations avant de sauvegarder.');
+        }
+    });
+});
+</script>
+{% endblock %}

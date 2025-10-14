@@ -1,0 +1,359 @@
+/* Styles pour le mode sombre */
+[data-bs-theme="dark"] .card {
+    background-color: #2d333b;
+    border-color: #444c56 !important;
+}
+
+[data-bs-theme="dark"] .card-header {
+    background-color: #2d333b !important;
+    border-bottom-color: #444c56 !important;
+    color: #adbac7;
+}
+
+[data-bs-theme="dark"] .card-title,
+[data-bs-theme="dark"] .display-value {
+    color: #adbac7 !important;
+}
+
+[data-bs-theme="dark"] .text-muted {
+    color: #768390 !important;
+}
+
+[data-bs-theme="dark"] .table {
+    --bs-table-color: #adbac7;
+    --bs-table-bg: transparent;
+    --bs-table-border-color: #444c56;
+    --bs-table-striped-bg: rgba(99, 110, 123, 0.1);
+    --bs-table-hover-bg: rgba(99, 110, 123, 0.2);
+}
+
+[data-bs-theme="dark"] .form-control,
+[data-bs-theme="dark"] .form-select {
+    background-color: #2d333b;
+    border-color: #444c56;
+    color: #adbac7;
+}
+
+[data-bs-theme="dark"] .form-control:focus,
+[data-bs-theme="dark"] .form-select:focus {
+    background-color: #2d333b;
+    border-color: #539bf5;
+    color: #adbac7;
+    box-shadow: 0 0 0 0.25rem rgba(83, 155, 245, 0.25);
+}
+
+[data-bs-theme="dark"] .btn-outline-secondary {
+    color: #adbac7;
+    border-color: #444c56;
+}
+
+[data-bs-theme="dark"] .btn-outline-secondary:hover {
+    background-color: #444c56;
+    border-color: #768390;
+    color: #cdd9e5;
+}
+
+[data-bs-theme="dark"] .btn-outline-secondary.active {
+    background-color: #347d39;
+    border-color: #347d39;
+    color: #fff;
+}
+
+/* Styles pour les cartes de graphiques */
+.chart-container {
+    position: relative;
+    width: 100%;
+    transition: all 0.3s ease;
+}
+
+/* Animation de chargement */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.chart-card {
+    animation: fadeIn 0.5s ease-out;
+    transition: all 0.3s ease;
+}
+
+/* Amélioration de la lisibilité des tooltips en mode sombre */
+[data-bs-theme="dark"] .chartjs-tooltip {
+    background: rgba(45, 51, 59, 0.95) !important;
+    border: 1px solid #444c56;
+    color: #adbac7 !important;
+}
+
+/* Amélioration de la lisibilité des légendes en mode sombre */
+[data-bs-theme="dark"] .chart-legend-item {
+    color: #adbac7 !important;
+}
+
+/* Amélioration de la grille des graphiques en mode sombre */
+[data-bs-theme="dark"] .chartjs-grid line {
+    border-color: #444c56 !important;
+}
+
+[data-bs-theme="dark"] .chartjs-tick {
+    color: #768390 !important;
+}
+
+/* Légende de la carte thermique */
+.heatmap-legend {
+    font-size: 0.8rem;
+}
+
+.legend-item {
+    display: inline-block;
+    width: 40px;
+    height: 16px;
+    margin: 0 2px;
+    border-radius: 3px;
+    text-indent: -9999px;
+    position: relative;
+}
+
+.legend-item::after {
+    content: '';
+    position: absolute;
+    bottom: -18px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 10px;
+    color: #6c757d;
+}
+
+.legend-item:first-child::after {
+    content: 'Faible';
+}
+
+.legend-item:nth-child(2)::after {
+    content: 'Moyen';
+}
+
+.legend-item:last-child::after {
+    content: 'Élevé';
+}
+
+/* Styles pour les cartes de statistiques */
+.card {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    border: 1px solid rgba(0, 0, 0, 0.05) !important;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.075) !important;
+}
+
+.card-header {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+    background-color: #f8f9fa;
+}
+
+/* Style pour les titres de cartes */
+.card-title {
+    color: #333;
+    font-weight: 600;
+}
+
+/* Style pour les valeurs dans les cartes */
+.display-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #2c3e50;
+}
+
+/* Style pour les indicateurs de progression */
+.progress {
+    height: 8px;
+    border-radius: 4px;
+    background-color: #e9ecef;
+    margin: 10px 0;
+}
+
+.progress-bar {
+    background-color: #ffc107;
+    transition: width 1s ease-in-out;
+}
+
+/* Style pour les sélecteurs de période */
+.period-selector {
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 50px;
+    padding: 0.25rem;
+    display: inline-flex;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.period-selector .btn {
+    border-radius: 50px;
+    margin: 0 2px;
+    font-size: 0.85rem;
+    padding: 0.4rem 1.2rem;
+    font-weight: 500;
+    border: 1px solid transparent;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 90px;
+}
+
+.period-selector .btn i {
+    margin-right: 0.4rem;
+    font-size: 0.9em;
+}
+
+.period-selector .btn:hover {
+    background-color: #e9ecef;
+    transform: translateY(-1px);
+}
+
+.period-selector .btn.active {
+    background-color: #0d6efd;
+    color: white;
+    border-color: #0d6efd;
+    box-shadow: 0 2px 8px rgba(13, 110, 253, 0.3);
+    transform: translateY(-1px);
+}
+
+.period-selector .btn:focus {
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    outline: none;
+}
+
+/* Style pour le mode sombre */
+[data-bs-theme="dark"] .period-selector {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+[data-bs-theme="dark"] .period-selector .btn {
+    color: #adbac7;
+}
+
+[data-bs-theme="dark"] .period-selector .btn:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-bs-theme="dark"] .period-selector .btn.active {
+    background-color: #3b82f6;
+    border-color: #3b82f6;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+/* Style pour les tooltips des graphiques */
+.chartjs-tooltip {
+    background: rgba(0, 0, 0, 0.8);
+    border-radius: 4px;
+    color: white;
+    padding: 8px 12px;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+/* Style pour la légende des graphiques */
+.chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 15px;
+}
+
+.chart-legend-item {
+    display: flex;
+    align-items: center;
+    margin: 0 10px 5px 0;
+    font-size: 12px;
+}
+
+.chart-legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    margin-right: 5px;
+    display: inline-block;
+}
+
+/* Style pour les graphiques responsives */
+@media (max-width: 768px) {
+    .chart-container {
+        height: 250px !important;
+    }
+    
+    .display-value {
+        font-size: 1.75rem;
+    }
+    
+    .card {
+        margin-bottom: 1rem;
+    }
+}
+
+/* Animation de chargement */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.chart-card {
+    animation: fadeIn 0.5s ease-out;
+}
+
+/* Style pour la carte thermique */
+#heatmap-chart {
+    min-height: 400px;
+    width: 100%;
+}
+
+/* Style pour les contrôles de la carte thermique */
+.heatmap-controls {
+    margin-bottom: 1rem;
+}
+
+/* Style pour les sélecteurs de données */
+.data-selector {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 0.5rem;
+    font-size: 0.9rem;
+}
+
+/* Style pour les étiquettes des axes */
+.chart-axis-label {
+    font-size: 0.8rem;
+    fill: #6c757d;
+}
+
+/* Style pour la grille des graphiques */
+.chart-grid line {
+    stroke: #e9ecef;
+}
+
+.chart-grid path {
+    stroke-width: 0;
+}
+
+/* Style pour les points de données sur mobile */
+@media (max-width: 576px) {
+    .chart-point {
+        r: 3;
+    }
+}
+
+/* Style pour les étiquettes de données */
+.chart-data-label {
+    font-size: 0.7rem;
+    font-weight: bold;
+    fill: #495057;
+}
+
+/* Style pour les annotations sur les graphiques */
+.chart-annotation {
+    font-size: 0.75rem;
+    fill: #6c757d;
+    font-style: italic;
+}

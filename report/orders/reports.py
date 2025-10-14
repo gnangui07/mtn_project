@@ -777,7 +777,8 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
             "Received Qty",
             "Payable Qty",
             "Net Qty to Receive in Fusion",
-            "Line"
+            "Line",
+            "Schedule"
         ]
         
         # Données du tableau
@@ -805,6 +806,7 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
                 # Objet Reception actuel - récupérer les informations depuis le fichier
                 line_description = "N/A"
                 line = "N/A"
+                schedule = "N/A"
                 
                 # Chercher la description de ligne dans les fichiers associés via business_id exact
                 try:
@@ -825,6 +827,8 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
                                 line_description = ld_val[:50] + "..." if len(ld_val) > 50 else ld_val
                         if 'Line' in contenu and contenu['Line'] not in (None, ''):
                             line = str(contenu['Line']).strip()
+                        if 'Schedule' in contenu and contenu['Schedule'] not in (None, ''):
+                            schedule = str(contenu['Schedule']).strip()    
                         # Fallback tolérant
                         if line_description == "N/A":
                             for key, value in contenu.items():
@@ -849,6 +853,15 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
                                 if value and ('line' in norm and 'description' not in norm and 'type' not in norm):
                                     line = str(value).strip()
                                     break
+                        if schedule == "N/A":
+                            for key, value in contenu.items():
+                                if not key:
+                                    continue
+                                norm = key.strip().lower().replace('_', ' ')
+                                norm = ' '.join(norm.split())
+                                if value and ('schedule' in norm):
+                                    schedule = str(value).strip()
+                                break        
                 except Exception:
                     pass
                 
@@ -875,19 +888,21 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
                 f"{fmt_amount(received_quantity, 2)}",
                 f"{fmt_amount(quantity_payable, 2)}",
                 f"{fmt_amount(net_qty_to_receipt_in_boost, 2)}",
-                line
+                line,
+                schedule
             ])
         
         # Créer le tableau de données
         po_lines_table = Table(po_lines_data, colWidths=[
-            TABLE_WIDTH*0.35,  # Line Description (40%)
-            TABLE_WIDTH*0.09,  # Ordered Quantity (10%)
-            TABLE_WIDTH*0.10,  # Quantity Delivered (10%)
-            TABLE_WIDTH*0.10,  # Received Quantity (10%)
-            TABLE_WIDTH*0.10,  # Quantity Payable (10%)
-            TABLE_WIDTH*0.18,  # NetQty to Receive in boost (18%)
-            TABLE_WIDTH*0.08,   # Line (10%)
-        ])
+        TABLE_WIDTH*0.38,  # Line Description (38%) - réduite pour faire de la place
+        TABLE_WIDTH*0.08,  # Ordered Quantity (8%)
+        TABLE_WIDTH*0.08,  # Quantity Delivered (8%)
+        TABLE_WIDTH*0.08,  # Received Quantity (8%)
+        TABLE_WIDTH*0.08,  # Quantity Payable (8%)
+        TABLE_WIDTH*0.16,  # NetQty to Receive in boost (16%)
+        TABLE_WIDTH*0.07,  # Line (8%)
+        TABLE_WIDTH*0.07,  # Schedule (14%) - nouvelle colonne
+    ])
         
         # Styles du tableau de données
         po_lines_table.setStyle(TableStyle([

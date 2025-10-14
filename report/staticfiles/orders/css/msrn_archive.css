@@ -1,0 +1,223 @@
+/* Styles pour la page d'archive des rapports MSRN */
+
+.msrn-archive {
+    max-width: 1200px;
+}
+
+.msrn-archive h2 {
+    color: #2c3e50;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+}
+
+/* Styles pour les filtres */
+.msrn-archive .form-label {
+    font-weight: 500;
+    color: #495057;
+}
+
+.msrn-archive .form-control,
+.msrn-archive .form-select {
+    border-radius: 0.375rem;
+    border: 1px solid #ced4da;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.msrn-archive .form-control:focus,
+.msrn-archive .form-select:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+/* Styles pour le tableau */
+.msrn-archive .table {
+    background-color: white;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.msrn-archive .table thead th {
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+    font-weight: 600;
+    color: #495057;
+    padding: 1rem 0.75rem;
+}
+
+.msrn-archive .table tbody td {
+    padding: 0.875rem 0.75rem;
+    vertical-align: middle;
+    border-top: 1px solid #dee2e6;
+}
+
+.msrn-archive .table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+/* Styles pour la colonne de téléchargement */
+.msrn-archive .download-col {
+    text-align: center;
+    width: 120px;
+}
+
+.msrn-archive .download-msrn {
+    font-size: 0.875rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.375rem;
+    transition: all 0.15s ease-in-out;
+}
+
+.msrn-archive .download-msrn:hover {
+    background-color: #0d6efd;
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.15);
+}
+
+/* Styles pour la pagination */
+.msrn-archive .pagination {
+    margin-top: 2rem;
+}
+
+.msrn-archive .page-link {
+    color: #0d6efd;
+    border: 1px solid #dee2e6;
+    padding: 0.5rem 0.75rem;
+}
+
+.msrn-archive .page-link:hover {
+    background-color: #e9ecef;
+    border-color: #adb5bd;
+}
+
+.msrn-archive .page-item.active .page-link {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+/* Message d'absence de données */
+.msrn-archive .text-muted {
+    font-style: italic;
+    padding: 2rem;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .msrn-archive .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .msrn-archive .download-msrn {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+    
+    .msrn-archive .form-control,
+    .msrn-archive .form-select {
+        font-size: 0.875rem;
+    }
+}
+
+/* Animation pour le chargement */
+.msrn-archive .table tbody tr {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Styles pour le modal personnalisé */
+.custom-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1050;
+}
+
+.custom-modal.show {
+    display: block;
+}
+
+.custom-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1051;
+}
+
+.custom-modal-container {
+    position: relative;
+    width: 500px;
+    max-width: 95%;
+    margin: 1.75rem auto;
+    background-color: #fff;
+    border-radius: 0.5rem;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    z-index: 1052;
+    transform: translateY(-50px);
+    opacity: 0;
+    transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+.custom-modal.show .custom-modal-container {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.custom-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.custom-modal-title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 500;
+}
+
+.custom-modal-close {
+    background: transparent;
+    border: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1;
+    color: #000;
+    opacity: 0.5;
+    cursor: pointer;
+}
+
+.custom-modal-close:hover {
+    opacity: 0.75;
+}
+
+.custom-modal-body {
+    padding: 1rem;
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+}
+
+.custom-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 1rem;
+    border-top: 1px solid #dee2e6;
+    gap: 0.5rem;
+}

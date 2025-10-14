@@ -78,6 +78,11 @@
                         data-report-id="{{ r.id }}">
                   <i class="fas fa-download"></i> Download
                 </button>
+                <a href="{% url 'orders:export_msrn_po_lines' r.id %}"
+                   class="btn btn-outline-success"
+                   title="Export Purchase Order Lines to Excel">
+                  <i class="fas fa-file-excel"></i> Export PO Lines
+                </a>
                 <button type="button"
                         class="btn btn-outline-secondary set-retention-btn"
                         data-report-id="{{ r.id }}"

@@ -41,6 +41,15 @@
         {% endif %}
       </span>
     </div>
+    
+    <!-- Bannière d'avertissement pour Migration IFS -->
+    {% if is_migration_ifs %}
+    <div class="alert alert-warning mt-3" role="alert">
+      <i class="fas fa-lock me-2"></i>
+      <strong>Read-Only Mode:</strong> This purchase order contains "Migration IFS" items. All actions are disabled. You can only view the information.
+    </div>
+    {% endif %}
+    
     <div class="mt-3">
       <a href="{% url 'orders:reception' %}" class="btn btn-secondary">
         <i class="fas fa-arrow-left me-2"></i> Back to Register Delivery
@@ -48,24 +57,47 @@
       
       <!-- Bouton d'exportation Excel avec données mises à jour -->
       <a href="{% url 'orders:export_bon_excel' bon_id=bon_id %}{% if selected_order_number %}?selected_order_number={{ selected_order_number }}{% endif %}" 
-         class="btn btn-success ms-2"
+         class="btn btn-success ms-2 {% if is_migration_ifs %}disabled{% endif %}"
+         {% if is_migration_ifs %}aria-disabled="true" onclick="return false;"{% endif %}
          title="Export Updated Excel">
         <i class="fas fa-file-excel me-2"></i> Export Delivery Report 
       </a>
 
       <!-- Bouton pour générer un rapport MSRN -->
       {% if bon_commande_id %}
-      <button id="generate-msrn-btn" class="btn btn-primary ms-2" data-bon-id="{{ bon_commande_id }}">
+      <button id="generate-msrn-btn" class="btn btn-primary ms-2 {% if is_migration_ifs %}disabled{% endif %}" 
+              data-bon-id="{{ bon_commande_id }}"
+              {% if is_migration_ifs %}disabled{% endif %}>
         <i class="fas fa-file-pdf me-2"></i> Generate MSRN
       </button>
       {% endif %}
 
       <!-- Ajouter après les autres boutons dans la section d'en-tête -->
-      <button id="set-retention-btn" class="btn btn-info ms-2" 
+      <button id="set-retention-btn" class="btn btn-info ms-2 {% if is_migration_ifs %}disabled{% endif %}" 
               data-retention-rate="{{ retention_rate|default:0 }}"
-              data-retention-cause="{{ retention_cause|default:'' }}">
+              data-retention-cause="{{ retention_cause|default:'' }}"
+              {% if is_migration_ifs %}disabled{% endif %}>
           <i class="fas fa-exclamation-triangle me-2"></i> Define Retention on Payment 
       </button>
+
+      <!-- Bouton pour générer l'évaluation fournisseur -->
+      {% if bon_commande_id and supplier != 'N/A' %}
+      <a href="{% url 'orders:vendor_evaluation' bon_commande_id=bon_commande_id %}?fichier_id={{ bon_id }}" 
+         class="btn btn-warning ms-2 {% if is_migration_ifs %}disabled{% endif %}"
+         {% if is_migration_ifs %}aria-disabled="true" onclick="return false;"{% endif %}>
+        <i class="fas fa-star me-2"></i> Generate Vendor Evaluation
+      </a>
+      {% endif %}
+      
+      <!-- Bouton Timeline Delays -->
+      {% if bon_commande_id %}
+      <a href="{% url 'orders:timeline_delays' bon_commande_id=bon_commande_id %}?fichier_id={{ bon_id }}" 
+         class="btn ms-2 {% if is_migration_ifs %}disabled{% endif %}" 
+         style="background-color: #FFCC00; color: #000; border: 2px solid #000;"
+         {% if is_migration_ifs %}aria-disabled="true" onclick="return false;"{% endif %}>
+        <i class="fas fa-clock me-2"></i> Timeline Delays
+      </a>
+      {% endif %}
     </div>
   </header>
 
@@ -195,7 +227,31 @@
         <span class="badge bg-warning text-dark">{{ bon_number }}</span>
       </div>
 
-      <!-- 3.2.2 TABLEAU DES DONNÉES BRUTES -->
+      <!-- 3.2.2 FILTRES DE LIVRAISON -->
+      <div class="card mb-3">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-md-8">
+              <h6 class="mb-0"><i class="fas fa-filter me-2"></i>Delivery Filters</h6>
+            </div>
+            <div class="col-md-4 text-end">
+              <div class="btn-group" role="group" aria-label="Delivery filters">
+                <button type="button" class="btn btn-outline-primary btn-sm filter-btn active" data-filter="all">
+                  <i class="fas fa-list me-1"></i> All Lines <span class="badge bg-secondary ms-1" id="count-all">{{ nb_lignes }}</span>
+                </button>
+                <button type="button" class="btn btn-outline-success btn-sm filter-btn" data-filter="partially-delivered">
+                  <i class="fas fa-truck-loading me-1"></i> Partially Delivered <span class="badge bg-success ms-1" id="count-partial">0</span>
+                </button>
+                <button type="button" class="btn btn-outline-info btn-sm filter-btn" data-filter="fully-delivered">
+                  <i class="fas fa-check-double me-1"></i> Fully Delivered <span class="badge bg-info ms-1" id="count-full">0</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3.2.3 TABLEAU DES DONNÉES BRUTES -->
       <div class="card mb-0 card-data" style="width: 98vw; max-width: 98vw; margin-left: 0; margin-right: 0;">
         <div class="card-header bg-white">
           <div class="d-flex justify-content-between align-items-center">
@@ -213,39 +269,32 @@
           
           <div class="data-container">
             <!-- Bouton flottant pour Quantity Delivered collectif (initialement caché) -->
+            {% if not is_migration_ifs %}
             <div id="collective-quantity-delivered-container" style="display: none; position: fixed; z-index: 1000; right: 30px; top: 120px;">
               <button id="apply-collective-quantity-delivered" class="btn btn-success btn-lg shadow">
                 <i class="fas fa-check-circle me-2"></i> Quantity Delivered collectif <span id="selected-count-badge" class="badge bg-light text-dark ms-2">0</span>
               </button>
             </div>
+            {% endif %}
             <table class="data-table" id="result_list">
               <thead>
                 <tr>
-                  <th style="width: 3%"><input type="checkbox" id="select-all-rows"></th>
+                  <th style="width: 3%"><input type="checkbox" id="select-all-rows" {% if is_migration_ifs %}disabled{% endif %}></th>
                   <th style="width: 3%">#</th>
                   {% for header in headers %}
-                  <th>
+                  <th {% if header == quantity_delivered_key %}class="quantity-delivered-header"{% endif %}>
                     {{ header }}
-                    {% if header == quantity_delivered_key %}
-                    <i class="fas fa-question-circle ms-1 text-info" 
-                       data-bs-toggle="tooltip" 
-                       data-bs-placement="top" 
-                       data-bs-html="true"
-                       title="<strong>Quantity Delivered Column Help:</strong><br>
-                              • Enter positive values to add receipts<br>
-                              • Enter negative values to correct errors<br>
-                              • Example: Enter -2 to cancel a wrong receipt of 2<br>
-                              • The system will ask for confirmation"
-                       style="cursor: help;"></i>
-                    {% endif %}
                   </th>
                   {% endfor %}
                 </tr>
               </thead>
               <tbody>
                 {% for item in raw_data %}
-                <tr data-row-index="{{ item|get_item:'_business_id' }}">
-                  <td><input type="checkbox" class="row-checkbox" data-row="{{ item|get_item:'_business_id' }}"></td>
+                <tr data-row-index="{{ item|get_item:'_business_id' }}" 
+                    data-quantity-delivered="{{ item|get_item:quantity_delivered_key|default:'0' }}" 
+                    data-ordered-quantity="{{ item|get_item:ordered_quantity_key|default:'0' }}" 
+                    class="data-row">
+                  <td><input type="checkbox" class="row-checkbox" data-row="{{ item|get_item:'_business_id' }}" {% if is_migration_ifs %}disabled{% endif %}></td>
                   <td>{{ item|get_item:'_business_id' }}</td>
                   {% for header in headers %}
                   <td class="{% if header == 'Content' or header == 'description' %}field-longtext{% endif %} {% if header == quantity_delivered_key %}quantity-delivered-cell{% endif %}" 
@@ -263,7 +312,8 @@
                     <input type="text" class="quantity-delivered-input" value="{{ item|get_item:quantity_delivered_key|default:'0'|floatformat:'0' }}" 
                            data-row="{{ item|get_item:'_business_id' }}" 
                            data-original="{{ item|get_item:quantity_delivered_key|default:'0' }}"
-                           data-original-value="{{ item|get_item:quantity_delivered_key|default:'0' }}" 
+                           data-original-value="{{ item|get_item:quantity_delivered_key|default:'0' }}"
+                           {% if is_migration_ifs %}disabled readonly style="background-color: #e9ecef; cursor: not-allowed;"{% endif %} 
                            data-ordered="{{ item|get_item:ordered_quantity_key|default:'0' }}"
                            style="border: none; background: transparent; width: 100%; padding: 0; margin: 0; outline: none; text-align: right;">
                     {% elif header == quantity_not_delivered_key %}
@@ -458,6 +508,13 @@
     const bonNumber = "{{ bon_number }}";
     const orderedKey = "{{ ordered_quantity_key }}";
     const bonCommandeId = "{{ bon_commande_id }}";
+    const poAmount = "{{ montant_total|floatformat:0 }}";
+    const amountDelivered = "{{ montant_total_recu|floatformat:0 }}";
+    const deliveryRate = "{{ taux_avancement|floatformat:2 }}";
+    const currency = "{{ devise }}";
+    const supplier = "{{ supplier|default:'N/A' }}";
+    const retentionRate = "{{ retention_rate|default:'0' }}";
+    const retentionCause = "{{ retention_cause|default:'N/A' }}";
 </script>
 
 <script src="{% static 'orders/js/detail_bon.js' %}"></script>

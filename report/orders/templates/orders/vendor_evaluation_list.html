@@ -1,0 +1,293 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Vendor Evaluations{% endblock %}
+
+{% block extra_css %}
+<style>
+    .evaluation-card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    .evaluation-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+    
+    .score-badge {
+        font-size: 1.1rem;
+        padding: 8px 12px;
+    }
+    
+    .filter-section {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .stats-card {
+        background: linear-gradient(135deg, #FFCC00 0%, #E6B800 100%);
+        color: #000000;
+        border-radius: 15px;
+        padding: 20px;
+        text-align: center;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 15px rgba(255, 204, 0, 0.3);
+    }
+    
+    .stats-number {
+        font-size: 2rem;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    
+    .stats-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- En-tête -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="fas fa-star me-3"></i>Vendor Evaluations</h1>
+                <div>
+                    <a href="{% url 'orders:vendor_ranking' %}" class="btn btn-primary me-2">
+                        <i class="fas fa-trophy me-2"></i>Vendor Ranking
+                    </a>
+                    <a href="{% url 'orders:export_vendor_evaluations' %}?supplier={{ supplier_filter }}&min_score={{ min_score }}&date_from={{ date_from }}&date_to={{ date_to }}" 
+                       class="btn me-2" style="background-color: #FFCC00; color: #000000; border: 2px solid #000000;">
+                        <i class="fas fa-file-excel me-2"></i>Export Filtered Data
+                    </a>
+                    <a href="{% url 'orders:accueil' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Home
+                    </a>
+                </div>
+            </div>
+
+            <!-- Statistiques -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <div class="stats-number">{{ total_evaluations }}</div>
+                        <div class="stats-label">Total Evaluations</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <div class="stats-number">{{ suppliers.count }}</div>
+                        <div class="stats-label">Suppliers Evaluated</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <div class="stats-number">
+                            {% if page_obj.object_list %}
+                                {{ page_obj.object_list|length }}
+                            {% else %}
+                                0
+                            {% endif %}
+                        </div>
+                        <div class="stats-label">This Page</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <div class="stats-number">{{ page_obj.paginator.num_pages }}</div>
+                        <div class="stats-label">Total Pages</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filtres -->
+            <div class="filter-section">
+                <form method="get" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="supplier" class="form-label"><i class="fas fa-building me-1"></i>Supplier</label>
+                        <input type="text" class="form-control" id="supplier" name="supplier" 
+                               value="{{ supplier_filter }}" placeholder="Enter supplier name...">
+                    </div>
+                    <div class="col-md-2">
+                        <label for="min_score" class="form-label"><i class="fas fa-star me-1"></i>Min Score</label>
+                        <input type="number" class="form-control" id="min_score" name="min_score" 
+                               value="{{ min_score }}" min="0" max="50" placeholder="0-50">
+                    </div>
+                    <div class="col-md-2">
+                        <label for="date_from" class="form-label"><i class="fas fa-calendar me-1"></i>From Date</label>
+                        <input type="date" class="form-control" id="date_from" name="date_from" 
+                               value="{{ date_from }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label for="date_to" class="form-label"><i class="fas fa-calendar me-1"></i>To Date</label>
+                        <input type="date" class="form-control" id="date_to" name="date_to" 
+                               value="{{ date_to }}">
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="fas fa-search me-2"></i>Apply Filters
+                        </button>
+                        <a href="{% url 'orders:vendor_evaluation_list' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times me-2"></i>Clear All
+                        </a>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Liste des évaluations - Format tableau -->
+            {% if page_obj.object_list %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead style="background-color: #000000; color: #FFCC00;">
+                            <tr>
+                                <th>Supplier</th>
+                                <th>Purchase Order</th>
+                                <th class="text-center">Delivery Compliance</th>
+                                <th class="text-center">Timeline</th>
+                                <th class="text-center">Advising</th>
+                                <th class="text-center">After Sales</th>
+                                <th class="text-center">Relationship</th>
+                                <th class="text-center">Total Score</th>
+                                <th class="text-center">Vendor Final Rating</th>
+                                <th>Date</th>
+                                <th>Evaluator</th>
+                                <th class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for evaluation in page_obj.object_list %}
+                            <tr class="evaluation-row">
+                                <td>
+                                    <strong style="color: #000000;">
+                                        <i class="fas fa-building me-2"></i>{{ evaluation.supplier }}
+                                    </strong>
+                                </td>
+                                <td>
+                                    <span class="badge" style="background-color: #000000; color: #FFCC00;">{{ evaluation.bon_commande.numero }}</span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge score-badge bg-{% if evaluation.delivery_compliance >= 7 %}success{% elif evaluation.delivery_compliance >= 4 %}warning{% else %}danger{% endif %}">
+                                        {{ evaluation.delivery_compliance }}/10
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge score-badge bg-{% if evaluation.delivery_timeline >= 7 %}success{% elif evaluation.delivery_timeline >= 4 %}warning{% else %}danger{% endif %}">
+                                        {{ evaluation.delivery_timeline }}/10
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge score-badge bg-{% if evaluation.advising_capability >= 7 %}success{% elif evaluation.advising_capability >= 4 %}warning{% else %}danger{% endif %}">
+                                        {{ evaluation.advising_capability }}/10
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge score-badge bg-{% if evaluation.after_sales_qos >= 7 %}success{% elif evaluation.after_sales_qos >= 4 %}warning{% else %}danger{% endif %}">
+                                        {{ evaluation.after_sales_qos }}/10
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge score-badge bg-{% if evaluation.vendor_relationship >= 7 %}success{% elif evaluation.vendor_relationship >= 4 %}warning{% else %}danger{% endif %}">
+                                        {{ evaluation.vendor_relationship }}/10
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <strong style="color: #FFCC00; background-color: #000000; padding: 5px 10px; border-radius: 5px;">{{ evaluation.get_total_score }}/50</strong>
+                                </td>
+                                <td class="text-center">
+                                    <strong style="color: #000000;">{{ evaluation.vendor_final_rating|floatformat:1 }}/10</strong>
+                                </td>
+                                <td>
+                                    <small class="text-muted">
+                                        <i class="fas fa-calendar me-1"></i>{{ evaluation.date_evaluation|date:"d/m/Y" }}
+                                    </small>
+                                </td>
+                                <td>
+                                    <small class="text-muted">
+                                        {% if evaluation.evaluator %}
+                                            <i class="fas fa-user me-1"></i>{{ evaluation.evaluator.username }}
+                                        {% else %}
+                                            System
+                                        {% endif %}
+                                    </small>
+                                </td>
+                                <td class="text-center">
+                                    <div class="btn-group" role="group">
+                                        <a href="{% url 'orders:vendor_evaluation_detail' evaluation_id=evaluation.id %}" 
+                                           class="btn btn-sm" style="background-color: #FFCC00; color: #000000; border: 1px solid #000000;" title="View Details">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{% url 'orders:vendor_evaluation' bon_commande_id=evaluation.bon_commande.id %}" 
+                                           class="btn btn-sm" style="background-color: #000000; color: #FFCC00; border: 1px solid #FFCC00;" title="Edit">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                {% if page_obj.has_other_pages %}
+                <nav aria-label="Evaluations pagination">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if min_score %}&min_score={{ min_score }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">First</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if min_score %}&min_score={{ min_score }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Previous</a>
+                            </li>
+                        {% endif %}
+
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if page_obj.number == num %}
+                                <li class="page-item active">
+                                    <span class="page-link" style="background-color: #FFCC00; color: #000000; border-color: #000000;">{{ num }}</span>
+                                </li>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ num }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if min_score %}&min_score={{ min_score }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">{{ num }}</a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if min_score %}&min_score={{ min_score }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Next</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if min_score %}&min_score={{ min_score }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Last</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-star fa-4x text-muted mb-4"></i>
+                    <h4 class="text-muted">No evaluations found</h4>
+                    <p class="text-muted">
+                        {% if supplier_filter or min_score %}
+                            No evaluations match your current filters.
+                        {% else %}
+                            No vendor evaluations have been created yet.
+                        {% endif %}
+                    </p>
+                    {% if supplier_filter or min_score %}
+                    <a href="{% url 'orders:vendor_evaluation_list' %}" class="btn btn-primary">
+                        <i class="fas fa-times me-2"></i>Clear Filters
+                    </a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

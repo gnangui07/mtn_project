@@ -8,6 +8,7 @@ import logging
 from .models import NumeroBonCommande, MSRNReport, Reception
 from .reports import generate_msrn_report
 from django.shortcuts import get_object_or_404
+from .emails import send_msrn_notification
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +80,17 @@ def generate_msrn_report_api(request, bon_id):
         report.save()
         
         logger.info(f"Rapport MSRN généré avec succès: MSRN-{report.report_number}")
+        
+        # Envoyer la notification email aux superusers
+        try:
+            email_sent = send_msrn_notification(report)
+            if email_sent:
+                logger.info(f"Notification email envoyée pour MSRN-{report.report_number}")
+            else:
+                logger.warning(f"Notification email non envoyée pour MSRN-{report.report_number}")
+        except Exception as email_error:
+            # Ne pas bloquer la génération du MSRN si l'email échoue
+            logger.error(f"Erreur lors de l'envoi de la notification email pour MSRN-{report.report_number}: {str(email_error)}")
         
         # Préparer la réponse
         return JsonResponse({
@@ -197,7 +209,8 @@ def update_msrn_retention(request, msrn_id):
                         'amount_delivered': reception_data['amount_delivered'],
                         'quantity_payable': float(quantity_payable),
                         'amount_payable': float(amount_payable),
-                        'line': reception_data.get('line', 'N/A')
+                        'line': reception_data.get('line', 'N/A'),
+                        'schedule': reception_data.get('schedule', 'N/A')
                     })
             else:
                 # Fallback : utiliser les réceptions actuelles si pas de snapshot
@@ -212,6 +225,7 @@ def update_msrn_retention(request, msrn_id):
                     # Récupérer line_description et line_info depuis les fichiers
                     line_description = "N/A"
                     line = "N/A"
+                    schedule = "N/A"
                     
                     for fichier in bon.fichiers.all():
                         # Utiliser business_id pour retrouver la ligne correspondante
@@ -236,9 +250,14 @@ def update_msrn_retention(request, msrn_id):
                                             line = str(value)
                                             break
                                     
-                                    if line_description != "N/A":
+                                # Chercher les informations de schedule (Schedule)
+                                for key, value in contenu.items():
+                                    key_lower = key.lower() if key else ''
+                                    if ('schedule' in key_lower) and value:
+                                        schedule = str(value)
                                         break
-                                if line_description != "N/A":
+                                
+                                if line_description != "N/A" or line != "N/A" or schedule != "N/A":
                                     break
                             except (ValueError, IndexError):
                                 # Si on ne peut pas extraire le numéro de ligne du business_id
@@ -254,7 +273,8 @@ def update_msrn_retention(request, msrn_id):
                         'amount_delivered': float(reception.amount_delivered),
                         'quantity_payable': float(quantity_payable),
                         'amount_payable': float(amount_payable),
-                        'line': line
+                        'line': line,
+                        'schedule': schedule
                     })
             
             # Sauvegarder le snapshot des données des réceptions

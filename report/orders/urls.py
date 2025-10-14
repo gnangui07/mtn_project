@@ -1,6 +1,6 @@
 from django.urls import path, include
 from django.views.generic.base import RedirectView
-from . import views, api, reception_api, msrn_api
+from . import views, api, reception_api, msrn_api, views_export
 
 
 app_name = 'orders'
@@ -19,9 +19,9 @@ urlpatterns = [
     # Téléchargement des fichiers
     path('telecharger/<int:fichier_id>/', views.telecharger_fichier, name='telecharger_fichier'),
     path('telecharger/<int:fichier_id>/<str:format_export>/', views.telecharger_fichier, name='telecharger_fichier_format'),
-    path('export-excel/<int:bon_id>/', views.export_bon_excel, name='export_bon_excel'),
-    path('export-fichier-complet/<int:fichier_id>/', views.export_fichier_complet, name='export_fichier_complet'),
-    path('export-po-progress-monitoring/', views.export_po_progress_monitoring, name='export_po_progress_monitoring'),
+    path('export-excel/<int:bon_id>/', views_export.export_bon_excel, name='export_bon_excel'),
+    path('export-fichier-complet/<int:fichier_id>/', views_export.export_fichier_complet, name='export_fichier_complet'),
+    path('export-po-progress-monitoring/', views_export.export_po_progress_monitoring, name='export_po_progress_monitoring'),
 
     # API endpoints (pour compatibilité)
     path('api/order-statistics/<str:order>/', views.api_statistiques_commande, name='api_statistiques_commande'),
@@ -43,11 +43,23 @@ urlpatterns = [
     # Téléchargement des rapports MSRN
     path('msrn-report/<int:report_id>/', views.download_msrn_report, name='download_msrn_report'),
     path('msrn/archive/', views.msrn_archive, name='msrn_archive'),
+    path('msrn/<int:msrn_id>/export-po-lines/', views_export.export_msrn_po_lines, name='export_msrn_po_lines'),
     path('api/generate-msrn/<int:bon_id>/', msrn_api.generate_msrn_report_api, name='generate_msrn_report_api'),
     path('api/msrn/<int:msrn_id>/update-retention/', msrn_api.update_msrn_retention, name='update_msrn_retention'),
     
     # Analytics API
     path('api/analytics/', include('orders.urls_analytics')),
     
+    # Évaluation des fournisseurs
+    path('vendor-evaluation/<int:bon_commande_id>/', views.vendor_evaluation, name='vendor_evaluation'),
+    path('vendor-evaluations/', views.vendor_evaluation_list, name='vendor_evaluation_list'),
+    path('vendor-evaluation-detail/<int:evaluation_id>/', views.vendor_evaluation_detail, name='vendor_evaluation_detail'),
+    path('export-vendor-evaluations/', views_export.export_vendor_evaluations, name='export_vendor_evaluations'),
+    path('vendor-ranking/', views.vendor_ranking, name='vendor_ranking'),
+    path('export-vendor-ranking/', views_export.export_vendor_ranking, name='export_vendor_ranking'),
+    
+    # Timeline delays
+    path('timeline-delays/<int:bon_commande_id>/', views.timeline_delays, name='timeline_delays'),
+    path('api/update-delays/<int:timeline_id>/', views.update_delays, name='update_delays'),
   
 ]

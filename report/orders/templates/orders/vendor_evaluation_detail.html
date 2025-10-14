@@ -1,0 +1,335 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Vendor Evaluation Details - {{ evaluation.supplier }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .evaluation-detail-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .evaluation-header {
+        background: linear-gradient(135deg, #FFCC00 0%, #E6B800 100%);
+        color: #000000;
+        padding: 30px;
+        border-radius: 15px;
+        margin-bottom: 30px;
+        box-shadow: 0 10px 30px rgba(255, 204, 0, 0.3);
+    }
+    
+    .evaluation-header h1 {
+        margin: 0;
+        font-size: 2.2rem;
+        font-weight: 300;
+    }
+    
+    .evaluation-meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+    }
+    
+    .meta-item {
+        background: rgba(0,0,0,0.1);
+        padding: 15px;
+        border-radius: 10px;
+        backdrop-filter: blur(10px);
+    }
+    
+    .meta-label {
+        font-size: 0.9rem;
+        opacity: 0.8;
+        margin-bottom: 5px;
+    }
+    
+    .meta-value {
+        font-size: 1.1rem;
+        font-weight: 500;
+    }
+    
+    .scores-summary {
+        background: white;
+        border-radius: 15px;
+        padding: 30px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        margin-bottom: 30px;
+    }
+    
+    .score-circle {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 20px;
+        font-weight: bold;
+        color: white;
+        position: relative;
+    }
+    
+    .score-circle.excellent {
+        background: linear-gradient(135deg, #FFCC00 0%, #E6B800 100%);
+        color: #000000;
+    }
+    
+    .score-circle.good {
+        background: linear-gradient(135deg, #000000 0%, #222222 100%);
+        color: #FFCC00;
+    }
+    
+    .score-circle.average {
+        background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+        color: #000000;
+    }
+    
+    .score-circle.poor {
+        background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+        color: white;
+    }
+    
+    .score-main {
+        font-size: 2rem;
+        line-height: 1;
+    }
+    
+    .score-sub {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    
+    .criteria-details {
+        background: white;
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        margin-bottom: 30px;
+    }
+    
+    .criteria-header {
+        background: #f8f9fa;
+        padding: 20px;
+        border-bottom: 2px solid #e9ecef;
+    }
+    
+    .criteria-item {
+        padding: 25px;
+        border-bottom: 1px solid #e9ecef;
+        transition: background-color 0.3s ease;
+    }
+    
+    .criteria-item:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .criteria-item:last-child {
+        border-bottom: none;
+    }
+    
+    .criteria-name {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 10px;
+    }
+    
+    .criteria-score {
+        display: inline-block;
+        padding: 8px 16px;
+        border-radius: 25px;
+        font-weight: 600;
+        font-size: 1.1rem;
+        margin-bottom: 15px;
+    }
+    
+    .criteria-score.excellent {
+        background: #FFCC00;
+        color: #000000;
+    }
+    
+    .criteria-score.good {
+        background: #000000;
+        color: #FFCC00;
+    }
+    
+    .criteria-score.average {
+        background: #ff9800;
+        color: #000000;
+    }
+    
+    .criteria-score.poor {
+        background: #f44336;
+        color: white;
+    }
+    
+    .criteria-description {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        font-style: italic;
+        color: #6c757d;
+        border-left: 4px solid #2196f3;
+    }
+    
+    .comments-section {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        margin-bottom: 30px;
+    }
+    
+    .action-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        margin-top: 30px;
+    }
+    
+    .btn-action {
+        padding: 12px 30px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-radius: 50px;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .btn-action:hover {
+        transform: translateY(-2px);
+        text-decoration: none;
+    }
+    
+    .btn-edit {
+        background: linear-gradient(135deg, #FFCC00 0%, #E6B800 100%);
+        color: #000000;
+        box-shadow: 0 5px 15px rgba(255, 204, 0, 0.3);
+        border: 2px solid #000000;
+    }
+    
+    .btn-edit:hover {
+        color: #000000;
+        box-shadow: 0 8px 25px rgba(255, 204, 0, 0.4);
+        background: linear-gradient(135deg, #E6B800 0%, #FFCC00 100%);
+    }
+    
+    .btn-back {
+        background: #000000;
+        color: #FFCC00;
+        border: 2px solid #FFCC00;
+    }
+    
+    .btn-back:hover {
+        background: #222222;
+        color: #FFCC00;
+    }
+    
+    @media (max-width: 768px) {
+        .evaluation-meta {
+            grid-template-columns: 1fr;
+        }
+        
+        .action-buttons {
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .btn-action {
+            width: 100%;
+            max-width: 300px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="evaluation-detail-container">
+    <!-- En-tête -->
+    <div class="evaluation-header">
+        <h1><i class="fas fa-star me-3"></i>Vendor Evaluation Details</h1>
+        <div class="evaluation-meta">
+            <div class="meta-item">
+                <div class="meta-label">Supplier</div>
+                <div class="meta-value">{{ evaluation.supplier }}</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label">Purchase Order</div>
+                <div class="meta-value">{{ evaluation.bon_commande.numero }}</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label">Evaluation Date</div>
+                <div class="meta-value">{{ evaluation.date_evaluation|date:"d/m/Y à H:i" }}</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label">Evaluator</div>
+                <div class="meta-value">
+                    {% if evaluation.evaluator %}
+                        {{ evaluation.evaluator.get_full_name|default:evaluation.evaluator.username }}
+                    {% else %}
+                        System
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Résumé des scores -->
+    <div class="scores-summary">
+        <div class="row text-center">
+            <div class="col-md-6">
+                <div class="score-circle {% if total_score >= 35 %}excellent{% elif total_score >= 25 %}good{% elif total_score >= 15 %}average{% else %}poor{% endif %}">
+                    <div class="score-main">{{ total_score }}</div>
+                    <div class="score-sub">/ 50</div>
+                </div>
+                <h5>Total Score</h5>
+            </div>
+            <div class="col-md-6">
+                <div class="score-circle {% if evaluation.vendor_final_rating >= 7 %}excellent{% elif evaluation.vendor_final_rating >= 5 %}good{% elif evaluation.vendor_final_rating >= 3 %}average{% else %}poor{% endif %}">
+                    <div class="score-main">{{ evaluation.vendor_final_rating|floatformat:1 }}</div>
+                    <div class="score-sub">/ 10</div>
+                </div>
+                <h5>Vendor Final Rating</h5>
+            </div>
+        </div>
+    </div>
+
+    <!-- Détails des critères -->
+    <div class="criteria-details">
+        <div class="criteria-header">
+            <h3><i class="fas fa-clipboard-list me-2"></i>Evaluation Criteria Details</h3>
+        </div>
+        
+        {% for criteria in criteria_details %}
+        <div class="criteria-item">
+            <div class="criteria-name">{{ criteria.label }}</div>
+            <div class="criteria-score {% if criteria.score >= 7 %}excellent{% elif criteria.score >= 5 %}good{% elif criteria.score >= 3 %}average{% else %}poor{% endif %}">
+                {{ criteria.score }}/10
+            </div>
+            <div class="criteria-description">
+                {{ criteria.description }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+
+    <!-- Boutons d'action -->
+    <div class="action-buttons">
+        <a href="{% url 'orders:vendor_evaluation' bon_commande_id=evaluation.bon_commande.id %}" 
+           class="btn-action btn-edit">
+            <i class="fas fa-edit me-2"></i>Edit Evaluation
+        </a>
+        <a href="{% url 'orders:vendor_evaluation_list' %}" 
+           class="btn-action btn-back">
+            <i class="fas fa-list me-2"></i>Back to List
+        </a>
+    </div>
+</div>
+{% endblock %}

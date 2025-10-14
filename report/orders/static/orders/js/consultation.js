@@ -1,5 +1,7 @@
-// Fonction pour initialiser et mettre à jour la carte thermique
-function initHeatmap() {
+// Fonction initHeatmap supprimée (carte thermique retirée)
+
+// Fonction pour initialiser et mettre à jour la carte thermique (SUPPRIMÉE)
+function initHeatmap_REMOVED() {
     // Référence à l'élément DOM pour la carte thermique
     const heatmapContainer = document.getElementById('heatmap-chart');
     const dataTypeSelect = document.getElementById('heatmap-data-type');

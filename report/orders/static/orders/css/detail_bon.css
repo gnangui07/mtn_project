@@ -428,6 +428,7 @@ body {
     border: 1px solid #ccc;
     border-radius: 4px;
     text-align: right;
+    background-color: transparent;
 }
   
 .quantity-delivered-input:focus {
@@ -436,6 +437,20 @@ body {
     outline: none;
 }
   
+/* Coloration de la colonne Quantity Delivered pour la mettre en évidence */
+.quantity-delivered-header {
+    background-color: #2196F3 !important; /* Bleu vif pour l'en-tête */
+    color: white !important;
+    border-left: 3px solid #1976D2 !important;
+    border-right: 3px solid #1976D2 !important;
+}
+
 .quantity-delivered-cell {
-    background-color: #f8f9fa;
+    background-color: #e3f2fd !important; /* Bleu clair */
+    border-left: 3px solid #2196F3 !important; /* Bordure bleue à gauche */
+    font-weight: 500;
+}
+
+.data-table tr:hover .quantity-delivered-cell {
+    background-color: #bbdefb !important; /* Bleu plus foncé au survol */
 }

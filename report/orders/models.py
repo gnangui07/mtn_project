@@ -31,6 +31,35 @@ def round_decimal(value, places=2):
     quant_format = Decimal('0.' + ('0' * (places-1)) + '1') if places > 0 else Decimal('1')
     return value.quantize(quant_format, rounding=ROUND_HALF_UP)
 
+# Fonction utilitaire pour normaliser les business_id
+def normalize_business_id(business_id):
+    """
+    Normalise un business_id en convertissant les valeurs numériques décimales en entiers
+    pour éviter les doublons (ex: 43.0 -> 43)
+    """
+    if not business_id:
+        return business_id
+    
+    parts = business_id.split('|')
+    normalized_parts = []
+    
+    for part in parts:
+        if ':' in part:
+            key, value = part.split(':', 1)
+            try:
+                # Essayer de convertir en float puis supprimer les .0 inutiles
+                float_val = float(value)
+                if float_val.is_integer():
+                    value = str(int(float_val))
+            except (ValueError, TypeError):
+                # Garder la valeur originale si conversion impossible
+                pass
+            normalized_parts.append(f"{key}:{value}")
+        else:
+            normalized_parts.append(part)
+    
+    return '|'.join(normalized_parts)
+
 # Utiliser le JSONField standard de Django au lieu de celui spécifique à PostgreSQL
 # Ce champ est disponible dans Django depuis la version 3.1
 
@@ -62,7 +91,7 @@ class NumeroBonCommande(models.Model):
         verbose_name="Montant reçu (cache)"
     )
     _taux_avancement = models.DecimalField(
-        max_digits=5,
+        max_digits=20,
         decimal_places=2,
         default=0,
         db_column='taux_avancement',
@@ -854,11 +883,26 @@ class LigneFichier(models.Model):
         ]
     
     def generate_business_id(self):
-        """Génère un ID métier basé sur Order+Line+Item+Schedule"""
+        """Génère un ID métier basé sur Order+Line+Item+Schedule avec normalisation des valeurs numériques"""
         if not self.contenu:
             return None
             
         components = []
+        
+        def normalize_numeric_value(value):
+            """Normalise les valeurs numériques pour éviter les doublons (43.0 -> 43)"""
+            if value is None:
+                return None
+            value_str = str(value).strip()
+            try:
+                # Essayer de convertir en float puis supprimer les .0 inutiles
+                float_val = float(value_str)
+                if float_val.is_integer():
+                    return str(int(float_val))
+                else:
+                    return value_str
+            except (ValueError, TypeError):
+                return value_str
         
         # Extraire Order
         order_value = None
@@ -875,7 +919,7 @@ class LigneFichier(models.Model):
         for key, value in self.contenu.items():
             key_lower = key.lower() if key else ''
             if 'line' in key_lower and 'description' not in key_lower and value:
-                line_value = str(value).strip()
+                line_value = normalize_numeric_value(value)
                 break
         if line_value:
             components.append(f"LINE:{line_value}")
@@ -885,7 +929,7 @@ class LigneFichier(models.Model):
         for key, value in self.contenu.items():
             key_lower = key.lower() if key else ''
             if 'item' in key_lower and 'description' not in key_lower and value:
-                item_value = str(value).strip()
+                item_value = normalize_numeric_value(value)
                 break
         if item_value:
             components.append(f"ITEM:{item_value}")
@@ -895,12 +939,14 @@ class LigneFichier(models.Model):
         for key, value in self.contenu.items():
             key_lower = key.lower() if key else ''
             if 'schedule' in key_lower and value:
-                schedule_value = str(value).strip()
+                schedule_value = normalize_numeric_value(value)
                 break
         if schedule_value:
             components.append(f"SCHEDULE:{schedule_value}")
             
-        return "|".join(components) if components else None
+        # Utiliser la fonction globale de normalisation pour s'assurer de la cohérence
+        raw_business_id = "|".join(components) if components else None
+        return normalize_business_id(raw_business_id) if raw_business_id else None
     
     def save(self, *args, **kwargs):
         # Générer l'ID métier avant sauvegarde
@@ -1166,8 +1212,25 @@ class FichierImporte(models.Model):
                             print(f"ID métier généré: {business_id}")
                             
                             try:
-                                # Vérifier d'abord si une réception existe avec cet ID
+                                # Vérifier d'abord si une réception existe avec cet ID (exact)
                                 reception = Reception.objects.filter(business_id=business_id).first()
+                                
+                                # Si pas trouvé, chercher avec normalisation
+                                if not reception:
+                                    normalized_business_id = normalize_business_id(business_id)
+                                    if normalized_business_id != business_id:
+                                        reception = Reception.objects.filter(business_id=normalized_business_id).first()
+                                        if reception:
+                                            print(f"Réception trouvée avec ID normalisé: {normalized_business_id}")
+                                    
+                                    # Si toujours pas trouvé, chercher parmi tous les business_id normalisés
+                                    if not reception:
+                                        all_receptions = Reception.objects.filter(bon_commande=bon_commande)
+                                        for existing_reception in all_receptions:
+                                            if normalize_business_id(existing_reception.business_id) == normalized_business_id:
+                                                reception = existing_reception
+                                                print(f"Réception trouvée après normalisation: {existing_reception.business_id} -> {normalized_business_id}")
+                                                break
                                 
                                 # Debug: Vérifier les réceptions existantes
                                 existing_receptions = list(Reception.objects.filter(bon_commande=bon_commande).values_list('business_id', flat=True))
@@ -1255,7 +1318,23 @@ class FichierImporte(models.Model):
                     # Vérifier si une ligne avec le même ID métier existe déjà
                     existing_business_line = None
                     if business_id:
+                        # Recherche exacte d'abord
                         existing_business_line = LigneFichier.objects.filter(business_id=business_id).first()
+                        
+                        # Si pas trouvé, recherche avec normalisation
+                        if not existing_business_line:
+                            normalized_bid = normalize_business_id(business_id)
+                            if normalized_bid != business_id:
+                                existing_business_line = LigneFichier.objects.filter(business_id=normalized_bid).first()
+                            
+                            # Si toujours pas trouvé, chercher parmi toutes les lignes normalisées
+                            if not existing_business_line:
+                                all_lines = LigneFichier.objects.all()
+                                for line in all_lines:
+                                    if normalize_business_id(line.business_id) == normalized_bid:
+                                        existing_business_line = line
+                                        print(f"Ligne existante trouvée après normalisation: {line.business_id} -> {normalized_bid}")
+                                        break
                     
                     if existing_business_line:
                         # Ligne métier identique trouvée - mise à jour avec les nouvelles données
@@ -1401,26 +1480,26 @@ class Reception(models.Model):
     
     # Champs alignés avec la terminologie de l'interface et ActivityLog
     ordered_quantity = models.DecimalField(
-        max_digits=15, 
+        max_digits=20, 
         decimal_places=2,
         verbose_name="Ordered Quantity",
         null=True, 
         blank=True
     )
     quantity_delivered = models.DecimalField(
-        max_digits=15, 
+        max_digits=20, 
         decimal_places=2,
         verbose_name="Quantity Delivered",
         default=0  # Valeur par défaut pour les enregistrements existants
     )
     received_quantity = models.DecimalField(
-        max_digits=15, 
+        max_digits=20, 
         decimal_places=2,
         verbose_name="Received Quantity (current file)",
         default=0
     )
     quantity_not_delivered = models.DecimalField(
-        max_digits=15, 
+        max_digits=20, 
         decimal_places=2,
         verbose_name="Quantity Not Delivered",
         null=True, 
@@ -1437,19 +1516,19 @@ class Reception(models.Model):
         verbose_name="Utilisateur"
     )
     unit_price = models.DecimalField(
-        max_digits=15,
+        max_digits=20,
         decimal_places=2,
         verbose_name="Unit Price",
         default=0
     )
     amount_delivered = models.DecimalField(
-        max_digits=15, 
+        max_digits=20, 
         decimal_places=2,
         default=0,
         verbose_name="Amount Delivered"
     )
     quantity_payable = models.DecimalField(
-        max_digits=15, 
+        max_digits=20, 
         decimal_places=2,
         default=0,
         verbose_name="Quantity Payable"
@@ -1481,6 +1560,10 @@ class Reception(models.Model):
     def save(self, *args, **kwargs):
         from decimal import Decimal, InvalidOperation
 
+        # Normaliser le business_id avant sauvegarde pour éviter les doublons
+        if self.business_id:
+            self.business_id = normalize_business_id(self.business_id)
+
         try:
             # Convertir quantity_delivered en Decimal
             quantity_delivered_qty = Decimal(str(self.quantity_delivered)) if self.quantity_delivered is not None else Decimal('0')
@@ -1511,7 +1594,7 @@ class Reception(models.Model):
         # Mettre à jour update_fields pour inclure les champs calculés
         if 'update_fields' in kwargs and kwargs['update_fields'] is not None:
             update_fields = set(kwargs['update_fields'])
-            update_fields.update(['amount_delivered', 'quantity_payable', 'amount_payable'])
+            update_fields.update(['amount_delivered', 'quantity_payable', 'amount_payable', 'business_id'])
             kwargs['update_fields'] = list(update_fields)
         
         # Sauvegarder l'objet
@@ -1560,22 +1643,22 @@ class ActivityLog(models.Model):
     
     # Valeurs de quantités
     ordered_quantity = models.DecimalField(
-        max_digits=15,
+        max_digits=20,
         decimal_places=2,
         verbose_name="Ordered Quantity"
     )
     quantity_delivered = models.DecimalField(
-        max_digits=15,
+        max_digits=20,
         decimal_places=2,
         verbose_name="Quantity Delivered"
     )
     quantity_not_delivered = models.DecimalField(
-        max_digits=15,
+        max_digits=20,
         decimal_places=2,
         verbose_name="Quantity Not Delivered"
     )
     cumulative_recipe = models.DecimalField(
-        max_digits=15,
+        max_digits=20,
         decimal_places=2,
         verbose_name="Cumulative Recipe",
         null=True,
@@ -1591,7 +1674,7 @@ class ActivityLog(models.Model):
     
     # Taux d'avancement au moment de la réception
     progress_rate = models.DecimalField(
-        max_digits=5,
+        max_digits=20,
         decimal_places=2,
         verbose_name="Taux d'avancement",
         null=True,
@@ -1631,7 +1714,7 @@ class MSRNReport(models.Model):
         verbose_name="Date de création"
     )
     retention_rate = models.DecimalField(
-        max_digits=5,
+        max_digits=20,
         decimal_places=2,
         default=0,
         verbose_name="Taux de rétention (%)",
@@ -1644,14 +1727,14 @@ class MSRNReport(models.Model):
         help_text="Raison de la rétention appliquée"
     )
     retention_amount = models.DecimalField(
-        max_digits=15,
+        max_digits=20,
         decimal_places=2,
         default=0,
         verbose_name="Montant de la rétention",
         help_text="Montant retenu (calculé automatiquement)"
     )
     payable_amount = models.DecimalField(
-        max_digits=15,
+        max_digits=20,
         decimal_places=2,
         default=0,
         verbose_name="Montant payable après rétention",
@@ -1660,7 +1743,7 @@ class MSRNReport(models.Model):
     
     # Snapshots pour préserver les valeurs au moment de la création du rapport
     montant_total_snapshot = models.DecimalField(
-        max_digits=15,
+        max_digits=20,
         decimal_places=2,
         null=True,
         blank=True,
@@ -1668,7 +1751,7 @@ class MSRNReport(models.Model):
         help_text="Montant total au moment de la création du rapport"
     )
     montant_recu_snapshot = models.DecimalField(
-        max_digits=15,
+        max_digits=20,
         decimal_places=2,
         null=True,
         blank=True,
@@ -1676,7 +1759,7 @@ class MSRNReport(models.Model):
         help_text="Montant reçu au moment de la création du rapport"
     )
     progress_rate_snapshot = models.DecimalField(
-        max_digits=5,
+        max_digits=20,
         decimal_places=2,
         null=True,
         blank=True,
@@ -1684,7 +1767,7 @@ class MSRNReport(models.Model):
         help_text="Taux d'avancement au moment de la création du rapport"
     )
     retention_rate_snapshot = models.DecimalField(
-        max_digits=5,
+        max_digits=20,
         decimal_places=2,
         null=True,
         blank=True,
@@ -1692,7 +1775,7 @@ class MSRNReport(models.Model):
         help_text="Taux de rétention au moment de la création du rapport"
     )
     retention_amount_snapshot = models.DecimalField(
-        max_digits=15,
+        max_digits=20,
         decimal_places=2,
         null=True,
         blank=True,
@@ -1700,7 +1783,7 @@ class MSRNReport(models.Model):
         help_text="Montant de rétention au moment de la création du rapport"
     )
     payable_amount_snapshot = models.DecimalField(
-        max_digits=15,
+        max_digits=20,
         decimal_places=2,
         null=True,
         blank=True,
@@ -1776,7 +1859,8 @@ class MSRNReport(models.Model):
                     # Récupérer line_description et line depuis les fichiers
                     line_description = "N/A"
                     line = "N/A"
-                    
+                    schedule = "N/A"
+                                        
                     for fichier in self.bon_commande.fichiers.all():
                         for ligne in fichier.lignes.filter(business_id=reception.business_id):
                             contenu = ligne.contenu or {}
@@ -1788,6 +1872,8 @@ class MSRNReport(models.Model):
                                     line_description = ld_val[:50] + "..." if len(ld_val) > 50 else ld_val
                             if 'Line' in contenu and contenu['Line'] not in (None, ''):
                                 line = str(contenu['Line']).strip()
+                            if 'Schedule' in contenu and contenu['Schedule'] not in (None, ''):
+                                schedule = str(contenu['Schedule']).strip()   
 
                             # 2) Fallback tolérant si non trouvées
                             if line_description == "N/A":
@@ -1814,11 +1900,24 @@ class MSRNReport(models.Model):
                                     if value and ('line' in norm and 'description' not in norm and 'type' not in norm):
                                         line = str(value).strip()
                                         break
+                            if line == "N/A":
+                                for key, value in contenu.items():
+                                    if not key:
+                                        continue
+                                    norm = key.strip().lower().replace('_', ' ')
+                                    norm = ' '.join(norm.split())
+                                    # Eviter 'line type' et 'line description'
+                                    if value and norm == 'line':
+                                        line = str(value).strip()
+                                        break
+                                    if value and ('line' in norm and 'description' not in norm and 'type' not in norm):
+                                        line = str(value).strip()
+                                        break
 
-                            if line_description != "N/A" or line != "N/A":
+                            if line_description != "N/A" or line != "N/A" or schedule != "N/A":
                                 break
-                        if line_description != "N/A" or line != "N/A":
-                            break
+                        if line_description != "N/A" or line != "N/A" or schedule != "N/A":
+                            break    
                     
                     receptions_snapshot.append({
                         'id': reception.id,
@@ -1830,7 +1929,8 @@ class MSRNReport(models.Model):
                         'amount_delivered': str(reception.amount_delivered if reception.amount_delivered is not None else Decimal('0')),
                         'quantity_payable': str(quantity_payable),
                         'amount_payable': str(amount_payable),
-                        'line': line
+                        'line': line,
+                        'schedule': schedule
                     })
                 
                 self.receptions_data_snapshot = receptions_snapshot
@@ -1899,32 +1999,32 @@ class InitialReceptionBusiness(models.Model):
     )
     source_file = models.ForeignKey(
         'FichierImporte',
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
         related_name='initial_reception_lines',
         verbose_name="Fichier source"
     )
     received_quantity = models.DecimalField(
-        max_digits=15,
+        max_digits=20,
         decimal_places=2,
         default=Decimal('0.00'),
         verbose_name="Received Quantity"
     )
     montant_total_initial = models.DecimalField(
-        max_digits=15,
+        max_digits=20,
         decimal_places=2,
         default=Decimal('0.00'),
         verbose_name="Montant total initial"
     )
     montant_recu_initial = models.DecimalField(
-        max_digits=15,
+        max_digits=20,
         decimal_places=2,
         default=Decimal('0.00'),
         verbose_name="Montant reçu initial"
     )
     taux_avancement_initial = models.DecimalField(
-        max_digits=5,
+        max_digits=20,
         decimal_places=2,
         default=Decimal('0.00'),
         verbose_name="Taux d'avancement initial (%)"
@@ -1938,6 +2038,19 @@ class InitialReceptionBusiness(models.Model):
         verbose_name = "Valeur initiale (business)"
         verbose_name_plural = "Valeurs initiales (business)"
         ordering = ['-date_mise_a_jour']
+
+    def save(self, *args, **kwargs):
+        # Normaliser le business_id avant sauvegarde pour éviter les doublons
+        if self.business_id:
+            self.business_id = normalize_business_id(self.business_id)
+        
+        # Mettre à jour update_fields pour inclure business_id si spécifié
+        if 'update_fields' in kwargs and kwargs['update_fields'] is not None:
+            update_fields = set(kwargs['update_fields'])
+            update_fields.add('business_id')
+            kwargs['update_fields'] = list(update_fields)
+        
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"IRV-BI {self.business_id} ({self.bon_commande.numero})"
@@ -1975,3 +2088,243 @@ def update_receptions_on_retention_rate_change(sender, instance, created, **kwar
         
         # Sauvegarder sans déclencher les signaux pour éviter les boucles
         reception.save(update_fields=['quantity_payable'])
+
+
+class TimelineDelay(models.Model):
+    """
+    Modèle pour gérer la répartition des retards indépendamment de l'évaluation fournisseur
+    """
+    bon_commande = models.OneToOneField(
+        NumeroBonCommande,
+        on_delete=models.CASCADE,
+        related_name='timeline_delay',
+        verbose_name="Bon de commande"
+    )
+    delay_part_mtn = models.IntegerField(default=0, verbose_name="Part MTN (jours)")
+    delay_part_force_majeure = models.IntegerField(default=0, verbose_name="Part Force Majeure (jours)")
+    delay_part_vendor = models.IntegerField(default=0, verbose_name="Part Fournisseur (jours)")
+    
+    # Montants calculés pour la timeline
+    retention_amount_timeline = models.DecimalField(
+        max_digits=20,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Montant Rétention Timeline"
+    )
+    retention_rate_timeline = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Taux Rétention Timeline (%)"
+    )
+    
+    date_creation = models.DateTimeField(auto_now_add=True, verbose_name="Date de création")
+    date_modification = models.DateTimeField(auto_now=True, verbose_name="Date de modification")
+    
+    class Meta:
+        verbose_name = "Timeline Delay"
+        verbose_name_plural = "Timeline Delays"
+    
+    def calculate_retention_timeline(self):
+        """Calcule le montant et le taux de rétention timeline"""
+        # Récupérer le PO Amount depuis le bon de commande
+        po_amount = self.bon_commande.montant_total()
+        
+        # Montant rétention timeline = PO Amount * 0.3% * Part Fournisseur
+        retention_amount_timeline = po_amount * Decimal('0.003') * Decimal(str(self.delay_part_vendor))
+        
+        # Taux rétention timeline = (Montant rétention / PO Amount) si <= 10%, sinon 10%
+        if po_amount > 0:
+            retention_rate_timeline = (retention_amount_timeline / po_amount) * Decimal('100')
+            if retention_rate_timeline > Decimal('10'):
+                # Recalculer le montant à 10% du PO Amount
+                retention_amount_timeline = po_amount * Decimal('0.10')
+                # Le taux est directement 10%
+                retention_rate_timeline = Decimal('10')
+        else:
+            retention_rate_timeline = Decimal('0')
+            retention_amount_timeline = Decimal('0')
+        
+        return retention_amount_timeline, retention_rate_timeline
+    
+    def save(self, *args, **kwargs):
+        """Calcule automatiquement les montants avant sauvegarde"""
+        self.retention_amount_timeline, self.retention_rate_timeline = self.calculate_retention_timeline()
+        super().save(*args, **kwargs)
+    
+    def __str__(self):
+        return f"Timeline Delays - {self.bon_commande.numero}"
+
+
+class VendorEvaluation(models.Model):
+    """
+    Modèle pour stocker les évaluations des fournisseurs
+    """
+    CRITERIA_CHOICES = {
+        'delivery_compliance': {
+            0: 'Non conforme',
+            1: 'Non conforme',
+            2: 'Conformité : 25% par rapport au besoin exprimé',
+            3: 'Conformité : 25% par rapport au besoin exprimé',
+            4: 'Conformité : 25% par rapport au besoin exprimé',
+            5: 'Conformité : 50% par rapport au besoin exprimé',
+            6: 'Conformité : 50% par rapport au besoin exprimé',
+            7: 'Conforme au besoin',
+            8: 'Conforme au besoin',
+            9: 'Conforme au besoin',
+            10: 'Supérieure / Meilleur que le besoin exprimé par MTN CI mais au même coût'
+        },
+        'delivery_timeline': {
+            0: 'Aucune livraison effectuée',
+            1: 'Aucune livraison effectuée',
+            2: 'Retard dans la livraison sans le notifier à MTN CI',
+            3: 'Retard dans la livraison sans le notifier à MTN CI',
+            4: 'Retard négocié avec MTN CI et non respect du nouveau planning avec explication donné à MTN',
+            5: 'Retard négocié avec MTN CI et non respect du nouveau planning avec explication donné à MTN',
+            6: 'Retard négocié avec MTN CI et non respect du nouveau planning avec explication donné à MTN',
+            7: 'Respect des délais',
+            8: 'Respect des délais',
+            9: 'Respect des délais',
+            10: 'En avance sur le délai de livraison prévue'
+        },
+        'advising_capability': {
+            0: 'Conseil inexistant',
+            1: 'Conseil inexistant',
+            2: 'Sur demande de MTN CI - Conseil donné mais pas utile',
+            3: 'Sur demande de MTN CI - Conseil donné mais pas utile',
+            4: 'Sur demande de MTN CI - Conseil donné utile mais incomplet',
+            5: 'Sur demande de MTN CI - Conseil donné utile mais incomplet',
+            6: 'Sur demande de MTN CI - Conseil donné utile mais incomplet',
+            7: 'Capacité à conseiller répond à nos attentes',
+            8: 'Capacité à conseiller répond à nos attentes',
+            9: 'Capacité à conseiller répond à nos attentes',
+            10: 'Transfert de compétence & formation régulière du client'
+        },
+        'after_sales_qos': {
+            0: 'SAV inexistant',
+            1: 'SAV inexistant',
+            2: 'Pas adapté à nos attentes',
+            3: 'Pas adapté à nos attentes',
+            4: 'Adapté à 50% à nos attentes sans respecter les délais',
+            5: 'Adapté à 50% à nos attentes sans respecter les délais',
+            6: 'Adapté à 50% à nos attentes sans respecter les délais',
+            7: '100% des requêtes et des plaintes résolues dans les délais',
+            8: '100% des requêtes et des plaintes résolues dans les délais',
+            9: '100% des requêtes et des plaintes résolues dans les délais',
+            10: 'Anticipation des problèmes / Aucun incident n\'est à signaler'
+        },
+        'vendor_relationship': {
+            0: 'Aucun contact',
+            1: 'Aucun contact',
+            2: 'Injoignable en dehors des visites / événements / pendant l\'exécution d\'une commande',
+            3: 'Injoignable en dehors des visites / événements / pendant l\'exécution d\'une commande',
+            4: 'Joignable après 2 ou 3 jours de relance, rappels …',
+            5: 'Joignable après 2 ou 3 jours de relance, rappels …',
+            6: 'Joignable après 2 ou 3 jours de relance, rappels …',
+            7: 'Bon contact / Prestataire réactif',
+            8: 'Bon contact / Prestataire réactif',
+            9: 'Bon contact / Prestataire réactif',
+            10: 'Bon contact / Prestataire très réactif'
+        }
+    }
+
+    bon_commande = models.ForeignKey(
+        NumeroBonCommande,
+        on_delete=models.CASCADE,
+        related_name='vendor_evaluations',
+        verbose_name="Bon de commande"
+    )
+    supplier = models.CharField(
+        max_length=255,
+        verbose_name="Fournisseur"
+    )
+    
+    # Critères d'évaluation (notes de 0 à 10)
+    delivery_compliance = models.IntegerField(
+        choices=[(i, f"{i}") for i in range(11)],
+        verbose_name="Delivery Compliance to Order (Quantity & Quality)",
+        help_text="Note de 0 à 10"
+    )
+    delivery_timeline = models.IntegerField(
+        choices=[(i, f"{i}") for i in range(11)],
+        verbose_name="Delivery Execution Timeline",
+        help_text="Note de 0 à 10"
+    )
+    advising_capability = models.IntegerField(
+        choices=[(i, f"{i}") for i in range(11)],
+        verbose_name="Vendor Advising Capability",
+        help_text="Note de 0 à 10"
+    )
+    after_sales_qos = models.IntegerField(
+        choices=[(i, f"{i}") for i in range(11)],
+        verbose_name="After Sales Services QOS",
+        help_text="Note de 0 à 10"
+    )
+    vendor_relationship = models.IntegerField(
+        choices=[(i, f"{i}") for i in range(11)],
+        verbose_name="Vendor Relationship",
+        help_text="Note de 0 à 10"
+    )
+    
+    # Note finale calculée automatiquement
+    vendor_final_rating = models.DecimalField(
+        max_digits=4,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Vendor Final Rating",
+        help_text="Moyenne des 5 critères (calculée automatiquement)"
+    )
+    
+    # Métadonnées
+    evaluator = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Évaluateur"
+    )
+    date_evaluation = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Date d'évaluation"
+    )
+    date_modification = models.DateTimeField(
+        auto_now=True,
+        verbose_name="Date de modification"
+    )
+
+    class Meta:
+        verbose_name = "Évaluation fournisseur"
+        verbose_name_plural = "Évaluations fournisseurs"
+        ordering = ['-date_evaluation']
+        unique_together = ['bon_commande', 'supplier']
+
+    def __str__(self):
+        return f"Évaluation {self.supplier} - {self.bon_commande.numero}"
+
+    def save(self, *args, **kwargs):
+        """Calcule automatiquement la moyenne avant la sauvegarde"""
+        scores = [
+            self.delivery_compliance,
+            self.delivery_timeline,
+            self.advising_capability,
+            self.after_sales_qos,
+            self.vendor_relationship
+        ]
+        self.vendor_final_rating = Decimal(str(sum(scores) / len(scores))) if scores else Decimal('0.00')
+        super().save(*args, **kwargs)
+
+    def get_criteria_description(self, criteria_name, score):
+        """Retourne la description du critère pour une note donnée"""
+        if criteria_name in self.CRITERIA_CHOICES:
+            return self.CRITERIA_CHOICES[criteria_name].get(score, f"Score: {score}")
+        return f"Score: {score}"
+
+    def get_total_score(self):
+        """Calcule le score total sur 50"""
+        return (
+            self.delivery_compliance +
+            self.delivery_timeline +
+            self.advising_capability +
+            self.after_sales_qos +
+            self.vendor_relationship
+        )

@@ -1,0 +1,441 @@
+:root {
+    --mtn-yellow: #FFCC00;
+    --mtn-black: #000000;
+    --mtn-gray: #f8f9fa;
+    --mtn-dark-gray: #343a40;
+}
+
+/* Style Excel-like pour le tableau de données */
+.data-table {
+    border-collapse: collapse;
+    table-layout: auto;
+    width: 100%;
+    min-width: 100%;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 13px;
+    border: 1px solid #d0d0d0;
+    margin: 0;
+    padding: 0;
+}
+.data-table th {
+    background-color: var(--mtn-yellow);
+    font-weight: bold;
+    text-align: center;
+    padding: 8px 10px;
+    border: 1px solid #d0d0d0;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    color: var(--mtn-black);
+    border-bottom: 2px solid #caa700;
+}
+.data-table td {
+    padding: 6px 10px;
+    border: 1px solid #d0d0d0;
+    white-space: nowrap;
+    min-width: 80px;
+}
+.data-table tr:nth-child(even) {
+    background-color: #fafafa;
+}
+.data-table tr:hover {
+    background-color: #e8f4fc;
+}
+
+/* Container avec défilement horizontal et vertical - plein écran */
+.data-container {
+    overflow: auto;
+    max-height: 75vh; /* Plus grand pour utiliser plus d'espace vertical */
+    width: 100%;
+    border: 1px solid #d0d0d0;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    background-color: white;
+    margin-bottom: 0; /* Pas d'espace en bas */
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 10px; /* Petit padding à gauche pour voir la première colonne */
+}
+
+/* Styles pour les valeurs spéciales */
+.field-longtext {
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.field-longtext div {
+    max-height: 100px;
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: 0.85rem;
+    white-space: pre-wrap;
+}
+
+/* Style pour le pied de tableau */
+.data-table tfoot tr {
+    background-color: #f0f0f0 !important;
+    font-weight: bold;
+    border-top: 2px solid #a0a0a0;
+}
+
+/* Optimisations pour utiliser tout l'espace disponible */
+.card-data {
+    margin-left: 0;
+    margin-right: 0;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 0;
+}
+.card-data .card-body {
+    padding: 0;
+    width: 100%;
+}
+
+/* Styles pour forcer le tableau à occuper toute la largeur */
+.card, .alert, .info-card {
+    border-radius: 0;
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+/* Styles pour les cases à cocher et le bouton de quantity delivered collectif */
+#collective-quantity-delivered-container {
+    transition: all 0.3s ease;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+#apply-collective-quantity-delivered {
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 20px;
+    transition: all 0.2s ease;
+    border-radius: 8px;
+    border: none;
+}
+
+#apply-collective-quantity-delivered:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 15px rgba(0,0,0,0.15);
+}
+
+#selected-count-badge {
+    font-size: 14px;
+    font-weight: 700;
+    padding: 5px 10px;
+    border-radius: 20px;
+    transition: all 0.2s ease;
+}
+
+/* Animation de pulsation pour le bouton */
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+}
+
+.pulse-animation {
+    animation: pulse 0.5s ease-in-out;
+}
+
+/* Style pour les cases à cocher */
+.row-checkbox, #select-all-rows {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+/* Mise en évidence des lignes sélectionnées */
+.row-checkbox:checked + td {
+    background-color: #e8f4fc;
+}
+
+.data-table tr:has(.row-checkbox:checked) {
+    background-color: #e8f4fc !important;
+}
+
+/* Styles pour occuper toute la largeur de l'écran */
+body {
+    overflow-x: hidden;
+    max-width: 100vw;
+}
+
+.container {
+    max-width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+.navbar > .container {
+    padding-left: 15px !important;
+    padding-right: 15px !important;
+}
+
+/* Styles généraux */
+.page-header {
+    background: linear-gradient(135deg, var(--mtn-dark-gray) 0%, #212529 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    width: 100%;
+    max-width: 100%;
+}
+
+.page-header h1 {
+    margin: 0;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+}
+
+.page-header h1 i {
+    color: var(--mtn-yellow);
+    margin-right: 10px;
+}
+
+.page-header .meta-info {
+    margin-top: 10px;
+    font-size: 0.9rem;
+}
+
+.info-card {
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    padding: 20px;
+    margin-bottom: 20px;
+    border-left: 4px solid var(--mtn-yellow);
+}
+
+.info-card h5 {
+    color: var(--mtn-dark-gray);
+    margin-bottom: 15px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+}
+
+.info-card h5 i {
+    color: var(--mtn-yellow);
+    margin-right: 10px;
+}
+
+.info-item {
+    display: flex;
+    margin-bottom: 10px;
+}
+
+.info-label {
+    font-weight: 500;
+    min-width: 150px;
+    color: var(--mtn-dark-gray);
+}
+
+.info-value {
+    color: #495057;
+}
+
+/* Styles pour le tableau des lignes de commande (style Django admin) */
+#result_list {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 0;
+    background-color: white;
+}
+
+#result_list th {
+    background-color: #f8f9fa;
+    color: #333;
+    font-weight: bold;
+    text-align: left;
+    padding: 8px;
+    border-bottom: 1px solid #ddd;
+}
+
+#result_list td {
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+    vertical-align: middle;
+}
+
+#result_list .row1 {
+    background-color: #ffffff;
+}
+
+#result_list .row2 {
+    background-color: #f9f9f9;
+}
+
+#result_list tr:hover {
+    background-color: #ffffcc;
+}
+
+.text-end {
+    text-align: right;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.field-longtext {
+    max-width: 300px;
+}
+
+/* Style pour les badges et alertes */
+.badge {
+    padding: 0.35em 0.65em;
+    font-size: 0.75em;
+    font-weight: 700;
+    border-radius: 0.25rem;
+}
+
+/* Style pour les alertes */
+.alert {
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.alert-info {
+    background-color: #cff4fc;
+    border: 1px solid #b6effb;
+    color: #055160;
+}
+
+.alert-warning {
+    background-color: #fff3cd;
+    border: 1px solid #ffecb5;
+    color: #664d03;
+}
+
+/* Style pour les badges */
+.badge {
+    display: inline-block;
+    padding: 0.25em 0.6em;
+    font-size: 75%;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: 0.25rem;
+}
+
+.badge-info {
+    background-color: #17a2b8;
+    color: white;
+}
+
+.badge-success {
+    background-color: #28a745;
+    color: white;
+}
+
+.badge-warning {
+    background-color: var(--mtn-yellow);
+    color: var(--mtn-black);
+}
+
+.badge-primary {
+    background-color: #007bff;
+    color: white;
+}
+
+/* Style pour les boutons d'action */
+.action-buttons {
+    display: flex;
+    gap: 5px;
+}
+
+.btn-mtn {
+    background-color: var(--mtn-yellow);
+    color: var(--mtn-black);
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-weight: 600;
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-mtn:hover {
+    background-color: #e6b800;
+    color: var(--mtn-black);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.12);
+}
+
+/* Style pour la ligne de total */
+.total-row {
+    background-color: #f8f9fa;
+    font-weight: bold;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .filter-form {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+    }
+}
+
+/* Styles pour la barre d'onglets Bootstrap */
+.tabs-bar {
+    margin: 0 15px 20px;
+}
+.tabs-bar .nav-tabs .nav-link {
+    font-weight: 500;
+}
+.tabs-bar .nav-tabs .nav-link.active {
+    background-color: var(--mtn-dark-gray);
+    color: white;
+    border-color: var(--mtn-dark-gray) var(--mtn-dark-gray) transparent;
+}
+
+/* Styles pour la page de détail des bons de commande */
+.page-header {
+    background-color: var(--mtn-dark-gray);
+    color: white;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-radius: 0;
+}
+  
+/* Styles pour les champs Quantity Delivered */
+.quantity-delivered-input {
+    width: 80px;
+    padding: 4px 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    text-align: right;
+}
+  
+.quantity-delivered-input:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    outline: none;
+}
+  
+.quantity-delivered-cell {
+    background-color: #f8f9fa;
+}

@@ -16,6 +16,9 @@ import openpyxl
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 from openpyxl.utils import get_column_letter
 import os
+from decimal import Decimal
+from .models import NumeroBonCommande, Reception, FichierImporte, LigneFichier, MSRNReport
+
 from .models import (
     FichierImporte, LigneFichier, NumeroBonCommande, Reception, ActivityLog, MSRNReport
 )
@@ -310,6 +313,70 @@ def details_bon(request, bon_id):
         except NumeroBonCommande.DoesNotExist:
             pass
 
+    # Fonction de normalisation tolérante des en-têtes (comme dans export_po_progress_monitoring)
+    def normalize_header(s: str):
+        """Normalise un en-tête: strip -> lower -> remplace _ et - par espace -> compresse espaces"""
+        return ' '.join(str(s).strip().lower().replace('_', ' ').replace('-', ' ').split())
+    
+    def get_value_tolerant(contenu: dict, exact_candidates=None, tokens=None):
+        """Retourne la valeur pour une clé en acceptant des variantes d'en-têtes.
+        - exact_candidates: liste de libellés candidats (str) comparés après normalisation
+        - tokens: liste de mots qui doivent tous être présents dans l'en-tête normalisé
+        Gestionne notamment: espaces de fin/début, doubles espaces, underscores, casse.
+        """
+        if not contenu:
+            return None
+        
+        # Construire un mapping normalisé -> (clé originale, valeur)
+        normalized = {normalize_header(k): (k, v) for k, v in contenu.items() if k}
+        
+        # 1) Essais exacts (après normalisation)
+        if exact_candidates:
+            for cand in exact_candidates:
+                nk = normalize_header(cand)
+                if nk in normalized:
+                    return normalized[nk][1]
+        
+        # 2) Recherche par tokens (tous présents dans la clé normalisée)
+        if tokens:
+            needed = [normalize_header(t) for t in tokens]
+            for nk, (_ok, v) in normalized.items():
+                if all(t in nk for t in needed):
+                    return v
+        return None
+    
+    def normalize_keys(data_list):
+        """Normalise les clés de tous les dictionnaires pour assurer la cohérence"""
+        if not data_list or not isinstance(data_list, list):
+            return data_list
+        
+        # Créer un mapping des variations de clés vers la clé normalisée (première occurrence)
+        key_mapping = {}
+        canonical_keys = {}  # normalized -> canonical
+        
+        for item in data_list:
+            for key in item.keys():
+                normalized = normalize_header(key)
+                if normalized not in canonical_keys:
+                    # Première fois qu'on voit cette clé normalisée
+                    canonical_keys[normalized] = key.strip()
+                key_mapping[key] = canonical_keys[normalized]
+        
+        # Appliquer la normalisation à tous les items
+        normalized_data = []
+        for item in data_list:
+            normalized_item = {}
+            for key, value in item.items():
+                normalized_key = key_mapping.get(key, key)
+                normalized_item[normalized_key] = value
+            normalized_data.append(normalized_item)
+        
+        return normalized_data
+    
+    # Normaliser les données
+    if contenu_data and isinstance(contenu_data, list):
+        contenu_data = normalize_keys(contenu_data)
+
     if contenu_data:
         # Utiliser les en-têtes stockés dans le fichier importé
         
@@ -320,8 +387,11 @@ def details_bon(request, bon_id):
             for item in contenu_data:
                 all_keys.update(item.keys())
             
-            # Trier les en-têtes de manière cohérente
+            # Trier les en-têtes par ordre alphabétique
             headers = sorted(list(all_keys))
+            
+            # Debug: afficher les headers disponibles
+            print(f"[DEBUG details_bon] Headers disponibles ({len(headers)}): {headers}")
             
             # Trouver la colonne qui contient le numéro de commande
             for cle in headers:
@@ -461,6 +531,24 @@ def details_bon(request, bon_id):
     if 'Amount Payable' not in headers:
         headers.append('Amount Payable')    
     
+    # Récupérer les évaluations du fournisseur pour ce bon de commande
+    vendor_evaluations = []
+    if selected_order_number and bon_commande:
+        from .models import VendorEvaluation
+        vendor_evaluations = VendorEvaluation.objects.filter(
+            bon_commande=bon_commande,
+            supplier=supplier
+        ).order_by('-date_evaluation')
+
+    # Vérifier si le bon contient "Migration IFS" dans Line Description
+    is_migration_ifs = False
+    if raw_data:
+        for item in raw_data:
+            line_desc = str(item.get('Line Description', '')).strip().upper()
+            if 'MIGRATION IFS' in line_desc:
+                is_migration_ifs = True
+                break
+    
     context = {
         'fichier': fichier,
         'bon': fichier,  
@@ -486,258 +574,12 @@ def details_bon(request, bon_id):
         'bon_commande_id': bon_commande.id if selected_order_number and hasattr(bon_commande, 'id') else None,
         'retention_rate': bon_commande.retention_rate if selected_order_number and hasattr(bon_commande, 'retention_rate') else Decimal('0'),
         'retention_cause': bon_commande.retention_cause if selected_order_number and hasattr(bon_commande, 'retention_cause') else '',
+        'vendor_evaluations': vendor_evaluations,
+        'is_migration_ifs': is_migration_ifs,  # Flag pour désactiver les actions
 
     }
     
     return render(request, 'orders/detail_bon.html', context)
-
-
-def export_bon_excel(request, bon_id):
-    """
-    Exporte les données d'un bon de commande en Excel avec les données mises à jour des réceptions.
-    Cette fonction réutilise la logique de fusion des données de details_bon.
-    """
-    selected_order_number = request.GET.get('selected_order_number')
-
-    if bon_id == 'search' and 'order_number' in request.GET:
-        selected_order_number = request.GET.get('order_number')
-        try:
-            bon_commande = NumeroBonCommande.objects.get(numero=selected_order_number)
-            fichier = bon_commande.fichiers.order_by('-date_importation').first()
-            if not fichier:
-                messages.warning(request, f'Purchase order {selected_order_number} exists but is not associated with any file.')
-                return redirect('orders:accueil')
-        except NumeroBonCommande.DoesNotExist:
-            messages.error(request, f'Purchase order {selected_order_number} not found.')
-            return redirect('orders:accueil')
-    else:
-        fichier = get_object_or_404(FichierImporte, id=bon_id)
-        if not selected_order_number and fichier.bons_commande.exists():
-            selected_order_number = fichier.bons_commande.first().numero
-    
-    # Récupérer les données depuis le modèle LigneFichier
-    try:
-        # Récupérer toutes les lignes du fichier avec leur ID
-        lignes_fichier = fichier.lignes.all().order_by('numero_ligne')
-        
-        # Ajouter une fonction utilitaire pour extraire les valeurs numériques
-        def extract_numeric_values(data):
-            numeric_fields = ['Ordered Quantity','Quantity Delivered', 'Quantity Not Delivered', 'Price']
-            for field in numeric_fields:
-                if field in data:
-                    try:
-                        # Convertir en float puis en int si possible
-                        value = data[field]
-                        if isinstance(value, str):
-                            value = value.replace(',', '').strip()
-                        num = float(value) if value not in (None, '') else 0.0
-                        if num.is_integer():
-                            data[field] = int(num)
-                        else:
-                            data[field] = num
-                    except (TypeError, ValueError):
-                        data[field] = 0
-            return data
-        
-        # Créer une liste des données avec l'ID de la ligne
-        contenu_data = []
-        for ligne in lignes_fichier:
-            data = ligne.contenu.copy()
-            data['_business_id'] = ligne.business_id  # Store business ID instead of row index
-            data = extract_numeric_values(data)  # Extraire les valeurs numériques
-            contenu_data.append(data)
-        
-        # Initialiser le dictionnaire des réceptions indexé par business_id
-        receptions = {}
-        
-        # Variables pour les informations financières
-        montant_total = 0
-        montant_recu = 0
-        taux_avancement = 0
-        
-        # Si un numéro de bon de commande est sélectionné, charger les réceptions existantes
-        if selected_order_number:
-            try:
-                # Récupérer le bon de commande
-                bon_commande = NumeroBonCommande.objects.get(numero=selected_order_number)
-                
-                # Récupérer les réceptions pour ce bon de commande et ce fichier
-                receptions_queryset = Reception.objects.filter(
-                    bon_commande=bon_commande,
-                    fichier=fichier
-                ).select_related('fichier', 'bon_commande').order_by('business_id')
-                
-                # Convertir les réceptions en dictionnaire indexé par business_id
-                for reception in receptions_queryset:
-                    receptions[str(reception.business_id)] = {
-                        'quantity_delivered': reception.quantity_delivered,
-                        'ordered_quantity': reception.ordered_quantity,
-                        'quantity_not_delivered': reception.quantity_not_delivered,
-                        'amount_delivered': reception.amount_delivered,
-                        'quantity_payable': reception.quantity_payable,
-                        'unit_price': reception.unit_price,
-                        'amount_payable': reception.amount_payable  # Use the desired header
-                    }
-                
-                # Calculer les montants totaux pour l'onglet d'information
-                montant_total = bon_commande.montant_total()
-                montant_recu = bon_commande.montant_recu()
-                if montant_total > 0:
-                    taux_avancement = (montant_recu / montant_total) * 100
-                else:
-                    taux_avancement = 0
-                    
-            except NumeroBonCommande.DoesNotExist:
-                # Si le bon de commande n'existe pas encore, on continue avec un dictionnaire vide
-                pass
-                
-    except Exception as e:
-        messages.error(request, f"Erreur lors de la récupération des données : {str(e)}")
-        return redirect('orders:details_bon', bon_id=bon_id)
-        
-    raw_data = []
-    headers = []
-    colonne_order = None
-    
-    if contenu_data:
-        # Utiliser les en-têtes stockés dans le fichier importé
-        
-        # Traitement des données structurées (liste de dictionnaires)
-        if isinstance(contenu_data, list) and len(contenu_data) > 0 and isinstance(contenu_data[0], dict):
-            # Récupérer tous les en-têtes uniques
-            all_keys = set()
-            for item in contenu_data:
-                all_keys.update(item.keys())
-            
-            # Trier les en-têtes de manière cohérente
-            headers = sorted(list(all_keys))
-            
-            # Trouver la colonne qui contient le numéro de commande
-            for cle in headers:
-                if cle.upper() in ['ORDER', 'ORDRE', 'BON', 'BON_COMMANDE', 'COMMANDE', 'BC', 'NUM_BC', 'PO', 'PO_NUMBER']:
-                    colonne_order = cle
-                    break
-            
-            # Filtrer les données si un numéro de commande est sélectionné
-            if selected_order_number and colonne_order:
-                raw_data = [
-                    item for item in contenu_data 
-                    if colonne_order in item and str(item[colonne_order]) == str(selected_order_number)
-                ]
-            else:
-                raw_data = contenu_data
-    
-    # Ajouter les données de réception aux données brutes en utilisant l'ID de ligne
-    if contenu_data and isinstance(contenu_data, list):
-        for item in contenu_data:
-            # Utiliser l'ID de la ligne pour la correspondance
-            idx = item.get('_business_id')
-            
-            if idx is not None and str(idx) in receptions:
-                # Si on a une réception pour cette ligne, utiliser ses valeurs
-                rec = receptions[str(idx)]
-                # Renommer Quantity Delivered en Receipt
-                item['Quantity Delivered'] = rec['quantity_delivered']
-                item['Ordered Quantity'] = rec['ordered_quantity']
-                item['Quantity Not Delivered'] = rec['quantity_not_delivered']
-                item['Amount Delivered'] = rec['amount_delivered']
-                item['Quantity Payable'] = rec['quantity_payable']
-                item['Amount Payable'] = rec['amount_payable']
-                
-                # Supprimer l'ancienne colonne Quantity Delivered si elle existe
-                # if 'Quantity Delivered' in item:
-                #     del item['Quantity Delivered']
-            elif 'Ordered Quantity' in item:
-                # Initialiser avec des valeurs par défaut si pas de réception existante
-                try:
-                    ordered_qty = float(item['Ordered Quantity']) if item['Ordered Quantity'] is not None else 0
-                    # Utiliser Quantity Delivered au lieu de Quantity Delivered
-                    item['Quantity Delivered'] = 0
-                    item['Quantity Not Delivered'] = ordered_qty
-                    item['Amount Delivered'] = 0
-                    item['Quantity Payable'] = 0
-                    item['Amount Payable'] = 0
-                    
-                    # Supprimer l'ancienne colonne Quantity Delivered si elle existe
-                    # if 'Quantity Delivered' in item:
-                    #     del item['Quantity Delivered']
-                except (ValueError, TypeError):
-                    item['Quantity Delivered'] = 0
-                    item['Quantity Not Delivered'] = 0
-                    item['Amount Delivered'] = 0
-                    item['Quantity Payable'] = 0
-                    item['Amount Payable'] = 0                    
-                    # Supprimer l'ancienne colonne Quantity Delivered si elle existe
-                    # if 'Quantity Delivered' in item:
-                    #     del item['Quantity Delivered']
-    
-    # Nettoyer les données avant export: retirer lignes d'erreur et totalement vides
-    filtered_raw = []
-    for item in raw_data:
-        if not isinstance(item, dict):
-            continue
-        # Exclure toute ligne d'erreur explicite
-        if 'error' in item:
-            continue
-        # Considérer vides les lignes dont toutes les valeurs non techniques sont vides/None
-        non_tech_keys = [k for k in item.keys() if not k.startswith('_')]
-        has_value = any(
-            (item.get(k) is not None and str(item.get(k)).strip() != '')
-            for k in non_tech_keys
-        )
-        if not has_value:
-            continue
-        filtered_raw.append(item)
-    raw_data = filtered_raw
-
-    # Supprimer les clés techniques qui ne doivent pas apparaître dans l'export
-    for item in raw_data:
-        if '_business_id' in item:
-            del item['_business_id']
-    
-    # Générer le fichier Excel
-    import pandas as pd
-    from django.http import HttpResponse
-    from io import BytesIO
-    
-    # Créer un DataFrame pandas avec les données
-    df = pd.DataFrame(raw_data)
-    
-    # Créer un buffer en mémoire pour stocker le fichier Excel
-    output = BytesIO()
-    
-    # Déterminer le nom du fichier
-    filename = f"PO_{selected_order_number}_updated.xlsx" if selected_order_number else f"Fichier_{fichier.id}_updated.xlsx"
-    
-    # Créer un writer Excel
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        # Premier onglet avec les données principales
-        df.to_excel(writer, index=False, sheet_name='Données')
-        
-        # Deuxième onglet avec les informations financières
-        if selected_order_number:
-            # Créer un DataFrame pour les informations financières
-            info_data = {
-                'Information': ['Montant Total', 'Montant Total Reçu', 'Taux d\'Avancement'],
-                'Valeur': [
-                    f"{montant_total:,.2f} FCFA",
-                    f"{montant_recu:,.2f} FCFA",
-                    f"{taux_avancement:.2f}%"
-                ]
-            }
-            info_df = pd.DataFrame(info_data)
-            info_df.to_excel(writer, index=False, sheet_name='Informations')
-    
-    # Configurer la réponse HTTP
-    output.seek(0)
-    response = HttpResponse(
-        output.read(),
-        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
-    
-    return response
-
 
 
 def telecharger_fichier(request, fichier_id, format_export='xlsx'):
@@ -849,151 +691,7 @@ def search_bon(request):
                 return redirect('orders:accueil')
         except NumeroBonCommande.DoesNotExist:
             messages.error(request, f"Aucun bon de commande trouvé avec le numéro '{order_number}'")
-            return redirect('accueil')
-
-
-def export_fichier_complet(request, fichier_id):
-    """
-    Exporte toutes les données d'un fichier importé en Excel avec les données mises à jour des réceptions.
-    Cette fonction réutilise la logique de fusion des données de export_bon_excel mais sans filtrer par numéro de commande.
-    """
-    try:
-        # Récupérer le fichier importé
-        fichier = get_object_or_404(FichierImporte, id=fichier_id)
-        
-        # Récupérer toutes les lignes du fichier avec leur ID
-        lignes_fichier = fichier.lignes.all().order_by('numero_ligne')
-        
-        # Ajouter une fonction utilitaire pour extraire les valeurs numériques
-        def extract_numeric_values(data):
-            numeric_fields = ['Ordered Quantity', 'Quantity Delivered', 'Quantity Not Delivered', 'Price']
-            for field in numeric_fields:
-                if field in data:
-                    try:
-                        # Convertir en float puis en int si possible
-                        value = data[field]
-                        if isinstance(value, str):
-                            value = value.replace(',', '').strip()
-                        num = float(value) if value not in (None, '') else 0.0
-                        if num.is_integer():
-                            data[field] = int(num)
-                        else:
-                            data[field] = num
-                    except (TypeError, ValueError):
-                        data[field] = 0
-            return data
-        
-        # Créer une liste des données avec l'ID de la ligne
-        contenu_data = []
-        for ligne in lignes_fichier:
-            data = ligne.contenu.copy()
-            data['_business_id'] = ligne.business_id  # Store business ID instead of row index
-            data = extract_numeric_values(data)  # Extraire les valeurs numériques
-            contenu_data.append(data)
-        
-        # Initialiser le dictionnaire des réceptions indexé par business_id
-        receptions = {}
-        
-        # Récupérer toutes les réceptions pour ce fichier
-        receptions_queryset = Reception.objects.filter(
-            fichier=fichier
-        ).select_related('fichier', 'bon_commande').order_by('business_id')
-        
-        # Convertir les réceptions en dictionnaire indexé par business_id
-        for reception in receptions_queryset:
-            receptions[str(reception.business_id)] = {
-                'quantity_delivered': reception.quantity_delivered,
-                'ordered_quantity': reception.ordered_quantity,
-                'quantity_not_delivered': reception.quantity_not_delivered,
-                'amount_delivered': reception.amount_delivered,
-                'quantity_payable': reception.quantity_payable,
-                'amount_payable': reception.amount_payable  # Use the desired header
-            }
-        
-        # Ajouter les données de réception aux données brutes en utilisant l'ID de ligne
-        if contenu_data and isinstance(contenu_data, list):
-            for item in contenu_data:
-                # Utiliser l'ID de la ligne pour la correspondance
-                idx = item.get('_business_id')
-                
-                if idx is not None and str(idx) in receptions:
-                    # Si on a une réception pour cette ligne, utiliser ses valeurs
-                    rec = receptions[str(idx)]
-                    # Ajouter les données de réception
-                    item['Quantity Delivered'] = rec['quantity_delivered']
-                    item['Ordered Quantity'] = rec['ordered_quantity']
-                    item['Quantity Not Delivered'] = rec['quantity_not_delivered']
-                    item['Amount Delivered'] = rec['amount_delivered']
-                    item['Quantity Payable'] = rec['quantity_payable']
-                    item['Amount Payable'] = rec['amount_payable']
-                elif 'Ordered Quantity' in item:
-                    # Initialiser avec des valeurs par défaut si pas de réception existante
-                    try:
-                        ordered_qty = float(item['Ordered Quantity']) if item['Ordered Quantity'] is not None else 0
-                        # Initialiser les valeurs par défaut
-                        item['Quantity Delivered'] = 0
-                        item['Quantity Not Delivered'] = ordered_qty
-                        item['Amount Delivered'] = 0
-                        item['Quantity Payable'] = 0
-                        item['Amount Payable'] = 0
-                    except (ValueError, TypeError):
-                        item['Quantity Delivered'] = 0
-                        item['Quantity Not Delivered'] = 0
-                        item['Amount Delivered'] = 0
-                        item['Quantity Payable'] = 0
-                        item['Amount Payable'] = 0
-                        
-                        # Conserver la colonne Quantity Delivered
-        
-        # Supprimer les clés techniques qui ne doivent pas apparaître dans l'export
-        for item in contenu_data:
-            if '_business_id' in item:
-                del item['_business_id']
-        
-        # Générer le fichier Excel
-        import pandas as pd
-        from django.http import HttpResponse
-        from io import BytesIO
-        
-        # Créer un DataFrame pandas avec les données
-        df = pd.DataFrame(contenu_data)
-        
-        # Créer un buffer en mémoire pour stocker le fichier Excel
-        output = BytesIO()
-        
-        # Déterminer le nom du fichier
-        filename = f"Fichier_complet_{fichier.id}_updated.xlsx"
-        
-        # Créer un writer Excel
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            # Premier onglet avec les données principales
-            df.to_excel(writer, index=False, sheet_name='Données')
-            
-            # Deuxième onglet avec les informations sur le fichier
-            info_data = {
-                'Information': ['Nom du fichier', 'Date d\'importation', 'Nombre de lignes'],
-                'Valeur': [
-                    os.path.basename(fichier.fichier.name),
-                    fichier.date_importation.strftime('%Y-%m-%d %H:%M'),
-                    fichier.nombre_lignes
-                ]
-            }
-            info_df = pd.DataFrame(info_data)
-            info_df.to_excel(writer, index=False, sheet_name='Informations')
-        
-        # Configurer la réponse HTTP
-        output.seek(0)
-        response = HttpResponse(
-            output.read(),
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        
-        return response
-        
-    except Exception as e:
-        messages.error(request, f"Erreur lors de l'exportation du fichier : {str(e)}")
-        return redirect('admin:orders_fichierimporte_changelist')
+            return redirect('orders:accueil')
 
 
 @login_required
@@ -1003,316 +701,434 @@ def po_progress_monitoring(request):
     """
     return render(request, 'orders/po_progress_monitoring.html')
 
-# orders/views.py
-from django.http import HttpResponse
-from django.contrib.auth.decorators import login_required
-from django.db.models import F, Value, DecimalField, ExpressionWrapper, Case, When, Sum, Subquery, OuterRef, FloatField
-import pandas as pd
-from io import BytesIO
-from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
-from openpyxl.utils import get_column_letter
-import logging
 
-
-logger = logging.getLogger(__name__)
 
 @login_required
-def export_po_progress_monitoring(request):
+def vendor_evaluation(request, bon_commande_id):
     """
-    Export Excel optimisé pour le suivi des bons de commande
-    Une seule ligne par numéro de bon de commande avec toutes les colonnes demandées
+    Vue pour créer ou modifier l'évaluation d'un fournisseur
     """
+    from .models import VendorEvaluation
+    
+    # Récupérer le bon de commande
+    bon_commande = get_object_or_404(NumeroBonCommande, id=bon_commande_id)
+    supplier = bon_commande.get_supplier()
+    
+    # Récupérer le fichier_id depuis la requête (d'où vient l'utilisateur)
+    fichier_id = request.GET.get('fichier_id')
+    if not fichier_id:
+        # Si pas de fichier_id, prendre le plus récent
+        fichier = bon_commande.fichiers.order_by('-date_importation').first()
+        fichier_id = fichier.id if fichier else None
+    
+    # Vérifier si une évaluation existe déjà
+    evaluation = None
     try:
-        from .models import NumeroBonCommande, InitialReceptionBusiness, LigneFichier
-
-        # Récupération des données des fichiers liés aux bons de commande
-        bons_commande = NumeroBonCommande.objects.prefetch_related(
-            'fichiers__lignes'
-        ).all()
-        
-        # Debug: Afficher les clés disponibles dans la première occurrence
-        debug_first_occurrence = None
-        
-        # Étape 1: Créer un cache pour les premières occurrences de chaque bon de commande
-        first_occurrence_cache = {}
-
-        # Parcourir tous les bons de commande et leurs fichiers/lignes
-        for bon in bons_commande:
-            # Initialiser à None pour ce bon
-            first_occurrence_cache[bon.numero] = None
-
-            # Parcourir les fichiers et les lignes dans l'ordre d'importation (par date d'importation croissante)
-            for fichier in bon.fichiers.order_by('date_importation'):
-                for ligne in fichier.lignes.order_by('numero_ligne'):
-                    contenu = ligne.contenu
-                    # Vérifier si cette ligne correspond au bon de commande (en fonction de la colonne 'Order')
-                    if contenu.get('Order') == bon.numero:
-                        # Stocker la première occurrence et sortir des boucles pour ce bon
-                        first_occurrence_cache[bon.numero] = contenu
-                        break
-                if first_occurrence_cache[bon.numero] is not None:
-                    break
-
-        # Étape 2: Préparation des données pour le DataFrame
-        data = []
-        for bon in bons_commande:
-            # Récupérer la première occurrence de ce bon de commande
-            premiere_occurrence = first_occurrence_cache.get(bon.numero)
+        evaluation = VendorEvaluation.objects.get(
+            bon_commande=bon_commande,
+            supplier=supplier
+        )
+    except VendorEvaluation.DoesNotExist:
+        pass
+    
+    if request.method == 'POST':
+        try:
+            # Récupérer les données du formulaire
+            delivery_compliance = int(request.POST.get('delivery_compliance'))
+            delivery_timeline = int(request.POST.get('delivery_timeline'))
+            advising_capability = int(request.POST.get('advising_capability'))
+            after_sales_qos = int(request.POST.get('after_sales_qos'))
+            vendor_relationship = int(request.POST.get('vendor_relationship'))
             
-            # Debug: Stocker la première occurrence pour inspection
-            if debug_first_occurrence is None and premiere_occurrence:
-                debug_first_occurrence = premiere_occurrence
-                print("Debug - Clés disponibles dans la première occurrence:", sorted(premiere_occurrence.keys()))
-
-            # Si aucune occurrence n'a été trouvée, passer à la suite
-            if premiere_occurrence is None:
-                print(f"Avertissement: Aucune occurrence trouvée pour le bon de commande {bon.numero}")
-                continue
-
-            # Récupération des montants avec conversion en float pour éviter les problèmes de type
-            from decimal import Decimal
-            montants = InitialReceptionBusiness.objects.filter(
-                bon_commande=bon
-            ).aggregate(
-                total_recu=Sum('montant_recu_initial'),
-                total_initial=Sum('montant_total_initial')
-            )
-
-            # Conversion des valeurs décimales en float
-            montants = {k: float(v if v is not None else 0) for k, v in montants.items()}
-
-            # Calcul du pourcentage financier
-            total_initial = montants['total_initial'] or 0
-            total_recu = montants['total_recu'] or 0
-            financial_percent = (total_recu / total_initial) if total_initial > 0 else 0
-            currency = premiere_occurrence.get('Currency')
-            if currency == 'XOF':
-                exchange_rate = 1.0
-            else:
-                # Récupérer le taux de conversion de la première occurrence
-                exchange_rate_str = premiere_occurrence.get('Conversion Rate')
-                try:
-                    exchange_rate = float(exchange_rate_str) if exchange_rate_str else 1.0
-                except (TypeError, ValueError):
-                    exchange_rate = 1.0
-
-            # Calcul du PO en XOF
-            po_amount = float(bon.montant_total()) if callable(getattr(bon, 'montant_total', None)) else 0.0
-            po_amount_xof = po_amount * exchange_rate
-
-
-            # Calcul du retard total
-            from datetime import datetime
-            pip_end_str = premiere_occurrence.get('PIP END DATE')
-            actual_end_str = premiere_occurrence.get('ACTUAL END DATE')
-            total_days_late = 0
-            if pip_end_str and actual_end_str:
-                try:
-                    pip_end = datetime.strptime(pip_end_str, '%Y-%m-%d')
-                    actual_end = datetime.strptime(actual_end_str, '%Y-%m-%d')
-                    total_days_late = (actual_end - pip_end).days
-                except Exception:
-                    total_days_late = 0
-
-            # Calcul du retard imputable au vendeur
-            force_majeure_value = premiere_occurrence.get('Day Late Due to Force Majeure')
-            if force_majeure_value is None:
-                force_majeure_value = 0
-            try:
-                day_late_force_majeure = float(force_majeure_value)
-            except (TypeError, ValueError):
-                day_late_force_majeure = 0
-
-            day_late_due_to_vendor = max(0, total_days_late - day_late_force_majeure)
-
-            # Calcul de Accruals (Cur)
-            montant_recu = float(bon.montant_recu()) if callable(getattr(bon, 'montant_recu', None)) else 0.0
-            accruals_cur = montant_recu - float(total_recu)
-
-            # Calcul de Receipt Not Invoiced (CUR)
-            invoiced_amount_str = premiere_occurrence.get("Invoiced Amount")
-            try:
-                invoiced_amount = float(invoiced_amount_str) if invoiced_amount_str else 0.0
-            except (TypeError, ValueError):
-                invoiced_amount = 0.0
-            receipt_not_invoiced = float(total_recu) - invoiced_amount
-
-            # Calcul de Année
-            project_name = premiere_occurrence.get('Project Name', '')
-            annee = project_name[:4] if project_name else ''
-
-            # Calcul des nouvelles colonnes
-            po_amount = float(bon.montant_total()) if callable(getattr(bon, 'montant_total', None)) else 0.0
-            
-            # 1. Calcul initial de Penalties (0.3% * Day Late due to Vendor * PO Amount)
-            penalties = 0.003 * day_late_due_to_vendor * po_amount
-            
-            # 2. Calcul de Rate PO Amount (PO Amount * 10%)
-            rate_po_amount = po_amount * 0.10
-            
-            # 3. Application de la condition : 
-            # Si penalties > rate_po_amount, on prend rate_po_amount, sinon on garde penalties
-            if penalties > rate_po_amount:
-                penalties = rate_po_amount
-
-            # Préparation de la ligne de données
-            data.append({
-                'numero': bon.numero,
-                'cpu': premiere_occurrence.get('CPU'),
-                'sponsor': premiere_occurrence.get('Sponsor'),
-                'project_number': premiere_occurrence.get('Project Number'),
-                'project_manager': premiere_occurrence.get(' Project Manager') or premiere_occurrence.get('Project Manager') or premiere_occurrence.get('Project Manager Name') or premiere_occurrence.get('Project_Manager') or premiere_occurrence.get('ProjectManager') or premiere_occurrence.get('PM') or '',
-                'project_coordinator': premiere_occurrence.get('Project Coordinator'),
-                'senior_technical_lead': premiere_occurrence.get('Senior Technical Lead'),
-                'supplier': premiere_occurrence.get('Supplier'),
-                'order_description': premiere_occurrence.get('Order Description'),
-                'currency': premiere_occurrence.get('Currency'),
-                'annee': annee,
-                'project_name': premiere_occurrence.get('Project Name'),
-                'po_type': premiere_occurrence.get('Po type'),
-                'replaced_order': premiere_occurrence.get('Replaced Order'),
-                'asset_type': premiere_occurrence.get('ASSET TYPE'),
-                'pip_end_date': premiere_occurrence.get('PIP END DATE'),
-                'revised_end_date': premiere_occurrence.get('REVISED END DATE'),
-                'actual_end_date': premiere_occurrence.get('ACTUAL END DATE'),
-                'line_type': premiere_occurrence.get('Line Type'),
-                'code_ifs': premiere_occurrence.get('Code IFS'),
-                'receipt_amount': float(total_recu),
-                'po_amount': po_amount,
-                'exchange_rate': exchange_rate,
-                'po_amount_xof': po_amount_xof,
-                'financial_percent': float(financial_percent),  # Convertir en décimal pour le format pourcentage
-                'current_onground_percent': float(bon.taux_avancement() / 100) if hasattr(bon, 'taux_avancement') and callable(bon.taux_avancement) else 0.0,
-                'retention_cause': bon.retention_cause or '',
-                'day_late_due_to_mtn': premiere_occurrence.get("Day Late Due to MTN"),
-                'day_late_due_to_force_majeure': premiere_occurrence.get("Day Late Due to Force Majeure"),
-                'total_days_late': total_days_late,
-                'day_late_due_to_vendor': day_late_due_to_vendor,
-                'invoiced_amount': premiere_occurrence.get("Invoiced Amount"),
-                'Delivery_Compliance_To_Order': premiere_occurrence.get("Delivery Compliance To Order"),
-                'Delivery_Execution_Timeline': premiere_occurrence.get("Delivery Execution Timeline"),
-                'Vendor_Advising_Capability': premiere_occurrence.get("Vendor Advising Capability"),
-                'After_Sales_Services_QOS': premiere_occurrence.get("After Sales Services QOS"),
-                'Vendor_Relationship': premiere_occurrence.get("Vendor Relationship"),
-                'Vendor_Final_Rating': premiere_occurrence.get("Vendor Final Rating"),
-                'accruals_cur': accruals_cur,
-                'receipt_not_invoiced': receipt_not_invoiced,
-                'penalties': penalties,  # Colonne Penalties (déjà mise à jour avec la condition)
-                'pip_retention_percent': (penalties / po_amount) if po_amount > 0 else 0.0,  # % PIP retention
-                'other_retentions': float(bon.retention_rate) / 100 if bon.retention_rate is not None else 0.0,
-                'total_retention': (penalties / po_amount if po_amount > 0 else 0.0) + (float(bon.retention_rate) / 100 if bon.retention_rate is not None else 0.0),
+            # Créer ou mettre à jour l'évaluation
+            if evaluation:
+                # Mise à jour
+                evaluation.delivery_compliance = delivery_compliance
+                evaluation.delivery_timeline = delivery_timeline
+                evaluation.advising_capability = advising_capability
+                evaluation.after_sales_qos = after_sales_qos
+                evaluation.vendor_relationship = vendor_relationship
+                evaluation.evaluator = request.user
+                evaluation.save()
                 
-            })
+                messages.success(request, f'Évaluation du fournisseur "{supplier}" mise à jour avec succès.')
+            else:
+                # Création
+                evaluation = VendorEvaluation.objects.create(
+                    bon_commande=bon_commande,
+                    supplier=supplier,
+                    delivery_compliance=delivery_compliance,
+                    delivery_timeline=delivery_timeline,
+                    advising_capability=advising_capability,
+                    after_sales_qos=after_sales_qos,
+                    vendor_relationship=vendor_relationship,
+                    evaluator=request.user
+                )
+                
+                messages.success(request, f'Évaluation du fournisseur "{supplier}" créée avec succès.')
+            
+            # Rediriger vers la page de détail du bon de commande avec le bon fichier_id
+            if fichier_id:
+                return redirect(f'/orders/bons/{fichier_id}/?selected_order_number={bon_commande.numero}')
+            else:
+                return redirect('orders:accueil')
+            
+        except (ValueError, TypeError) as e:
+            messages.error(request, 'Erreur dans les données saisies. Veuillez vérifier vos notes.')
+        except Exception as e:
+            logger.error(f"Erreur lors de la sauvegarde de l'évaluation: {str(e)}")
+            messages.error(request, 'Une erreur s\'est produite lors de la sauvegarde.')
+    
+    context = {
+        'bon_commande': bon_commande,
+        'supplier': supplier,
+        'evaluation': evaluation,
+        'fichier_id': fichier_id,
+    }
+    
+    return render(request, 'orders/notation.html', context)
 
-        # Création du DataFrame à partir des données préparées
-        df = pd.DataFrame(data)
 
-        # Renommage des colonnes pour l'export
-        column_mapping = {
-            'numero': 'Order Number',
-            'cpu': 'CPU',
-            'sponsor': 'Sponsor',
-            'project_number': 'Project Number',
-            'project_manager': 'Project Manager',
-            'project_coordinator': 'Project Coordinator',
-            'senior_technical_lead': 'Senior Technical Lead',
-            'supplier': 'Supplier Name',
-            'penalties': 'Penalties',
-            'order_description': 'Order Description',
-            'currency': 'Currency',
-            'annee': 'Année',
-            'project_name': 'Project Name',
-            'po_type': 'PO Type',
-            'replaced_order': 'Replaced Order',
-            'asset_type': 'Asset Type',
-            'pip_end_date': 'PIP End Date',
-            'revised_end_date': 'Revised End Date',
-            'actual_end_date': 'Actual End Date',
-            'line_type': 'Line Type',
-            'code_ifs': 'Code IFS',
-            'current_onground_percent': 'Current Onground (%)',
-            'retention_cause': 'Cause rétention',
-            'receipt_amount': 'Receipt Amount',
-            'po_amount': 'PO Amount',  # Ajouter le mapping pour la nouvelle colonne
-            'exchange_rate': 'Exchange Rate',
-            'po_amount_xof': 'PO XOF',
-            'financial_percent': '%Financial',
-            'day_late_due_to_mtn': 'Day Late Due to MTN',
-            'day_late_due_to_force_majeure': 'Day Late Due to Force Majeure',
-            'total_days_late': '# Total Days Late',
-            'day_late_due_to_vendor': 'Day Late Due to Vendor',
-            'invoiced_amount': 'Invoiced Amount',
-            'Delivery_Compliance_To_Order': 'Delivery Compliance To Order',
-            'Delivery_Execution_Timeline': 'Delivery Execution Timeline',
-            'Vendor_Advising_Capability': 'Vendor Advising Capability',
-            'After_Sales_Services_QOS': 'After Sales Services QOS',
-            'Vendor_Relationship': 'Vendor Relationship',
-            'Vendor_Final_Rating': 'Vendor Final Rating',
-            'accruals_cur': 'Accruals (Cur)',
-            'receipt_not_invoiced': 'Receipt Not Invoiced (CUR)',
-            'pip_retention_percent': '% PIP Retention',
-            'other_retentions': 'Other Retentions (%)',
-            'total_retention': 'Total Retention (%)',
-        }
-        df.rename(columns=column_mapping, inplace=True)
+@login_required
+def vendor_evaluation_list(request):
+    """
+    Vue pour lister toutes les évaluations de fournisseurs avec filtres
+    """
+    from .models import VendorEvaluation
+    from django.core.paginator import Paginator
+    from datetime import datetime
+    
+    # Récupérer toutes les évaluations
+    evaluations = VendorEvaluation.objects.select_related(
+        'bon_commande', 'evaluator'
+    ).order_by('-date_evaluation')
+    
+    # Filtrage par fournisseur
+    supplier_filter = request.GET.get('supplier', '').strip()
+    if supplier_filter:
+        evaluations = evaluations.filter(supplier__icontains=supplier_filter)
+    
+    # Filtrage par score minimum
+    min_score = request.GET.get('min_score', '').strip()
+    if min_score:
+        try:
+            min_score = int(min_score)
+            # Filtrer par score total minimum
+            filtered_ids = []
+            for eval in evaluations:
+                if eval.get_total_score() >= min_score:
+                    filtered_ids.append(eval.id)
+            evaluations = evaluations.filter(id__in=filtered_ids)
+        except ValueError:
+            pass
+    
+    # Filtrage par date de début
+    date_from = request.GET.get('date_from', '').strip()
+    if date_from:
+        try:
+            date_from_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
+            evaluations = evaluations.filter(date_evaluation__date__gte=date_from_obj)
+        except ValueError:
+            date_from = ''
+    
+    # Filtrage par date de fin
+    date_to = request.GET.get('date_to', '').strip()
+    if date_to:
+        try:
+            date_to_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
+            evaluations = evaluations.filter(date_evaluation__date__lte=date_to_obj)
+        except ValueError:
+            date_to = ''
+    
+    # Pagination
+    paginator = Paginator(evaluations, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # Statistiques
+    total_evaluations = evaluations.count()
+    suppliers = evaluations.values_list('supplier', flat=True).distinct()
+    
+    context = {
+        'page_obj': page_obj,
+        'supplier_filter': supplier_filter,
+        'min_score': min_score,
+        'date_from': date_from,
+        'date_to': date_to,
+        'total_evaluations': total_evaluations,
+        'suppliers': suppliers,
+    }
+    
+    return render(request, 'orders/vendor_evaluation_list.html', context)
 
-        # Création du fichier Excel avec mise en forme
-        output = BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False, sheet_name='PO Progress Monitoring')
-            workbook = writer.book
-            worksheet = writer.sheets['PO Progress Monitoring']
 
-            # Styles
-            header_font = Font(bold=True, color="FFFFFF")
-            header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
-            alignment = Alignment(horizontal="center", vertical="center")
-            thin_border = Border(
-                left=Side(style='thin'),
-                right=Side(style='thin'),
-                top=Side(style='thin'),
-                bottom=Side(style='thin')
-            )
+@login_required
+def vendor_evaluation_detail(request, evaluation_id):
+    """
+    Vue pour afficher les détails d'une évaluation de fournisseur
+    """
+    from .models import VendorEvaluation
+    
+    evaluation = get_object_or_404(VendorEvaluation, id=evaluation_id)
+    
+    # Calculer les statistiques
+    total_score = evaluation.get_total_score()
+    
+    # Récupérer les descriptions des critères
+    criteria_details = []
+    criteria_fields = [
+        ('delivery_compliance', 'Delivery Compliance to Order (Quantity & Quality)'),
+        ('delivery_timeline', 'Delivery Execution Timeline'),
+        ('advising_capability', 'Vendor Advising Capability'),
+        ('after_sales_qos', 'After Sales Services QOS'),
+        ('vendor_relationship', 'Vendor Relationship'),
+    ]
+    
+    for field_name, field_label in criteria_fields:
+        score = getattr(evaluation, field_name)
+        description = evaluation.get_criteria_description(field_name, score)
+        criteria_details.append({
+            'label': field_label,
+            'score': score,
+            'description': description
+        })
+    
+    context = {
+        'evaluation': evaluation,
+        'total_score': total_score,
+        'criteria_details': criteria_details,
+    }
+    
+    return render(request, 'orders/vendor_evaluation_detail.html', context)
 
-            # Format header
-            for col_num, value in enumerate(df.columns.values, 1):
-                cell = worksheet.cell(row=1, column=col_num)
-                cell.font = header_font
-                cell.fill = header_fill
-                cell.alignment = alignment
-                cell.border = thin_border
-                worksheet.column_dimensions[get_column_letter(col_num)].width = max(len(value) + 2, 15)
 
-            # Format data cells
-            for row in worksheet.iter_rows(min_row=2, max_row=worksheet.max_row,
-                                           min_col=1, max_col=worksheet.max_column):
-                for cell in row:
-                    cell.border = thin_border
-                    if isinstance(cell.value, (int, float)):
-                        cell.number_format = '0.00'
+@login_required
+def timeline_delays(request, bon_commande_id):
+    """Vue simple pour gérer les retards d'un bon de commande"""
+    from .models import TimelineDelay, LigneFichier, NumeroBonCommande
+    from datetime import datetime
+    
+    bon = get_object_or_404(NumeroBonCommande, id=bon_commande_id)
+    
+    # Récupérer le fichier_id depuis la requête (d'où vient l'utilisateur)
+    fichier_id = request.GET.get('fichier_id')
+    if not fichier_id:
+        # Si pas de fichier_id, prendre le plus récent
+        fichier = bon.fichiers.order_by('-date_importation').first()
+        fichier_id = fichier.id if fichier else None
+    
+    def get_total_days_late(bon_commande):
+        """Calcule total_days_late comme dans export_po_progress_monitoring"""
+        lignes = LigneFichier.objects.filter(fichier__bons_commande=bon_commande).order_by('numero_ligne').first()
+        if not lignes:
+            return 0
+        
+        contenu = lignes.contenu or {}
+        pip_end = contenu.get('PIP END DATE', '')
+        actual_end = contenu.get('ACTUAL END DATE', '')
+        
+        if pip_end and actual_end:
+            try:
+                try:
+                    pip = datetime.strptime(str(pip_end), '%d/%m/%Y')
+                    actual = datetime.strptime(str(actual_end), '%d/%m/%Y')
+                except ValueError:
+                    pip = datetime.strptime(str(pip_end), '%Y-%m-%d')
+                    actual = datetime.strptime(str(actual_end), '%Y-%m-%d')
+                return max(0, (actual - pip).days)
+            except:
+                return 0
+        return 0
+    
+    # Créer ou récupérer le TimelineDelay
+    timeline, created = TimelineDelay.objects.get_or_create(bon_commande=bon)
+    
+    # Récupérer le PO Amount directement depuis le bon de commande
+    po_amount = bon.montant_total()
+    
+    total_days_late = get_total_days_late(bon)
+    supplier = bon.get_supplier()
+    
+    data = {
+        'id': timeline.id,
+        'po_number': bon.numero,
+        'supplier': supplier,
+        'total_days_late': total_days_late,
+        'delay_part_mtn': timeline.delay_part_mtn,
+        'delay_part_force_majeure': timeline.delay_part_force_majeure,
+        'delay_part_vendor': max(0, total_days_late - timeline.delay_part_mtn - timeline.delay_part_force_majeure),
+        'po_amount': float(po_amount),
+        'retention_amount_timeline': float(timeline.retention_amount_timeline),
+        'retention_rate_timeline': float(timeline.retention_rate_timeline),
+    }
+    
+    return render(request, 'orders/timeline_delays.html', {'data': data, 'bon': bon, 'fichier_id': fichier_id})
 
-            # Format percentages
-            percent_columns = ['Current Onground (%)', 'Retention Rate (%)', '%Financial', 'PIP Retention (%)', 'Over Retentions (%)', 'Total Retention (%)']
-            for col_name in percent_columns:
-                if col_name in df.columns:
-                    col_idx = df.columns.get_loc(col_name) + 1
-                    for row in range(2, worksheet.max_row + 1):
-                        cell = worksheet.cell(row=row, column=col_idx)
-                        cell.number_format = '0.00%'
 
-        # Préparer la réponse HTTP
-        output.seek(0)
-        response = HttpResponse(
-            output.getvalue(),
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+@login_required
+def update_delays(request, timeline_id):
+    """API pour sauvegarder les parts"""
+    if request.method == 'POST':
+        import json
+        from .models import TimelineDelay
+        
+        timeline = get_object_or_404(TimelineDelay, id=timeline_id)
+        data = json.loads(request.body)
+        
+        timeline.delay_part_mtn = int(data.get('mtn', 0))
+        timeline.delay_part_force_majeure = int(data.get('fm', 0))
+        timeline.delay_part_vendor = int(data.get('vendor', 0))
+        timeline.save()
+        
+        return JsonResponse({'success': True})
+    return JsonResponse({'success': False}, status=400)
+
+
+@login_required
+def vendor_ranking(request):
+    """
+    Vue pour afficher le classement des fournisseurs avec statistiques consolidées
+    """
+    from .models import VendorEvaluation, LigneFichier
+    from django.db.models import Avg, Count
+    from decimal import Decimal
+    
+    # Récupérer toutes les évaluations
+    evaluations = VendorEvaluation.objects.all()
+    
+    # Grouper par supplier et calculer les statistiques
+    suppliers_data = {}
+    
+    for eval in evaluations:
+        supplier = eval.supplier
+        if supplier not in suppliers_data:
+            suppliers_data[supplier] = {
+                'name': supplier,
+                'evaluations': [],
+                'po_numbers': set(),
+                'po_ids': set(),  # Ajouter les IDs des PO
+            }
+        
+        suppliers_data[supplier]['evaluations'].append({
+            'delivery_compliance': eval.delivery_compliance,
+            'delivery_timeline': eval.delivery_timeline,
+            'advising_capability': eval.advising_capability,
+            'after_sales_qos': eval.after_sales_qos,
+            'vendor_relationship': eval.vendor_relationship,
+            'vendor_final_rating': float(eval.vendor_final_rating),
+        })
+        suppliers_data[supplier]['po_numbers'].add(eval.bon_commande.numero)
+        suppliers_data[supplier]['po_ids'].add(eval.bon_commande.id)
+    
+    # Pré-calculer le mapping supplier -> nombre de PO (une seule fois pour tous les suppliers)
+    # Utiliser LigneFichier directement pour plus de performance
+    from .models import NumeroBonCommande
+    supplier_po_count = {}
+    
+    # Récupérer toutes les lignes avec leurs fichiers et bons de commande en une seule requête
+    lignes = LigneFichier.objects.select_related('fichier').prefetch_related('fichier__bons_commande').all()
+    
+    # Créer un mapping: supplier -> set de numéros de PO
+    supplier_po_numbers = {}
+    
+    for ligne in lignes:
+        contenu = ligne.contenu or {}
+        
+        # Chercher la colonne Supplier/Vendor/Fournisseur
+        supplier_value = None
+        for key, value in contenu.items():
+            if not key:
+                continue
+            key_lower = key.strip().lower()
+            if ('supplier' in key_lower or 'vendor' in key_lower or 
+                'fournisseur' in key_lower or 'vendeur' in key_lower) and value:
+                supplier_value = str(value).strip()
+                break
+        
+        if supplier_value and supplier_value != 'N/A':
+            # Récupérer le numéro de PO de cette ligne
+            order_number = None
+            for key, value in contenu.items():
+                if not key:
+                    continue
+                key_lower = key.strip().lower()
+                if ('order' in key_lower or 'commande' in key_lower or 
+                    'bon' in key_lower or 'bc' in key_lower) and value:
+                    order_number = str(value).strip()
+                    break
+            
+            if order_number:
+                if supplier_value not in supplier_po_numbers:
+                    supplier_po_numbers[supplier_value] = set()
+                supplier_po_numbers[supplier_value].add(order_number)
+    
+    # Convertir en comptage
+    for supplier, po_set in supplier_po_numbers.items():
+        supplier_po_count[supplier] = len(po_set)
+    
+    # Calculer les moyennes et statistiques pour chaque supplier
+    suppliers_stats = []
+    for supplier, data in suppliers_data.items():
+        evals = data['evaluations']
+        num_evals = len(evals)
+        
+        avg_delivery_compliance = sum(e['delivery_compliance'] for e in evals) / num_evals
+        avg_delivery_timeline = sum(e['delivery_timeline'] for e in evals) / num_evals
+        avg_advising_capability = sum(e['advising_capability'] for e in evals) / num_evals
+        avg_after_sales_qos = sum(e['after_sales_qos'] for e in evals) / num_evals
+        avg_vendor_relationship = sum(e['vendor_relationship'] for e in evals) / num_evals
+        avg_final_rating = sum(e['vendor_final_rating'] for e in evals) / num_evals
+        
+        # Récupérer le nombre de PO depuis le cache pré-calculé
+        po_count = supplier_po_count.get(supplier, 0)
+        
+        suppliers_stats.append({
+            'name': supplier,
+            'po_count': po_count,
+            'num_evaluations': num_evals,
+            'avg_delivery_compliance': round(avg_delivery_compliance, 2),
+            'avg_delivery_timeline': round(avg_delivery_timeline, 2),
+            'avg_advising_capability': round(avg_advising_capability, 2),
+            'avg_after_sales_qos': round(avg_after_sales_qos, 2),
+            'avg_vendor_relationship': round(avg_vendor_relationship, 2),
+            'avg_final_rating': round(avg_final_rating, 2),
+        })
+    
+    # Trier par moyenne finale décroissante et attribuer les rangs
+    suppliers_stats.sort(key=lambda x: x['avg_final_rating'], reverse=True)
+    for idx, supplier in enumerate(suppliers_stats, 1):
+        supplier['rank'] = idx
+    
+    # Top 10 meilleurs (les 10 premiers)
+    top_10_best = suppliers_stats[:10]
+    
+    # Top 10 pires (les 10 derniers, inversés avec nouveaux rangs)
+    worst_suppliers = suppliers_stats[-10:]
+    worst_suppliers.sort(key=lambda x: x['avg_final_rating'])  # Tri croissant (du pire au moins pire)
+    top_10_worst = []
+    for idx, supplier in enumerate(worst_suppliers, 1):
+        worst_copy = supplier.copy()
+        worst_copy['worst_rank'] = idx  # Nouveau rang pour l'affichage (1 = le pire)
+        top_10_worst.append(worst_copy)
+    
+    # Supplier sélectionné (si fourni dans la requête)
+    selected_supplier = request.GET.get('supplier', '')
+    selected_supplier_data = None
+    if selected_supplier:
+        selected_supplier_data = next(
+            (s for s in suppliers_stats if s['name'] == selected_supplier),
+            None
         )
-        response['Content-Disposition'] = 'attachment; filename="po_progress_monitoring.xlsx"'
+    
+    context = {
+        'suppliers_stats': suppliers_stats,
+        'top_10_best': top_10_best,
+        'top_10_worst': top_10_worst,
+        'selected_supplier': selected_supplier,
+        'selected_supplier_data': selected_supplier_data,
+        'total_suppliers': len(suppliers_stats),
+    }
+    
+    return render(request, 'orders/vendor_ranking.html', context)
 
-        return response
 
-    except Exception as e:
-        logger.error(f"Erreur lors de l'export PO Progress Monitoring: {str(e)}")
-        return HttpResponse(
-            f"Une erreur s'est produite lors de l'export: {str(e)}",
-            status=500
-        )

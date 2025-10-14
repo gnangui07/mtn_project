@@ -48,10 +48,10 @@
         <!-- Message d'erreur -->
         <div id="analytics-error" class="alert alert-danger" style="display: none;"></div>
         
-        <!-- Cartes de statistiques -->
-        <div class="row g-4 mb-4">
+        <!-- Cartes de statistiques et graphique -->
+        <div class="row g-4 mb-4 justify-content-center">
             <!-- Carte 1: Nombre de bons avec réception -->
-            <div class="col-md-6 col-xl-4">
+            <div class="col-md-6 col-lg-4">
                 <div class="card h-100 border-0 shadow-sm hover-zoom">
                     <div class="card-body">
                         <div class="d-flex align-items-center mb-3">
@@ -71,32 +71,8 @@
                 </div>
             </div>
             
-            <!-- Carte 2: Bons entièrement reçus -->
-            <div class="col-md-6 col-xl-4">
-                <div class="card h-100 border-0 shadow-sm hover-zoom">
-                    <div class="card-body">
-                        <div class="d-flex align-items-center mb-3">
-                            <div class="icon-shape icon-lg bg-soft-yellow text-yellow rounded-3 me-3">
-                                <i class="fas fa-check-circle fs-4"></i>
-                            </div>
-                            <h3 class="mb-0 fs-5 fw-semibold text-uppercase">Bons complétés</h3>
-                        </div>
-                        <div class="d-flex align-items-baseline mb-2">
-                            <h2 class="mb-0 fw-bold" id="bons-complet">0</h2>
-                            <span class="ms-2 text-muted small">sur <span id="total-bons-ref">0</span> bons</span>
-                        </div>
-                        <div class="progress mb-3" style="height: 6px;">
-                            <div class="progress-bar bg-yellow" id="pourcentage-complet-progress" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
-                        </div>
-                        <p class="text-muted small mb-0">
-                            <span id="pourcentage-complet" class="fw-semibold">0%</span> des bons sont entièrement reçus
-                        </p>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Carte 3: Total des bons de commande -->
-            <div class="col-md-6 col-xl-4">
+            <!-- Carte 2: Total des bons de commande -->
+            <div class="col-md-6 col-lg-4">
                 <div class="card h-100 border-0 shadow-sm hover-zoom">
                     <div class="card-body">
                         <div class="d-flex align-items-center mb-3">
@@ -115,12 +91,9 @@
                     </div>
                 </div>
             </div>
-        </div>
-        
-        <!-- Graphiques -->
-        <div class="row g-4 mb-4">
-            <!-- Graphique 1: Diagramme circulaire -->
-            <div class="col-12 col-lg-6">
+            
+            <!-- Graphique: Diagramme circulaire -->
+            <div class="col-12 col-lg-4">
                 <div class="card h-100 border-0 shadow-sm">
                     <div class="card-header bg-white border-0 py-3">
                         <h5 class="card-title mb-0 d-flex align-items-center">
@@ -135,94 +108,6 @@
                     </div>
                     <div class="card-footer bg-transparent border-0 py-2">
                         <small class="text-muted">Répartition des bons selon leur statut de réception</small>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Graphique 2: Histogramme -->
-            <div class="col-12 col-lg-6">
-                <div class="card h-100 border-0 shadow-sm">
-                    <div class="card-header bg-white border-0 py-3">
-                        <h5 class="card-title mb-0 d-flex align-items-center">
-                            <i class="fas fa-chart-bar text-yellow me-2"></i>
-                            Bons avec réception par mois
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container" style="position: relative; height: 300px;">
-                            <canvas id="bar-chart"></canvas>
-                        </div>
-                    </div>
-                    <div class="card-footer bg-transparent border-0 py-2">
-                        <small class="text-muted">Évolution mensuelle des réceptions</small>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Graphique 3: Courbe d'évolution -->
-            <div class="col-12">
-                <div class="card border-0 shadow-sm">
-                    <div class="card-header bg-white border-0 py-3">
-                        <h5 class="card-title mb-0 d-flex align-items-center">
-                            <i class="fas fa-chart-line text-yellow me-2"></i>
-                            Évolution des bons entièrement reçus
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container" style="position: relative; height: 350px;">
-                            <canvas id="line-chart"></canvas>
-                        </div>
-                    </div>
-                    <div class="card-footer bg-transparent border-0 py-2">
-                        <small class="text-muted">Cumul des bons complétés sur la période sélectionnée</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        </div>
-    </div>
-    
-    <!-- Section Carte thermique -->
-    <div class="row mb-5">
-        <div class="col-12">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white border-0 py-3">
-                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
-                        <h5 class="card-title mb-0 d-flex align-items-center">
-                            <i class="fas fa-fire text-yellow me-2"></i>
-                            Carte thermique des activités
-                        </h5>
-                        <div class="mt-2 mt-md-0">
-                            <div class="input-group input-group-sm" style="width: 220px;">
-                                <span class="input-group-text bg-light border-0">
-                                    <i class="fas fa-filter text-muted"></i>
-                                </span>
-                                <select id="heatmap-data-type" class="form-select form-select-sm border-0 bg-light">
-                                    <option value="activity_count">Nombre d'activités</option>
-                                    <option value="reception_quantity">Quantités reçues</option>
-                                    <option value="reception_ratio">Taux de réception</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="chart-container" style="position: relative; min-height: 400px;">
-                        <div id="heatmap-chart" class="w-100"></div>
-                    </div>
-                </div>
-                <div class="card-footer bg-transparent border-0 py-2">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <small class="text-muted">Analyse des activités par jour de la semaine et heure</small>
-                        <div class="heatmap-legend d-flex align-items-center">
-                            <span class="me-2 small text-muted">Légende :</span>
-                            <div class="d-flex">
-                                <span class="legend-item" style="background-color: #f8f9fa;">Faible</span>
-                                <span class="legend-item" style="background-color: #ffd700;">Moyen</span>
-                                <span class="legend-item" style="background-color: #ff8c00;">Élevé</span>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -413,9 +298,6 @@
 <!-- Inclure Chart.js pour les graphiques -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 
-<!-- Inclure ApexCharts pour la carte thermique -->
-<script src="https://cdn.jsdelivr.net/npm/apexcharts@3.37.1/dist/apexcharts.min.js"></script>
-
 <!-- Inclure XLSX pour l'export Excel -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
@@ -430,6 +312,6 @@
 <!-- Inclure nos JS personnalisés -->
 <script src="{% static 'orders/js/consultation.js' %}"></script>
 <script src="{% static 'orders/js/analytics_dashboard.js' %}"></script>
-<script src="{% static 'orders/js/heatmap.min.js' %}"></script>
+<!-- heatmap.min.js supprimé (carte thermique retirée) -->
 <script src="{% static 'orders/js/custom_modal.js' %}"></script>
 {% endblock %}

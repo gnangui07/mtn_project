@@ -218,6 +218,9 @@ def update_quantity_delivered(request, fichier_id):
                 # Les rapports MSRN sont maintenant générés manuellement via l'API generate_msrn_report
                 report = None
                 
+                # Forcer le refresh du bon_commande depuis la DB pour obtenir les valeurs à jour
+                bon_commande.refresh_from_db()
+                
                 # Préparer la réponse avec les nouvelles valeurs
                 response_data = {
                     'status': 'success',
@@ -368,11 +371,20 @@ def bulk_update_receptions(request, fichier_id):
                 'amount_payable': float(reception.amount_payable)
             })
         
+        # Forcer le refresh du bon_commande depuis la DB pour obtenir les valeurs à jour
+        bon_commande.refresh_from_db()
+        
+        # Recalculer les totaux après toutes les mises à jour
+        taux_avancement = bon_commande.taux_avancement()
+        montant_total_recu = bon_commande.montant_recu()
+        
+        logger.info(f"[BULK_UPDATE] Bon {bon_number}: {len(updated_receptions)} lignes mises à jour. Taux: {taux_avancement}%, Montant reçu: {montant_total_recu}")
+        
         return JsonResponse({
             'status': 'success',
             'updated_receptions': updated_receptions,
-            'taux_avancement': float(bon_commande.taux_avancement()),
-            'montant_total_recu': float(bon_commande.montant_recu())
+            'taux_avancement': float(taux_avancement),
+            'montant_total_recu': float(montant_total_recu)
         })
         
     except NumeroBonCommande.DoesNotExist:
@@ -799,10 +811,15 @@ def bulk_correction_quantity_delivered(request, fichier_id):
             except Exception as e:
                 errors.append(f"Business ID {business_id}: Erreur - {str(e)}")
         
-        # Calculer les totaux mis à jour
+        # Forcer le refresh du bon_commande depuis la DB pour obtenir les valeurs à jour
+        bon_commande.refresh_from_db()
+        
+        # Calculer les totaux mis à jour après toutes les corrections
         taux_avancement = bon_commande.taux_avancement()
         montant_total_recu = bon_commande.montant_recu()
         montant_total = bon_commande.montant_total()
+        
+        logger.info(f"[BULK_CORRECTION] Bon {bon_number}: {len(results)} corrections appliquées. Taux: {taux_avancement}%, Montant reçu: {montant_total_recu}")
         
         return JsonResponse({
             'status': 'success',

@@ -1,0 +1,198 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Timeline Delays{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-clock me-2"></i>Timeline Delays Management</h2>
+        {% if fichier_id %}
+        <a href="{% url 'orders:details_bon' bon_id=fichier_id %}?selected_order_number={{ data.po_number }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back
+        </a>
+        {% else %}
+        <a href="{% url 'orders:accueil' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover table-bordered">
+            <thead style="background-color: #FFCC00; color: #000;">
+                <tr>
+                    <th>Purchase Order</th>
+                    <th>Supplier</th>
+                    <th class="text-center">Nombre Total de Jours de Retard</th>
+                    <th class="text-center">Part MTN</th>
+                    <th class="text-center">Part Force Majeure</th>
+                    <th class="text-center">Part Fournisseur</th>
+                    <th class="text-center">Montant PO</th>
+                    <th class="text-center">Montant Rétention Timeline</th>
+                    <th class="text-center">Taux Rétention Timeline (%)</th>
+                    <th class="text-center">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr id="row-{{ data.id }}">
+                    <td><strong>{{ data.po_number }}</strong></td>
+                    <td>{{ data.supplier }}</td>
+                    <td class="text-center"><span class="badge bg-secondary">{{ data.total_days_late }}</span></td>
+                    <td class="text-center">
+                        <input type="number" class="form-control form-control-sm text-center" 
+                               value="{{ data.delay_part_mtn }}" 
+                               min="0" max="{{ data.total_days_late }}"
+                               data-id="{{ data.id }}" data-field="mtn"
+                               onchange="updateVendor()">
+                    </td>
+                    <td class="text-center">
+                        <input type="number" class="form-control form-control-sm text-center" 
+                               value="{{ data.delay_part_force_majeure }}" 
+                               min="0" max="{{ data.total_days_late }}"
+                               data-id="{{ data.id }}" data-field="fm"
+                               onchange="updateVendor()">
+                    </td>
+                    <td class="text-center">
+                        <strong id="vendor-{{ data.id }}">{{ data.delay_part_vendor }}</strong>
+                    </td>
+                    <td class="text-center">
+                        <strong id="po-amount-{{ data.id }}">{{ data.po_amount|floatformat:2|intcomma }}</strong>
+                    </td>
+                    <td class="text-center">
+                        <strong id="retention-amount-timeline-{{ data.id }}" class="text-danger">{{ data.retention_amount_timeline|floatformat:2|intcomma }}</strong>
+                    </td>
+                    <td class="text-center">
+                        <strong id="retention-rate-timeline-{{ data.id }}" class="text-danger">{{ data.retention_rate_timeline|floatformat:2 }}%</strong>
+                    </td>
+                    <td class="text-center">
+                        <button class="btn btn-sm" style="background-color: #FFCC00; color: #000; border: 1px solid #000;" 
+                                onclick="save()">
+                            <i class="fas fa-save"></i> Save
+                        </button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+(function() {
+    var evalId = parseInt('{{ data.id }}');
+    var totalDays = parseInt('{{ data.total_days_late }}');
+    var poAmount = parseFloat('{{ data.po_amount }}');
+    
+    // Stocker les valeurs initiales
+    var initialMtn = parseInt('{{ data.delay_part_mtn }}');
+    var initialFm = parseInt('{{ data.delay_part_force_majeure }}');
+
+    window.updateVendor = function() {
+        var mtnInput = document.querySelector('[data-field="mtn"]');
+        var fmInput = document.querySelector('[data-field="fm"]');
+        var mtn = parseInt(mtnInput.value) || 0;
+        var fm = parseInt(fmInput.value) || 0;
+        
+        // Validation : MTN + FM ne doit pas dépasser Total Days Late
+        if (mtn + fm > totalDays) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erreur de saisie',
+                text: 'La somme de Part MTN (' + mtn + ') et Part Force Majeure (' + fm + ') ne peut pas dépasser le nombre total de jours de retard (' + totalDays + ').',
+                confirmButtonColor: '#d33'
+            });
+            // Réinitialiser les inputs aux valeurs précédentes
+            mtnInput.value = initialMtn;
+            fmInput.value = initialFm;
+            return;
+        }
+        
+        // Mettre à jour les valeurs initiales si la validation passe
+        initialMtn = mtn;
+        initialFm = fm;
+        
+        var vendor = Math.max(0, totalDays - mtn - fm);
+        document.getElementById('vendor-' + evalId).textContent = vendor;
+        
+        // Calculer le montant de rétention timeline : PO Amount * 0.3% * Part Fournisseur
+        var retentionAmountTimeline = poAmount * 0.003 * vendor;
+        
+        // Calculer le taux de rétention timeline
+        var retentionRateTimeline = 0;
+        if (poAmount > 0) {
+            retentionRateTimeline = (retentionAmountTimeline / poAmount) * 100;
+            // Si > 10%, recalculer le montant et fixer le taux à 10%
+            if (retentionRateTimeline > 10) {
+                retentionAmountTimeline = poAmount * 0.10;
+                retentionRateTimeline = 10;
+            }
+        }
+        
+        // Mettre à jour l'affichage avec séparateurs de milliers
+        document.getElementById('retention-amount-timeline-' + evalId).textContent = formatNumber(retentionAmountTimeline);
+        document.getElementById('retention-rate-timeline-' + evalId).textContent = retentionRateTimeline.toFixed(2) + '%';
+    };
+    
+    // Fonction pour formater les nombres avec séparateurs de milliers
+    function formatNumber(num) {
+        return num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    }
+
+    window.save = function() {
+        var mtn = parseInt(document.querySelector('[data-field="mtn"]').value) || 0;
+        var fm = parseInt(document.querySelector('[data-field="fm"]').value) || 0;
+        var vendor = parseInt(document.getElementById('vendor-' + evalId).textContent) || 0;
+        
+        fetch('/orders/api/update-delays/' + evalId + '/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({mtn: mtn, fm: fm, vendor: vendor})
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if(d.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Saved!',
+                    text: 'Delays updated successfully',
+                    confirmButtonColor: '#FFCC00',
+                    confirmButtonText: 'OK'
+                });
+            }
+        })
+        .catch(function(error) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error!',
+                text: 'Failed to save delays',
+                confirmButtonColor: '#d33'
+            });
+        });
+    };
+
+    function getCookie(name) {
+        var v = null;
+        if (document.cookie) {
+            var cookies = document.cookie.split(';');
+            for (var i = 0; i < cookies.length; i++) {
+                var c = cookies[i].trim();
+                if (c.substring(0, name.length + 1) === (name + '=')) {
+                    v = decodeURIComponent(c.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return v;
+    }
+})();
+</script>
+{% endblock %}
