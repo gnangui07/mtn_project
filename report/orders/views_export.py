@@ -165,23 +165,48 @@ def export_po_progress_monitoring(request):
             po_amount_xof = po_amount * exchange_rate
 
 
-            # Recalculer le retard total à partir des dates (format dd/mm/YYYY ou YYYY-MM-DD)
+            # Recalculer le retard total à partir des dates (supporte plusieurs formats)
             from datetime import datetime
             pip_end_str = premiere_occurrence.get('PIP END DATE')
             actual_end_str = premiere_occurrence.get('ACTUAL END DATE')
             total_days_late = 0
             if pip_end_str and actual_end_str:
                 try:
-                    # Essayer d'abord le format DD/MM/YYYY
-                    try:
-                        pip_end = datetime.strptime(pip_end_str, '%d/%m/%Y')
-                        actual_end = datetime.strptime(actual_end_str, '%d/%m/%Y')
-                    except ValueError:
-                        # Si ça échoue, essayer le format YYYY-MM-DD
-                        pip_end = datetime.strptime(pip_end_str, '%Y-%m-%d')
-                        actual_end = datetime.strptime(actual_end_str, '%Y-%m-%d')
+                    # Convertir en string et nettoyer
+                    pip_end_str = str(pip_end_str).strip()
+                    actual_end_str = str(actual_end_str).strip()
                     
-                    total_days_late = (actual_end - pip_end).days
+                    # Liste des formats supportés
+                    date_formats = [
+                        '%Y-%m-%d %H:%M:%S',  # 2025-07-30 00:00:00
+                        '%Y-%m-%d',           # 2025-07-30
+                        '%d/%m/%Y',           # 30/07/2025
+                        '%d/%m/%Y %H:%M:%S'   # 30/07/2025 00:00:00
+                    ]
+                    
+                    pip_end = None
+                    actual_end = None
+                    
+                    # Essayer chaque format pour PIP END DATE
+                    for fmt in date_formats:
+                        try:
+                            pip_end = datetime.strptime(pip_end_str, fmt)
+                            break
+                        except ValueError:
+                            continue
+                    
+                    # Essayer chaque format pour ACTUAL END DATE
+                    for fmt in date_formats:
+                        try:
+                            actual_end = datetime.strptime(actual_end_str, fmt)
+                            break
+                        except ValueError:
+                            continue
+                    
+                    if pip_end and actual_end:
+                        total_days_late = (actual_end - pip_end).days
+                    else:
+                        total_days_late = 0
                 except Exception:
                     total_days_late = 0
 
@@ -836,28 +861,80 @@ def export_vendor_evaluations(request):
                 exact_candidates=['Project Manager', 'PM', 'Manager'],
                 tokens=['project', 'manager']) or 'N/A'
             
-            pip_end_date = get_value_tolerant(premiere_occurrence,
+            pip_end_date_raw = get_value_tolerant(premiere_occurrence,
                 exact_candidates=['PIP END DATE', 'PIP End Date', 'Pip End Date'],
                 tokens=['pip', 'end', 'date']) or ''
             
-            actual_end_date = get_value_tolerant(premiere_occurrence,
+            actual_end_date_raw = get_value_tolerant(premiere_occurrence,
                 exact_candidates=['ACTUAL END DATE', 'Actual End Date', 'Real End Date'],
                 tokens=['actual', 'end', 'date']) or ''
             
-            # Calculer le nombre de jours de retard
+            # Normaliser les dates au format YYYY-MM-DD (comme dans PO Progress)
+            def normalize_date(date_val):
+                """Normalise une date au format YYYY-MM-DD"""
+                if not date_val:
+                    return ''
+                
+                date_str = str(date_val).strip()
+                
+                # Si déjà au format ISO avec timestamp, extraire la date
+                if len(date_str) >= 10 and date_str[4] == '-' and date_str[7] == '-':
+                    return date_str[:10]  # Prendre seulement YYYY-MM-DD
+                
+                # Essayer de parser d'autres formats
+                date_formats = ['%d/%m/%Y', '%d-%m-%Y', '%Y/%m/%d']
+                for fmt in date_formats:
+                    try:
+                        parsed = datetime.strptime(date_str, fmt)
+                        return parsed.strftime('%Y-%m-%d')
+                    except ValueError:
+                        continue
+                
+                # Par défaut, retourner tel quel
+                return date_str
+            
+            pip_end_date = normalize_date(pip_end_date_raw)
+            actual_end_date = normalize_date(actual_end_date_raw)
+            
+            # Calculer le nombre de jours de retard (supporte plusieurs formats)
             total_days_late = 0
             if pip_end_date and actual_end_date:
                 try:
-                    # Essayer d'abord le format DD/MM/YYYY
-                    try:
-                        pip_end = datetime.strptime(str(pip_end_date), '%d/%m/%Y')
-                        actual_end = datetime.strptime(str(actual_end_date), '%d/%m/%Y')
-                    except ValueError:
-                        # Si ça échoue, essayer le format YYYY-MM-DD
-                        pip_end = datetime.strptime(str(pip_end_date), '%Y-%m-%d')
-                        actual_end = datetime.strptime(str(actual_end_date), '%Y-%m-%d')
+                    # Convertir en string et nettoyer
+                    pip_end_str = str(pip_end_date).strip()
+                    actual_end_str = str(actual_end_date).strip()
                     
-                    total_days_late = max(0, (actual_end - pip_end).days)
+                    # Liste des formats supportés
+                    date_formats = [
+                        '%Y-%m-%d %H:%M:%S',  # 2025-07-30 00:00:00
+                        '%Y-%m-%d',           # 2025-07-30
+                        '%d/%m/%Y',           # 30/07/2025
+                        '%d/%m/%Y %H:%M:%S'   # 30/07/2025 00:00:00
+                    ]
+                    
+                    pip_end = None
+                    actual_end = None
+                    
+                    # Essayer chaque format pour PIP END DATE
+                    for fmt in date_formats:
+                        try:
+                            pip_end = datetime.strptime(pip_end_str, fmt)
+                            break
+                        except ValueError:
+                            continue
+                    
+                    # Essayer chaque format pour ACTUAL END DATE
+                    for fmt in date_formats:
+                        try:
+                            actual_end = datetime.strptime(actual_end_str, fmt)
+                            break
+                        except ValueError:
+                            continue
+                    
+                    if pip_end and actual_end:
+                        total_days_late = max(0, (actual_end - pip_end).days)
+                    else:
+                        total_days_late = 0
                 except Exception as e:
                     total_days_late = 0
         else:
@@ -883,8 +960,8 @@ def export_vendor_evaluations(request):
             'Qualité du SAV': evaluation.after_sales_qos,
             'Contact relationnel': evaluation.vendor_relationship,
             'NOTE GLOBALE': float(evaluation.vendor_final_rating),
-            'DATE DE FIN CONTRACTUELLE(PIP)': str(pip_end_date),
-            'DATE DE FIN REELLE': str(actual_end_date),
+            'DATE DE FIN CONTRACTUELLE(PIP)': pip_end_date,
+            'DATE DE FIN REELLE': actual_end_date,
             'NOMBRE TOTAL DE JOURS DE RETARD': total_days_late,
             'PART MTN': getattr(bon.timeline_delay, 'delay_part_mtn', 0) if hasattr(bon, 'timeline_delay') else 0,
             'PART FORCE MAJEURE': getattr(bon.timeline_delay, 'delay_part_force_majeure', 0) if hasattr(bon, 'timeline_delay') else 0,
@@ -944,6 +1021,15 @@ def export_vendor_evaluations(request):
             else:
                 worksheet.column_dimensions[get_column_letter(col_num)].width = max(len(column_title) + 2, 15)
 
+        # Formater les colonnes de dates en texte (pour préserver le format YYYY-MM-DD)
+        date_cols = ['DATE DE FIN CONTRACTUELLE(PIP)', 'DATE DE FIN REELLE']
+        for col_name in date_cols:
+            if col_name in df.columns:
+                col_idx = df.columns.get_loc(col_name) + 1
+                for row_idx in range(2, worksheet.max_row + 1):
+                    cell = worksheet.cell(row=row_idx, column=col_idx)
+                    cell.number_format = '@'  # Format texte
+        
         # Formater les cellules de données
         for row in worksheet.iter_rows(min_row=2, max_row=worksheet.max_row, min_col=1, max_col=worksheet.max_column):
             for idx, cell in enumerate(row):
@@ -958,6 +1044,8 @@ def export_vendor_evaluations(request):
                     elif 'NOTE' in column_name:
                         cell.number_format = '0.00'
                 elif any(x in column_name for x in ['Conformité', 'Délai', 'Capacité', 'Qualité', 'Contact']):
+                    cell.alignment = alignment_center
+                elif 'DATE' in column_name:
                     cell.alignment = alignment_center
                 else:
                     cell.alignment = alignment_left

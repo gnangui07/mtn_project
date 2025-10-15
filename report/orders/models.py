@@ -1796,6 +1796,12 @@ class MSRNReport(models.Model):
         verbose_name="Snapshot - Données des réceptions",
         help_text="Snapshot complet des réceptions au moment de la création du rapport"
     )
+    payment_terms_snapshot = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name="Snapshot - Payment Terms",
+        help_text="Payment Terms au moment de la création du rapport"
+    )
     user = models.CharField(
         max_length=150, 
         blank=True, 
@@ -1813,18 +1819,21 @@ class MSRNReport(models.Model):
         if not self.report_number:
             # Générer un numéro au format MSRN250353 (MSRN + année + séquence)
             from datetime import datetime
+            from django.db import transaction
+            
             current_year = datetime.now().year
             year_suffix = str(current_year)[-2:]  # Prendre les 2 derniers chiffres de l'année
             
-            # Trouver le prochain numéro séquentiel pour cette année
+            # CRITIQUE: Utiliser select_for_update() pour éviter les race conditions
             year_prefix = f"MSRN{year_suffix}"
-            existing_reports = MSRNReport.objects.filter(
-                report_number__startswith=year_prefix
-            ).order_by('-report_number')
+            with transaction.atomic():
+                latest_report = MSRNReport.objects.filter(
+                    report_number__startswith=year_prefix
+                ).select_for_update().only('report_number').order_by('-report_number').first()
             
-            if existing_reports.exists():
+            if latest_report:
                 # Extraire le numéro séquentiel du rapport le plus récent
-                latest_number = existing_reports.first().report_number
+                latest_number = latest_report.report_number
                 sequence_part = latest_number[6:]  # Prendre les 4 derniers chiffres après "MSRN25"
                 next_sequence = int(sequence_part) + 1
             else:
@@ -1843,10 +1852,51 @@ class MSRNReport(models.Model):
             self.retention_amount_snapshot = self.retention_amount or Decimal('0')
             self.payable_amount_snapshot = self.payable_amount or Decimal('0')
             
-            # Capturer le snapshot des données des réceptions si pas déjà défini
+            # OPTIMISATION: Capturer Payment Terms (2 requêtes optimisées avec .only())
+            if not self.payment_terms_snapshot:
+                from .models import Reception, LigneFichier
+                try:
+                    # Récupérer une réception avec son business_id uniquement (1 requête)
+                    reception = Reception.objects.filter(
+                        bon_commande=self.bon_commande
+                    ).only('business_id').first()
+                    
+                    if reception and reception.business_id:
+                        # Chercher la ligne correspondante via business_id (1 requête)
+                        ligne = LigneFichier.objects.filter(
+                            business_id=reception.business_id
+                        ).only('contenu').first()
+                        
+                        if ligne and ligne.contenu:
+                            contenu = ligne.contenu
+                            # Chercher directement 'Payment Terms'
+                            if 'Payment Terms' in contenu and contenu['Payment Terms']:
+                                val = str(contenu['Payment Terms']).strip()
+                                if val and val.lower() not in ['n/a', 'na', '', 'none']:
+                                    self.payment_terms_snapshot = val
+                except Exception:
+                    pass
+            
+            # Optimisation: Capturer le snapshot des données des réceptions si pas déjà défini
             if not self.receptions_data_snapshot:
-                from .models import Reception
-                receptions = Reception.objects.filter(bon_commande=self.bon_commande)
+                from .models import Reception, LigneFichier
+                # Optimisation: Charger toutes les réceptions en une seule requête
+                receptions = Reception.objects.filter(
+                    bon_commande=self.bon_commande
+                ).select_related('fichier', 'bon_commande')
+                
+                # CRITIQUE pour 50K+ lignes: Pré-charger avec iterator() pour économiser la RAM
+                business_ids = [r.business_id for r in receptions]
+                lignes_map = {}
+                if business_ids:
+                    # Utiliser iterator() pour ne pas charger tout en mémoire
+                    lignes = LigneFichier.objects.filter(
+                        business_id__in=business_ids
+                    ).only('business_id', 'contenu').iterator(chunk_size=2000)
+                    for ligne in lignes:
+                        if ligne.business_id not in lignes_map:
+                            lignes_map[ligne.business_id] = ligne
+                
                 receptions_snapshot = []
                 retention_rate = self.retention_rate or Decimal('0')
                 
@@ -1856,68 +1906,51 @@ class MSRNReport(models.Model):
                     quantity_payable = reception.quantity_delivered * factor
                     amount_payable = reception.amount_delivered * factor
                     
-                    # Récupérer line_description et line depuis les fichiers
+                    # Optimisation: Récupérer line_description et line depuis le dictionnaire pré-chargé
                     line_description = "N/A"
                     line = "N/A"
                     schedule = "N/A"
-                                        
-                    for fichier in self.bon_commande.fichiers.all():
-                        for ligne in fichier.lignes.filter(business_id=reception.business_id):
-                            contenu = ligne.contenu or {}
+                    
+                    # Utiliser le dictionnaire pré-chargé au lieu de faire des requêtes
+                    ligne = lignes_map.get(reception.business_id)
+                    if ligne:
+                        contenu = ligne.contenu or {}
 
-                            # 1) Essayer les clés exactes utilisées à l'import
-                            if 'Line Description' in contenu and contenu['Line Description']:
-                                ld_val = str(contenu['Line Description']).strip()
-                                if ld_val:
-                                    line_description = ld_val[:50] + "..." if len(ld_val) > 50 else ld_val
-                            if 'Line' in contenu and contenu['Line'] not in (None, ''):
-                                line = str(contenu['Line']).strip()
-                            if 'Schedule' in contenu and contenu['Schedule'] not in (None, ''):
-                                schedule = str(contenu['Schedule']).strip()   
+                        # 1) Essayer les clés exactes utilisées à l'import
+                        if 'Line Description' in contenu and contenu['Line Description']:
+                            ld_val = str(contenu['Line Description']).strip()
+                            if ld_val:
+                                line_description = ld_val[:50] + "..." if len(ld_val) > 50 else ld_val
+                        if 'Line' in contenu and contenu['Line'] not in (None, ''):
+                            line = str(contenu['Line']).strip()
+                        if 'Schedule' in contenu and contenu['Schedule'] not in (None, ''):
+                            schedule = str(contenu['Schedule']).strip()   
 
-                            # 2) Fallback tolérant si non trouvées
-                            if line_description == "N/A":
-                                for key, value in contenu.items():
-                                    if not key:
-                                        continue
-                                    norm = key.strip().lower().replace('_', ' ')
-                                    norm = ' '.join(norm.split())
-                                    if value and (norm == 'line description' or ('description' in norm and 'line' in norm)):
-                                        v = str(value).strip()
-                                        if v:
-                                            line_description = v[:50] + "..." if len(v) > 50 else v
-                                            break
-                            if line == "N/A":
-                                for key, value in contenu.items():
-                                    if not key:
-                                        continue
-                                    norm = key.strip().lower().replace('_', ' ')
-                                    norm = ' '.join(norm.split())
-                                    # Eviter 'line type' et 'line description'
-                                    if value and norm == 'line':
-                                        line = str(value).strip()
+                        # 2) Fallback tolérant si non trouvées
+                        if line_description == "N/A":
+                            for key, value in contenu.items():
+                                if not key:
+                                    continue
+                                norm = key.strip().lower().replace('_', ' ')
+                                norm = ' '.join(norm.split())
+                                if value and (norm == 'line description' or ('description' in norm and 'line' in norm)):
+                                    v = str(value).strip()
+                                    if v:
+                                        line_description = v[:50] + "..." if len(v) > 50 else v
                                         break
-                                    if value and ('line' in norm and 'description' not in norm and 'type' not in norm):
-                                        line = str(value).strip()
-                                        break
-                            if line == "N/A":
-                                for key, value in contenu.items():
-                                    if not key:
-                                        continue
-                                    norm = key.strip().lower().replace('_', ' ')
-                                    norm = ' '.join(norm.split())
-                                    # Eviter 'line type' et 'line description'
-                                    if value and norm == 'line':
-                                        line = str(value).strip()
-                                        break
-                                    if value and ('line' in norm and 'description' not in norm and 'type' not in norm):
-                                        line = str(value).strip()
-                                        break
-
-                            if line_description != "N/A" or line != "N/A" or schedule != "N/A":
-                                break
-                        if line_description != "N/A" or line != "N/A" or schedule != "N/A":
-                            break    
+                        if line == "N/A":
+                            for key, value in contenu.items():
+                                if not key:
+                                    continue
+                                norm = key.strip().lower().replace('_', ' ')
+                                norm = ' '.join(norm.split())
+                                # Eviter 'line type' et 'line description'
+                                if value and norm == 'line':
+                                    line = str(value).strip()
+                                    break
+                                if value and ('line' in norm and 'description' not in norm and 'type' not in norm):
+                                    line = str(value).strip()
+                                    break    
                     
                     receptions_snapshot.append({
                         'id': reception.id,

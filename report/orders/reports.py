@@ -18,6 +18,8 @@ from django.core.files import File
 from django.conf import settings
 import os
 from .utils import generate_report_number
+
+logger = logging.getLogger(__name__)
 from datetime import datetime
 from decimal import Decimal
 # Safety alias to avoid any accidental local shadowing
@@ -329,9 +331,16 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
     taux_avancement_initial = _D('0')
     try:
         from .models import InitialReceptionBusiness
-        rows = InitialReceptionBusiness.objects.filter(bon_commande=bon_commande)
-        montant_recu_initial = sum((r.montant_recu_initial or _D('0')) for r in rows) or _D('0')
-        montant_total_initial = sum((r.montant_total_initial or _D('0')) for r in rows) or _D('0')
+        from django.db.models import Sum
+        # Optimisation: Utiliser l'agrégation SQL au lieu de Python
+        aggregates = InitialReceptionBusiness.objects.filter(
+            bon_commande=bon_commande
+        ).aggregate(
+            total_recu=Sum('montant_recu_initial'),
+            total_montant=Sum('montant_total_initial')
+        )
+        montant_recu_initial = aggregates['total_recu'] or _D('0')
+        montant_total_initial = aggregates['total_montant'] or _D('0')
         if montant_total_initial > 0:
             taux_avancement_initial = (montant_recu_initial / montant_total_initial) * _D('100')
         else:
@@ -425,6 +434,36 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
         montant_total = bon_commande.montant_total() or _D('0')
         montant_recu_actuel = bon_commande.montant_recu() or _D('0')
     
+    # OPTIMISATION: Utiliser le snapshot si disponible, sinon récupérer depuis LigneFichier
+    if msrn_report and msrn_report.payment_terms_snapshot:
+        payment_terms = msrn_report.payment_terms_snapshot
+    else:
+        payment_terms = "N/A"
+        try:
+            from .models import Reception, LigneFichier
+            # OPTIMISATION: Récupérer Payment Terms en une seule requête optimisée
+            
+            # Récupérer une réception avec son business_id (une seule requête)
+            reception = Reception.objects.filter(
+                bon_commande=bon_commande
+            ).only('business_id').first()
+            
+            if reception and reception.business_id:
+                # Chercher la ligne correspondante via business_id (une seule requête)
+                ligne = LigneFichier.objects.filter(
+                    business_id=reception.business_id
+                ).only('contenu').first()
+                
+                if ligne and ligne.contenu:
+                    contenu = ligne.contenu
+                    # Chercher directement 'Payment Terms' (clé exacte du fichier)
+                    if 'Payment Terms' in contenu and contenu['Payment Terms']:
+                        val = str(contenu['Payment Terms']).strip()
+                        if val and val.lower() not in ['n/a', 'na', '', 'none']:
+                            payment_terms = val
+        except Exception as e:
+            logger.warning(f"Erreur lors de la récupération des Payment Terms: {e}")
+    
     retention_amount = (montant_total * retention_rate / _D('100')).quantize(_D('0.01'))
     payable_amount = (montant_recu_actuel - retention_amount).quantize(_D('0.01'))
     taux_payable = (payable_amount / montant_total * _D('100')).quantize(_D('0.01')) if montant_total != 0 else _D('0')
@@ -432,7 +471,7 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
     payment_data = [
     [Paragraph("<b>PAYMENT / PAIEMENT</b>", table_title_style), "", "", ""],
     ["DESCRIPTION", "Amount/Montant","Percentage (%)","Comments/Observations"],
-    ["TOTAL PAYABLE AMOUNT / MONTANT TOTAL PAYABLE", f"{fmt_amount(payable_amount)}",f"{fmt_rate(taux_payable, 2)}%", ""],
+    ["TOTAL PAYABLE AMOUNT / MONTANT TOTAL PAYABLE", f"{fmt_amount(payable_amount)}",f"{fmt_rate(taux_payable, 2)}%", payment_terms],
     ["RETENTION AMOUNT / RETENUE SUR PAIEMENT *", f"{fmt_amount(retention_amount)}",f"{fmt_rate(retention_rate, 2)}%", ""],
     ["RETENTION CAUSE / CAUSE DE LA RETENUE", f"{retention_cause}", "", ""]
 ]
@@ -763,12 +802,44 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
         receptions_data = msrn_report.receptions_data_snapshot
         receptions_with_quantity_delivered = [r for r in receptions_data if float(r.get('quantity_delivered', 0)) > 0]
     else:
-        # Fallback sur les données actuelles des réceptions
+        # Optimisation: Fallback sur les données actuelles des réceptions avec prefetch
         from .models import Reception
-        all_receptions = Reception.objects.filter(bon_commande=bon_commande).order_by('business_id')
-        receptions_with_quantity_delivered = [r for r in all_receptions if float(r.quantity_delivered) > 0]
+        all_receptions = Reception.objects.filter(
+            bon_commande=bon_commande,
+            quantity_delivered__gt=0  # Filtrer directement en SQL
+        ).select_related('fichier', 'bon_commande').order_by('business_id')
+        
+        # CRITIQUE: Pour 50K+ lignes, limiter à 5000 lignes max dans le PDF
+        # Les autres lignes seront dans l'export Excel séparé
+        MAX_LINES_IN_PDF = 5000
+        total_receptions = all_receptions.count()
+        receptions_with_quantity_delivered = list(all_receptions[:MAX_LINES_IN_PDF])
+        
+        # Stocker si le PDF est tronqué pour afficher un avertissement
+        is_truncated = total_receptions > MAX_LINES_IN_PDF
+        lines_not_shown = total_receptions - MAX_LINES_IN_PDF if is_truncated else 0
     
     if receptions_with_quantity_delivered:
+        # Optimisation: Pré-charger toutes les lignes de fichier nécessaires en une seule requête
+        from .models import LigneFichier as _LF
+        business_ids = []
+        for reception in receptions_with_quantity_delivered:
+            if isinstance(reception, dict):
+                business_ids.append(reception.get('business_id'))
+            else:
+                business_ids.append(reception.business_id)
+        
+        # CRITIQUE pour 50K+ lignes: Charger avec iterator() pour économiser la RAM
+        lignes_map = {}
+        if business_ids:
+            # Utiliser iterator() et only() pour ne charger que les champs nécessaires
+            lignes = _LF.objects.filter(
+                business_id__in=business_ids
+            ).only('business_id', 'contenu').order_by('-id').iterator(chunk_size=2000)
+            for ligne in lignes:
+                if ligne.business_id not in lignes_map:
+                    lignes_map[ligne.business_id] = ligne
+        
         # En-têtes du tableau de données
         po_lines_headers = [
             "Line Description",
@@ -802,22 +873,16 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
                     net_qty_to_receipt_in_boost = 0
                 quantity_payable = reception['quantity_payable']
                 line = reception.get('line', 'N/A')
+                schedule = reception.get('schedule', 'N/A')
             else:
                 # Objet Reception actuel - récupérer les informations depuis le fichier
                 line_description = "N/A"
                 line = "N/A"
                 schedule = "N/A"
                 
-                # Chercher la description de ligne dans les fichiers associés via business_id exact
+                # Optimisation: Utiliser le dictionnaire pré-chargé au lieu de faire des requêtes
                 try:
-                    from .models import LigneFichier as _LF
-                    lf = _LF.objects.filter(business_id=reception.business_id).order_by('-id').first()
-                    if not lf:
-                        # fallback: parcourir les fichiers liés au bon (ancien comportement)
-                        for fichier in bon_commande.fichiers.all():
-                            lf = fichier.lignes.filter(business_id=reception.business_id).order_by('-id').first()
-                            if lf:
-                                break
+                    lf = lignes_map.get(reception.business_id)
                     if lf:
                         contenu = lf.contenu or {}
                         # Priorité aux clés exactes

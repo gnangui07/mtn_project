@@ -2,9 +2,11 @@ from django.http import JsonResponse, HttpResponseBadRequest
 from django.views.decorators.csrf import csrf_protect
 from django.core.files import File
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from decimal import Decimal, InvalidOperation
 import json
 import logging
+import time
 from .models import NumeroBonCommande, MSRNReport, Reception
 from .reports import generate_msrn_report
 from django.shortcuts import get_object_or_404
@@ -14,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 @csrf_protect
 @login_required
+@transaction.atomic  # CRITIQUE: Transaction atomique pour éviter les données incohérentes
 def generate_msrn_report_api(request, bon_id):
     """
     API pour générer manuellement un rapport MSRN pour un bon de commande.
@@ -32,9 +35,12 @@ def generate_msrn_report_api(request, bon_id):
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'Méthode non autorisée'}, status=405)
     
-    # Récupérer le bon de commande
+    # Optimisation: Récupérer le bon de commande avec prefetch
     try:
-        bon_commande = NumeroBonCommande.objects.get(id=bon_id)
+        bon_commande = NumeroBonCommande.objects.prefetch_related(
+            'fichiers__lignes',
+            'receptions'
+        ).get(id=bon_id)
     except NumeroBonCommande.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Bon de commande non trouvé'}, status=404)
     
@@ -60,6 +66,9 @@ def generate_msrn_report_api(request, bon_id):
     
     # Créer et sauvegarder le rapport
     try:
+        # Mesurer le temps de génération
+        start_time = time.time()
+        
         # Créer le rapport MSRN
         report = MSRNReport(
             bon_commande=bon_commande,
@@ -69,8 +78,13 @@ def generate_msrn_report_api(request, bon_id):
         )
         report.save()
         
+        logger.info(f"MSRN report created in {time.time() - start_time:.2f}s")
+        pdf_start = time.time()
+        
         # Générer le PDF avec le numéro de rapport qui vient d'être créé
         pdf_buffer = generate_msrn_report(bon_commande, report.report_number, username=request.user.username)
+        
+        logger.info(f"PDF generated in {time.time() - pdf_start:.2f}s")
         
         # Mettre à jour le fichier PDF avec le bon numéro
         report.pdf_file.save(
@@ -79,7 +93,8 @@ def generate_msrn_report_api(request, bon_id):
         )
         report.save()
         
-        logger.info(f"Rapport MSRN généré avec succès: MSRN-{report.report_number}")
+        total_time = time.time() - start_time
+        logger.info(f"Rapport MSRN généré avec succès: MSRN-{report.report_number} (Total: {total_time:.2f}s)")
         
         # Envoyer la notification email aux superusers
         try:
@@ -173,6 +188,31 @@ def update_msrn_retention(request, msrn_id):
             if msrn_report.progress_rate_snapshot is None:
                 msrn_report.progress_rate_snapshot = bon.taux_avancement()
             
+            # OPTIMISATION: S'assurer que Payment Terms est préservé (2 requêtes optimisées)
+            if not msrn_report.payment_terms_snapshot:
+                from .models import Reception, LigneFichier
+                try:
+                    # Récupérer une réception avec son business_id uniquement (1 requête)
+                    reception = Reception.objects.filter(
+                        bon_commande=bon
+                    ).only('business_id').first()
+                    
+                    if reception and reception.business_id:
+                        # Chercher la ligne correspondante via business_id (1 requête)
+                        ligne = LigneFichier.objects.filter(
+                            business_id=reception.business_id
+                        ).only('contenu').first()
+                        
+                        if ligne and ligne.contenu:
+                            contenu = ligne.contenu
+                            # Chercher directement 'Payment Terms'
+                            if 'Payment Terms' in contenu and contenu['Payment Terms']:
+                                val = str(contenu['Payment Terms']).strip()
+                                if val and val.lower() not in ['n/a', 'na', '', 'none']:
+                                    msrn_report.payment_terms_snapshot = val
+                except Exception:
+                    pass
+            
             # Utiliser les snapshots pour les calculs
             total_amount = msrn_report.montant_recu_snapshot
             
@@ -250,12 +290,12 @@ def update_msrn_retention(request, msrn_id):
                                             line = str(value)
                                             break
                                     
-                                # Chercher les informations de schedule (Schedule)
-                                for key, value in contenu.items():
-                                    key_lower = key.lower() if key else ''
-                                    if ('schedule' in key_lower) and value:
-                                        schedule = str(value)
-                                        break
+                                    # Chercher les informations de schedule (Schedule)
+                                    for key, value in contenu.items():
+                                        key_lower = key.lower() if key else ''
+                                        if ('schedule' in key_lower) and value:
+                                            schedule = str(value)
+                                            break
                                 
                                 if line_description != "N/A" or line != "N/A" or schedule != "N/A":
                                     break

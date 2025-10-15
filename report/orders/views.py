@@ -918,24 +918,80 @@ def timeline_delays(request, bon_commande_id):
         fichier_id = fichier.id if fichier else None
     
     def get_total_days_late(bon_commande):
-        """Calcule total_days_late comme dans export_po_progress_monitoring"""
-        lignes = LigneFichier.objects.filter(fichier__bons_commande=bon_commande).order_by('numero_ligne').first()
-        if not lignes:
+        """Calcule total_days_late à partir des dates PIP END DATE et ACTUAL END DATE"""
+        # Chercher la ligne qui correspond exactement au numéro de bon de commande
+        order_number = bon_commande.numero
+        
+        # Récupérer les fichiers associés au bon de commande
+        fichiers = bon_commande.fichiers.all().order_by('date_importation')
+        
+        contenu = None
+        for fichier in fichiers:
+            lignes = LigneFichier.objects.filter(fichier=fichier).order_by('numero_ligne')
+            for ligne in lignes:
+                if not ligne.contenu:
+                    continue
+                
+                # Chercher la clé Order dans le contenu
+                order_val = None
+                if 'Order' in ligne.contenu:
+                    order_val = str(ligne.contenu['Order']).strip()
+                elif 'ORDER' in ligne.contenu:
+                    order_val = str(ligne.contenu['ORDER']).strip()
+                elif 'order' in ligne.contenu:
+                    order_val = str(ligne.contenu['order']).strip()
+                
+                # Si on trouve la ligne correspondant au bon de commande
+                if order_val == order_number:
+                    contenu = ligne.contenu
+                    break
+            
+            if contenu:
+                break
+        
+        if not contenu:
             return 0
         
-        contenu = lignes.contenu or {}
         pip_end = contenu.get('PIP END DATE', '')
         actual_end = contenu.get('ACTUAL END DATE', '')
         
         if pip_end and actual_end:
             try:
-                try:
-                    pip = datetime.strptime(str(pip_end), '%d/%m/%Y')
-                    actual = datetime.strptime(str(actual_end), '%d/%m/%Y')
-                except ValueError:
-                    pip = datetime.strptime(str(pip_end), '%Y-%m-%d')
-                    actual = datetime.strptime(str(actual_end), '%Y-%m-%d')
-                return max(0, (actual - pip).days)
+                # Convertir en string et nettoyer
+                pip_end_str = str(pip_end).strip()
+                actual_end_str = str(actual_end).strip()
+                
+                # Liste des formats supportés
+                date_formats = [
+                    '%Y-%m-%d %H:%M:%S',  # 2025-07-30 00:00:00
+                    '%Y-%m-%d',           # 2025-07-30
+                    '%d/%m/%Y',           # 30/07/2025
+                    '%d/%m/%Y %H:%M:%S'   # 30/07/2025 00:00:00
+                ]
+                
+                pip = None
+                actual = None
+                
+                # Essayer chaque format pour PIP END DATE
+                for fmt in date_formats:
+                    try:
+                        pip = datetime.strptime(pip_end_str, fmt)
+                        break
+                    except ValueError:
+                        continue
+                
+                # Essayer chaque format pour ACTUAL END DATE
+                for fmt in date_formats:
+                    try:
+                        actual = datetime.strptime(actual_end_str, fmt)
+                        break
+                    except ValueError:
+                        continue
+                
+                if pip and actual:
+                    return max(0, (actual - pip).days)
+                else:
+                    return 0
             except:
                 return 0
         return 0
