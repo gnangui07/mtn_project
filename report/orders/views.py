@@ -1114,11 +1114,103 @@ def vendor_ranking(request):
     # Supplier sélectionné (si fourni dans la requête)
     selected_supplier = request.GET.get('supplier', '')
     selected_supplier_data = None
+    yearly_stats_list = []
+    
     if selected_supplier:
         selected_supplier_data = next(
             (s for s in suppliers_stats if s['name'] == selected_supplier),
             None
         )
+        
+        # Récupérer les statistiques par année pour le fournisseur sélectionné
+        if selected_supplier_data:
+            # Récupérer toutes les évaluations de ce fournisseur avec optimisation
+            supplier_evals = VendorEvaluation.objects.filter(
+                supplier=selected_supplier
+            ).select_related('bon_commande').prefetch_related('bon_commande__fichiers__lignes')
+            
+            # Grouper par année
+            years_data = {}
+            
+            for eval in supplier_evals:
+                # Récupérer l'année depuis la ligne du fichier Excel
+                year = 'N/A'
+                bon_numero = eval.bon_commande.numero
+                
+                # Vérifier si le bon de commande a des fichiers
+                fichiers_count = eval.bon_commande.fichiers.count()
+                if fichiers_count == 0:
+                    year = 'N/A'
+                    if year not in years_data:
+                        years_data[year] = []
+                    years_data[year].append({
+                        'delivery_compliance': eval.delivery_compliance,
+                        'delivery_timeline': eval.delivery_timeline,
+                        'advising_capability': eval.advising_capability,
+                        'after_sales_qos': eval.after_sales_qos,
+                        'vendor_relationship': eval.vendor_relationship,
+                        'vendor_final_rating': float(eval.vendor_final_rating),
+                    })
+                    continue
+                
+                # Parcourir tous les fichiers liés au bon de commande
+                found = False
+                for fichier in eval.bon_commande.fichiers.all():
+                    if found:
+                        break
+                    # Utiliser filter pour limiter les lignes à parcourir
+                    # Chercher seulement les lignes qui contiennent le PO dans le JSON
+                    for ligne in fichier.lignes.all():
+                        if not ligne.contenu:
+                            continue
+                            
+                        ligne_po = ligne.contenu.get('Order')
+                        
+                        # Si le PO correspond exactement
+                        if ligne_po == bon_numero:
+                            ligne_supplier = ligne.contenu.get('Supplier')
+                            ligne_year = ligne.contenu.get('Année')
+                            
+                            # Vérifier le supplier (flexible)
+                            if ligne_supplier and selected_supplier:
+                                if (ligne_supplier == selected_supplier or 
+                                    selected_supplier in ligne_supplier or 
+                                    ligne_supplier in selected_supplier):
+                                    # Trouvé !
+                                    if ligne_year:
+                                        year = ligne_year
+                                        found = True
+                                        break
+                
+                # Ajouter l'évaluation dans l'année correspondante
+                if year not in years_data:
+                    years_data[year] = []
+                
+                years_data[year].append({
+                    'delivery_compliance': eval.delivery_compliance,
+                    'delivery_timeline': eval.delivery_timeline,
+                    'advising_capability': eval.advising_capability,
+                    'after_sales_qos': eval.after_sales_qos,
+                    'vendor_relationship': eval.vendor_relationship,
+                    'vendor_final_rating': float(eval.vendor_final_rating),
+                })
+            
+            # Calculer les moyennes par année
+            for year, evals in sorted(years_data.items()):
+                num_evals = len(evals)
+                yearly_stats_list.append({
+                    'year': year,
+                    'avg_delivery_compliance': round(sum(e['delivery_compliance'] for e in evals) / num_evals, 2),
+                    'avg_delivery_timeline': round(sum(e['delivery_timeline'] for e in evals) / num_evals, 2),
+                    'avg_advising_capability': round(sum(e['advising_capability'] for e in evals) / num_evals, 2),
+                    'avg_after_sales_qos': round(sum(e['after_sales_qos'] for e in evals) / num_evals, 2),
+                    'avg_vendor_relationship': round(sum(e['vendor_relationship'] for e in evals) / num_evals, 2),
+                    'avg_final_rating': round(sum(e['vendor_final_rating'] for e in evals) / num_evals, 2),
+                    'num_evaluations': num_evals,
+                })
+    
+    import json
+    yearly_stats_json = json.dumps(yearly_stats_list) if yearly_stats_list else '[]'
     
     context = {
         'suppliers_stats': suppliers_stats,
@@ -1126,6 +1218,8 @@ def vendor_ranking(request):
         'top_10_worst': top_10_worst,
         'selected_supplier': selected_supplier,
         'selected_supplier_data': selected_supplier_data,
+        'yearly_stats_list': yearly_stats_list,
+        'yearly_stats_json': yearly_stats_json,
         'total_suppliers': len(suppliers_stats),
     }
     
