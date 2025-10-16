@@ -1527,6 +1527,12 @@ class Reception(models.Model):
         default=0,
         verbose_name="Amount Delivered"
     )
+    amount_not_delivered = models.DecimalField(
+        max_digits=20,
+        decimal_places=2,
+        default=0,
+        verbose_name="Amount Not Delivered"
+    )
     quantity_payable = models.DecimalField(
         max_digits=20, 
         decimal_places=2,
@@ -1567,10 +1573,14 @@ class Reception(models.Model):
         try:
             # Convertir quantity_delivered en Decimal
             quantity_delivered_qty = Decimal(str(self.quantity_delivered)) if self.quantity_delivered is not None else Decimal('0')
+            quantity_not_delivered_qty = Decimal(str(self.quantity_not_delivered)) if self.quantity_not_delivered is not None else Decimal('0')
             
             # Calculer amount delivered (valeur monétaire)
             unit_price_val = Decimal(str(self.unit_price)) if self.unit_price is not None else Decimal('0')
             self.amount_delivered = round_decimal(quantity_delivered_qty * unit_price_val)
+            
+            # Calculer amount not delivered (valeur monétaire)
+            self.amount_not_delivered = round_decimal(quantity_not_delivered_qty * unit_price_val)
             
             # Calculer quantity_payable (quantité physique après rétention)
             retention_rate = self.bon_commande.retention_rate if self.bon_commande and self.bon_commande.retention_rate is not None else 0
@@ -1588,13 +1598,14 @@ class Reception(models.Model):
             
             # Passer les calculs en cas d'erreur
             self.amount_delivered = Decimal('0')
+            self.amount_not_delivered = Decimal('0')
             self.quantity_payable = Decimal('0')
             self.amount_payable = Decimal('0')
         
         # Mettre à jour update_fields pour inclure les champs calculés
         if 'update_fields' in kwargs and kwargs['update_fields'] is not None:
             update_fields = set(kwargs['update_fields'])
-            update_fields.update(['amount_delivered', 'quantity_payable', 'amount_payable', 'business_id'])
+            update_fields.update(['amount_delivered', 'amount_not_delivered', 'quantity_payable', 'amount_payable', 'business_id'])
             kwargs['update_fields'] = list(update_fields)
         
         # Sauvegarder l'objet

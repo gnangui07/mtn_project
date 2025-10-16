@@ -46,7 +46,7 @@ def update_quantity_delivered(request, fichier_id):
                 receptions = Reception.objects.filter(
                     bon_commande=bon_commande,
                     fichier=fichier
-                ).values('business_id', 'quantity_delivered', 'ordered_quantity', 'quantity_not_delivered', 'unit_price','amount_delivered', 'quantity_payable', 'amount_payable')
+                ).values('business_id', 'quantity_delivered', 'ordered_quantity', 'quantity_not_delivered', 'unit_price','amount_delivered', 'amount_not_delivered', 'quantity_payable', 'amount_payable')
                 
                 # Convertir en dictionnaire pour un accès facile
                 reception_dict = {}
@@ -59,6 +59,7 @@ def update_quantity_delivered(request, fichier_id):
                     quantity_not_delivered = float(item['quantity_not_delivered']) if item['quantity_not_delivered'] is not None else 0.0
                     unit_price = float(item['unit_price']) if item['unit_price'] is not None else 0.0
                     amount_delivered = float(item['amount_delivered']) if item['amount_delivered'] is not None else 0.0
+                    amount_not_delivered = float(item['amount_not_delivered']) if item['amount_not_delivered'] is not None else 0.0
                     quantity_payable = float(item['quantity_payable']) if item['quantity_payable'] is not None else 0.0
                     amount_payable = float(item['amount_payable']) if item['amount_payable'] is not None else 0.0
                     
@@ -85,6 +86,7 @@ def update_quantity_delivered(request, fichier_id):
                       'quantity_payable': quantity_payable,
                       'amount_payable': amount_payable,
                       'amount_delivered': amount_delivered,
+                      'amount_not_delivered': amount_not_delivered,
                       'supplier': supplier,
                       'project_number': project_number,
                       'task_number': task_number,
@@ -228,6 +230,7 @@ def update_quantity_delivered(request, fichier_id):
                     'ordered_quantity': float(original_quantity),
                     'quantity_not_delivered': float(quantity_not_delivered),
                     'amount_delivered': float(reception.amount_delivered),
+                    'amount_not_delivered': float(reception.amount_not_delivered),
                     'quantity_payable': float(reception.quantity_payable),
                     'amount_payable': float(reception.amount_payable),  # Ajout du nouveau champ
                     'taux_avancement': float(bon_commande.taux_avancement()),
@@ -367,6 +370,7 @@ def bulk_update_receptions(request, fichier_id):
                 'quantity_delivered': float(total_quantity_delivered),
                 'quantity_not_delivered': float(quantity_not_delivered),
                 'amount_delivered': float(reception.amount_delivered),
+                'amount_not_delivered': float(reception.amount_not_delivered),
                 'quantity_payable': float(reception.quantity_payable),
                 'amount_payable': float(reception.amount_payable)
             })
@@ -802,6 +806,7 @@ def bulk_correction_quantity_delivered(request, fichier_id):
                     'quantity_delivered': float(reception.quantity_delivered),
                     'quantity_not_delivered': float(reception.quantity_not_delivered),
                     'amount_delivered': float(reception.amount_delivered),
+                    'amount_not_delivered': float(reception.amount_not_delivered),
                     'quantity_payable': float(reception.quantity_payable),
                     'amount_payable': float(reception.amount_payable),
                 })

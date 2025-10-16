@@ -320,8 +320,8 @@
                     <span class="quantity-not-delivered" data-row="{{ item|get_item:'_business_id' }}" style="display: block; text-align: right;">
                       {{ item|get_item:quantity_not_delivered_key|default:"0"|floatformat:"0" }}
                     </span>
-                    {% elif header == 'Amount Delivered' or header == 'Quantity Payable' %}
-                    <span class="{% if header == 'Amount Delivered' %}amount-delivered{% else %}quantity-payable{% endif %}" 
+                    {% elif header == 'Amount Delivered' or header == 'Amount Not Delivered' or header == 'Quantity Payable' %}
+                    <span class="{% if header == 'Amount Delivered' %}amount-delivered{% elif header == 'Amount Not Delivered' %}amount-not-delivered{% else %}quantity-payable{% endif %}" 
                            data-row="{{ item|get_item:'_business_id' }}" style="display: block; text-align: right;">
                       {{ item|get_item:header|default:"0"|floatformat:"2" }}
                     </span>

@@ -278,6 +278,7 @@ def details_bon(request, bon_id):
                         'ordered_quantity': reception.ordered_quantity,
                         'quantity_not_delivered': reception.quantity_not_delivered,
                         'amount_delivered': reception.amount_delivered,
+                        'amount_not_delivered': reception.amount_not_delivered,
                         'quantity_payable': reception.quantity_payable,
                         'unit_price': reception.unit_price,
                         'amount_payable': reception.amount_payable  # Use the desired header
@@ -483,6 +484,7 @@ def details_bon(request, bon_id):
                 item['Ordered Quantity'] = rec['ordered_quantity']
                 item['Quantity Not Delivered'] = rec['quantity_not_delivered']
                 item['Amount Delivered'] = rec['amount_delivered']
+                item['Amount Not Delivered'] = rec['amount_not_delivered']
                 item['Quantity Payable'] = rec['quantity_payable']
                 item['Amount Payable'] = rec['amount_payable']  # Use the desired header
             elif 'Ordered Quantity' in item:
@@ -492,12 +494,14 @@ def details_bon(request, bon_id):
                     item['Quantity Delivered'] = 0
                     item['Quantity Not Delivered'] = ordered_qty
                     item['Amount Delivered'] = 0
+                    item['Amount Not Delivered'] = 0
                     item['Quantity Payable'] = 0
                     item['Amount Payable'] = 0
                 except (ValueError, TypeError):
                     item['Quantity Delivered'] = 0
                     item['Quantity Not Delivered'] = 0
                     item['Amount Delivered'] = 0
+                    item['Amount Not Delivered'] = 0
                     item['Quantity Payable'] = 0
                     item['Amount Payable'] = 0
 
@@ -524,8 +528,18 @@ def details_bon(request, bon_id):
             status_value = first_item[status_key]
 
     # Ajouter les nouvelles colonnes aux en-têtes si elles n'existent pas
+    # Insérer Amount Delivered et Amount Not Delivered ensemble
     if 'Amount Delivered' not in headers:
         headers.append('Amount Delivered')
+    
+    # Insérer Amount Not Delivered juste après Amount Delivered
+    if 'Amount Not Delivered' not in headers:
+        try:
+            amount_delivered_index = headers.index('Amount Delivered')
+            headers.insert(amount_delivered_index + 1, 'Amount Not Delivered')
+        except ValueError:
+            headers.append('Amount Not Delivered')
+    
     if 'Quantity Payable' not in headers:
         headers.append('Quantity Payable')
     if 'Amount Payable' not in headers:

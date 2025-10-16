@@ -404,6 +404,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const quantityDeliveredInput = document.querySelector(`.quantity-delivered-input[data-row="${row}"]`);
         const quantityNotDeliveredElement = document.querySelector(`.quantity-not-delivered[data-row="${row}"]`);
         const amountDeliveredElement = document.querySelector(`.amount-delivered[data-row="${row}"]`);
+        const amountNotDeliveredElement = document.querySelector(`.amount-not-delivered[data-row="${row}"]`);
         const quantityPayableElement = document.querySelector(`.quantity-payable[data-row="${row}"]`);
         const amountPayableElement = document.querySelector(`.amount-payable[data-row="${row}"]`);
         
@@ -479,8 +480,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }
                     
-                    // Mettre à jour Amount Delivered et Quantity Payable
+                    // Mettre à jour Amount Delivered, Amount Not Delivered et Quantity Payable
                     amountDeliveredElement.textContent = data.amount_delivered.toFixed(2);
+                    if (amountNotDeliveredElement) {
+                        amountNotDeliveredElement.textContent = data.amount_not_delivered.toFixed(2);
+                    }
                     quantityPayableElement.textContent = data.quantity_payable.toFixed(2);
                     amountPayableElement.textContent = data.amount_payable.toFixed(2);
                     
@@ -696,6 +700,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const quantityDeliveredInput = document.querySelector(`.quantity-delivered-input[data-row="${businessId}"]`);
                     const quantityNotDeliveredElement = document.querySelector(`.quantity-not-delivered[data-row="${businessId}"]`);
                     const amountDeliveredElement = document.querySelector(`.amount-delivered[data-row="${businessId}"]`);
+                    const amountNotDeliveredElement = document.querySelector(`.amount-not-delivered[data-row="${businessId}"]`);
                     const quantityPayableElement = document.querySelector(`.quantity-payable[data-row="${businessId}"]`);
                     const amountPayableElement = document.querySelector(`.amount-payable[data-row="${businessId}"]`);
                     
@@ -708,6 +713,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     if (amountDeliveredElement) {
                         amountDeliveredElement.textContent = reception.amount_delivered.toFixed(2);
+                    }
+                    if (amountNotDeliveredElement) {
+                        amountNotDeliveredElement.textContent = reception.amount_not_delivered.toFixed(2);
                     }
                     if (quantityPayableElement) {
                         quantityPayableElement.textContent = reception.quantity_payable.toFixed(2);
@@ -1094,6 +1102,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const orderedElement = document.querySelector(`.ordered-quantity[data-row="${businessId}"]`);
                     const quantityNotDeliveredElement = document.querySelector(`.quantity-not-delivered[data-row="${businessId}"]`);
                     const amountDeliveredElement = document.querySelector(`.amount-delivered[data-row="${businessId}"]`);
+                    const amountNotDeliveredElement = document.querySelector(`.amount-not-delivered[data-row="${businessId}"]`);
                     const quantityPayableElement = document.querySelector(`.quantity-payable[data-row="${businessId}"]`);
                     const amountPayableElement = document.querySelector(`.amount-payable[data-row="${businessId}"]`);
                     
@@ -1111,8 +1120,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         quantityDeliveredInput.setAttribute('data-original', data.receptions[businessId].ordered_quantity);
                         quantityDeliveredInput.setAttribute('data-ordered', data.receptions[businessId].ordered_quantity);
                         
-                        // Mettre à jour Amount Delivered et Quantity Payable
+                        // Mettre à jour Amount Delivered, Amount Not Delivered et Quantity Payable
                         amountDeliveredElement.textContent = data.receptions[businessId].amount_delivered.toFixed(2);
+                        if (amountNotDeliveredElement) {
+                            amountNotDeliveredElement.textContent = data.receptions[businessId].amount_not_delivered.toFixed(2);
+                        }
                         quantityPayableElement.textContent = data.receptions[businessId].quantity_payable.toFixed(2);
                         amountPayableElement.textContent = data.receptions[businessId].amount_payable.toFixed(2);
                     }
@@ -1385,6 +1397,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         const quantityDeliveredInput = document.querySelector(`.quantity-delivered-input[data-row="${businessId}"]`);
                         const quantityNotDeliveredElement = document.querySelector(`.quantity-not-delivered[data-row="${businessId}"]`);
                         const amountDeliveredElement = document.querySelector(`.amount-delivered[data-row="${businessId}"]`);
+                        const amountNotDeliveredElement = document.querySelector(`.amount-not-delivered[data-row="${businessId}"]`);
                         const quantityPayableElement = document.querySelector(`.quantity-payable[data-row="${businessId}"]`);
                         const amountPayableElement = document.querySelector(`.amount-payable[data-row="${businessId}"]`);
                         
@@ -1397,6 +1410,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                         if (amountDeliveredElement) {
                             amountDeliveredElement.textContent = result.amount_delivered.toFixed(2);
+                        }
+                        if (amountNotDeliveredElement) {
+                            amountNotDeliveredElement.textContent = result.amount_not_delivered.toFixed(2);
                         }
                         if (quantityPayableElement) {
                             quantityPayableElement.textContent = result.quantity_payable.toFixed(2);
