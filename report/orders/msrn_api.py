@@ -72,7 +72,7 @@ def generate_msrn_report_api(request, bon_id):
         # Créer le rapport MSRN
         report = MSRNReport(
             bon_commande=bon_commande,
-            user=request.user.username,
+            user=request.user.email,
             retention_rate=retention_rate,
             retention_cause=retention_cause
         )
@@ -82,7 +82,7 @@ def generate_msrn_report_api(request, bon_id):
         pdf_start = time.time()
         
         # Générer le PDF avec le numéro de rapport qui vient d'être créé
-        pdf_buffer = generate_msrn_report(bon_commande, report.report_number, username=request.user.username)
+        pdf_buffer = generate_msrn_report(bon_commande, report.report_number, user_email=request.user.email)
         
         logger.info(f"PDF generated in {time.time() - pdf_start:.2f}s")
         
@@ -325,7 +325,7 @@ def update_msrn_retention(request, msrn_id):
         
         # Régénérer le PDF avec les nouvelles valeurs de rétention
         if msrn_report.bon_commande:
-            pdf_buffer = generate_msrn_report(msrn_report.bon_commande, msrn_report.report_number, msrn_report=msrn_report,username=request.user.username)
+            pdf_buffer = generate_msrn_report(msrn_report.bon_commande, msrn_report.report_number, msrn_report=msrn_report, user_email=request.user.email)
             
             # Mettre à jour le fichier PDF
             msrn_report.pdf_file.save(

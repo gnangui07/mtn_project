@@ -65,7 +65,7 @@ class FichierImporteAdmin(admin.ModelAdmin):
     def user_display(self, obj):
         """Affiche l'utilisateur qui a importé le fichier"""
         if obj.utilisateur:
-            return f"{obj.utilisateur.username}"
+            return f"{obj.utilisateur.get_full_name() or obj.utilisateur.email}"
         return "—"  # tiret cadratin pour valeur vide
     user_display.short_description = "Importé par"
     

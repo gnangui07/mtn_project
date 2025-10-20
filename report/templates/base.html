@@ -332,7 +332,7 @@
 </head>
 <body id="app"
       data-auth="{% if user.is_authenticated %}true{% else %}false{% endif %}"
-      data-username="{{ user.get_full_name|default:user.username|escapejs }}">
+      data-username="{% if user.is_authenticated %}{{ user.get_full_name|default:user.email|escapejs }}{% endif %}">
     <!-- Barre de navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top navbar-modern">
         <div class="container">
@@ -374,11 +374,11 @@
                     </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle d-flex align-items-center px-lg-2" href="#" id="userMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <span class="avatar-badge">{{ user.username|default:'U'|slice:':1'|upper }}</span>
-                            <span class="ms-2 d-none d-xl-inline">{{ user.get_full_name|default:user.username }}</span>
+                            <span class="avatar-badge">{{ user.first_name|default:'U'|slice:':1'|upper }}</span>
+                            <span class="ms-2 d-none d-xl-inline">{{ user.get_full_name|default:user.email }}</span>
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
-                            <li class="px-3 py-2 small text-muted">Connected as<br><strong>{{ user.get_full_name|default:user.username }}</strong></li>
+                            <li class="px-3 py-2 small text-muted">Connected as<br><strong>{{ user.get_full_name|default:user.email }}</strong></li>
                             <li><hr class="dropdown-divider"></li>
                             <li>
                                 <form method="post" action="{% url 'deconnexion' %}" class="px-3 py-2">
@@ -614,16 +614,6 @@
           if (prefs.enabled) {
             setTimeout(() => {
               try { playWelcomeSound(USERNAME); } catch (e) {}
-              try {
-                fetch('/users/play-welcome-sound/', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken')
-                  },
-                  body: JSON.stringify({})
-                }).catch(() => {});
-              } catch (e) {}
               sessionStorage.setItem(PLAY_KEY, 'true');
             }, 800);
           }

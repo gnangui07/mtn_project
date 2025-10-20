@@ -271,7 +271,7 @@
                 <div class="meta-label">Evaluator</div>
                 <div class="meta-value">
                     {% if evaluation.evaluator %}
-                        {{ evaluation.evaluator.get_full_name|default:evaluation.evaluator.username }}
+                        {{ evaluation.evaluator.get_full_name|default:evaluation.evaluator.email }}
                     {% else %}
                         System
                     {% endif %}

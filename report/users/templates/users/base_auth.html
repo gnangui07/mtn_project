@@ -1,0 +1,618 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>{% block title %}MTN CI - CAPEX Works Valuation Tool{% endblock %}</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/jpeg" href="{% static 'logo_mtn.jpeg' %}">
+    <link rel="shortcut icon" type="image/jpeg" href="{% static 'logo_mtn.jpeg' %}">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Animate.css -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    
+    <!-- Custom CSS -->
+    <style>
+        :root {
+            --mtn-yellow: #FFCC00;
+            --mtn-yellow-dark: #E6B800;
+            --mtn-blue: #0066CC;
+            --mtn-dark: #1a1a1a;
+            --mtn-gray: #6c757d;
+            --gradient-primary: linear-gradient(135deg, #FFCC00 0%, #FFB800 100%);
+            --gradient-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.1);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 40px rgba(0,0,0,0.15);
+            --shadow-xl: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(-45deg, #FFCC00, #FFB800, #1a1a1a, #000000);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        /* Animated floating shapes */
+        body::before,
+        body::after {
+            content: '';
+            position: absolute;
+            border-radius: 50%;
+            opacity: 0.3;
+            animation: float 20s ease-in-out infinite;
+        }
+        
+        body::before {
+            width: 300px;
+            height: 300px;
+            background: rgba(255, 204, 0, 0.3);
+            top: -100px;
+            left: -100px;
+            animation-delay: 0s;
+        }
+        
+        body::after {
+            width: 400px;
+            height: 400px;
+            background: rgba(102, 126, 234, 0.2);
+            bottom: -150px;
+            right: -150px;
+            animation-delay: 7s;
+        }
+        
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0) rotate(0deg);
+            }
+            50% {
+                transform: translateY(-50px) rotate(180deg);
+            }
+        }
+        
+        .auth-wrapper {
+            width: 100%;
+            max-width: 900px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .auth-container {
+            background: white;
+            border-radius: 24px;
+            box-shadow: var(--shadow-xl);
+            overflow: hidden;
+            display: flex;
+            min-height: 550px;
+            max-height: 650px;
+        }
+        
+        /* Left Panel - Branding */
+        .auth-brand {
+            flex: 0.9;
+            background: var(--gradient-primary);
+            padding: 40px 30px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .auth-brand::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: rotate 20s linear infinite;
+        }
+        
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .brand-logo {
+            width: 140px;
+            height: auto;
+            background: transparent;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            box-shadow: none;
+            position: relative;
+            z-index: 1;
+            padding: 0;
+        }
+        
+        .brand-logo img {
+            width: 100%;
+            height: auto;
+            object-fit: contain;
+            display: block;
+        }
+        
+        .brand-title {
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--mtn-dark);
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .brand-subtitle {
+            font-size: 14px;
+            color: var(--mtn-dark);
+            opacity: 0.8;
+            margin-bottom: 25px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .brand-features {
+            list-style: none;
+            text-align: left;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .brand-features li {
+            padding: 8px 0;
+            color: var(--mtn-dark);
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .brand-features li i {
+            margin-right: 10px;
+            font-size: 16px;
+            color: var(--mtn-dark);
+        }
+        
+        /* Right Panel - Form */
+        .auth-form-wrapper {
+            flex: 1.1;
+            padding: 40px 35px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            overflow-y: auto;
+        }
+        
+        .auth-header {
+            margin-bottom: 25px;
+            text-align: center;
+        }
+        
+        .auth-header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--mtn-dark);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .auth-header h1 i {
+            font-size: 26px;
+            color: var(--mtn-yellow);
+        }
+        
+        .auth-header p {
+            color: var(--mtn-gray);
+            font-size: 13px;
+        }
+        
+        /* Form Styles */
+        .form-label {
+            font-weight: 500;
+            color: var(--mtn-dark);
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .form-control {
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+            padding: 12px 16px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+        
+        .form-control:focus {
+            border-color: var(--mtn-yellow);
+            box-shadow: 0 0 0 0.2rem rgba(255, 204, 0, 0.15);
+            background: white;
+        }
+        
+        .input-group {
+            position: relative;
+        }
+        
+        .input-group-text {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-right: none;
+            border-radius: 10px 0 0 10px;
+            color: var(--mtn-gray);
+        }
+        
+        .input-group .form-control {
+            border-left: none;
+            border-radius: 0 10px 10px 0;
+        }
+        
+        .input-group:focus-within .input-group-text {
+            border-color: var(--mtn-yellow);
+            background: white;
+        }
+        
+        .btn-primary {
+            background: var(--gradient-primary);
+            border: none;
+            color: var(--mtn-dark);
+            font-weight: 600;
+            padding: 14px 30px;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            width: 100%;
+            font-size: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: var(--shadow-md);
+        }
+        
+        .btn-primary:hover {
+            background: var(--mtn-yellow-dark);
+            color: var(--mtn-dark);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+        
+        /* Alerts */
+        .alert {
+            border-radius: 10px;
+            border: none;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            box-shadow: var(--shadow-sm);
+        }
+        
+        .alert i {
+            margin-right: 10px;
+        }
+        
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .alert-error,
+        .alert-danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        /* Password Strength */
+        .password-strength {
+            height: 4px;
+            border-radius: 2px;
+            margin-top: 8px;
+            transition: all 0.3s ease;
+            background: #e9ecef;
+        }
+        
+        .strength-weak {
+            background: #dc3545;
+        }
+        
+        .strength-medium {
+            background: #ffc107;
+        }
+        
+        .strength-strong {
+            background: #28a745;
+        }
+        
+        /* Responsive */
+        @media (max-width: 992px) {
+            .auth-wrapper {
+                max-width: 750px;
+            }
+            
+            .auth-container {
+                min-height: 500px;
+            }
+            
+            .auth-brand {
+                padding: 30px 25px;
+            }
+            
+            .brand-logo {
+                width: 120px;
+            }
+            
+            .brand-title {
+                font-size: 22px;
+            }
+            
+            .brand-subtitle {
+                font-size: 13px;
+            }
+            
+            .brand-features li {
+                font-size: 12px;
+                padding: 6px 0;
+            }
+            
+            .auth-form-wrapper {
+                padding: 30px 25px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .auth-wrapper {
+                max-width: 100%;
+                padding: 0 15px;
+            }
+            
+            .auth-container {
+                flex-direction: column;
+                min-height: auto;
+                max-height: none;
+                border-radius: 20px;
+            }
+            
+            .auth-brand {
+                padding: 30px 20px;
+                min-height: auto;
+            }
+            
+            .brand-logo {
+                width: 100px;
+                margin-bottom: 15px;
+            }
+            
+            .brand-title {
+                font-size: 20px;
+            }
+            
+            .brand-subtitle {
+                font-size: 12px;
+                margin-bottom: 15px;
+            }
+            
+            .brand-features {
+                display: none;
+            }
+            
+            .auth-form-wrapper {
+                padding: 30px 20px;
+            }
+            
+            .auth-header h1 {
+                font-size: 20px;
+            }
+            
+            .auth-header h1 i {
+                font-size: 22px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .auth-container {
+                border-radius: 16px;
+            }
+            
+            .auth-brand {
+                padding: 25px 15px;
+            }
+            
+            .auth-form-wrapper {
+                padding: 25px 15px;
+            }
+            
+            .form-control {
+                font-size: 14px;
+            }
+            
+            .btn-primary {
+                font-size: 14px;
+                padding: 12px;
+            }
+        }
+        
+        /* Animations */
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .animate-slide-in-left {
+            animation: slideInLeft 0.6s ease-out;
+        }
+        
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        .animate-slide-in-right {
+            animation: slideInRight 0.6s ease-out;
+        }
+        
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="auth-wrapper">
+        <div class="auth-container animate-fade-in">
+            <!-- Left Panel - Branding -->
+            <div class="auth-brand animate-slide-in-left">
+                <div class="brand-logo">
+                    <img src="{% static 'logo_mtn.jpeg' %}" alt="MTN Logo">
+                </div>
+                <h1 class="brand-title">MTN Côte d'Ivoire</h1>
+                <p class="brand-subtitle">CAPEX Works Valuation Tool</p>
+                
+                <ul class="brand-features">
+                    <li>
+                        <i class="fas fa-file-invoice-dollar"></i>
+                        <span>Gestion des acceptances CAPEX</span>
+                    </li>
+                    <li>
+                        <i class="fas fa-chart-line"></i>
+                        <span>Suivi des bons de commande</span>
+                    </li>
+                    <li>
+                        <i class="fas fa-clipboard-check"></i>
+                        <span>Validation et évaluation</span>
+                    </li>
+                    <li>
+                        <i class="fas fa-shield-alt"></i>
+                        <span>Sécurité et traçabilité</span>
+                    </li>
+                </ul>
+            </div>
+            
+            <!-- Right Panel - Form -->
+            <div class="auth-form-wrapper animate-slide-in-right">
+                <div class="auth-header">
+                    <h1>{% block header_title %}Bienvenue{% endblock %}</h1>
+                    <p>{% block header_subtitle %}Connectez-vous pour accéder à votre espace{% endblock %}</p>
+                </div>
+                
+                <!-- Messages d'alerte -->
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            {% if message.tags == 'error' or message.tags == 'danger' %}
+                                <i class="fas fa-exclamation-circle"></i>
+                            {% elif message.tags == 'success' %}
+                                <i class="fas fa-check-circle"></i>
+                            {% elif message.tags == 'info' %}
+                                <i class="fas fa-info-circle"></i>
+                            {% elif message.tags == 'warning' %}
+                                <i class="fas fa-exclamation-triangle"></i>
+                            {% endif %}
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+                
+                {% block content %}{% endblock %}
+                
+                <div class="auth-footer">
+                    {% block footer %}
+                        <p style="color: var(--mtn-gray); font-size: 13px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e9ecef;">&copy; 2025 MTN Côte d'Ivoire. Tous droits réservés.</p>
+                    {% endblock %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Auto-dismiss alerts -->
+    <script>
+        // Auto-dismiss alerts after 5 seconds
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.alert:not(.alert-permanent)');
+            alerts.forEach(alert => {
+                const bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            });
+        }, 5000);
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

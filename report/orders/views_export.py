@@ -16,6 +16,7 @@ import logging
 import os
 from datetime import datetime, date
 from decimal import Decimal
+from .views import filter_bons_by_user_service
 
 logger = logging.getLogger(__name__)
 
@@ -34,10 +35,17 @@ def export_po_progress_monitoring(request):
         from .models import NumeroBonCommande, InitialReceptionBusiness, LigneFichier
 
         # Récupération des données des fichiers liés aux bons de commande
-        bons_commande = NumeroBonCommande.objects.prefetch_related(
+        bons_commande_qs = NumeroBonCommande.objects.prefetch_related(
             'fichiers__lignes',
             'receptions'
         ).all()
+
+        # Filtrer par service/CPU (Option A) pour les non-superusers
+        if not request.user.is_superuser:
+            from .views import filter_bons_by_user_service
+            bons_commande_qs = filter_bons_by_user_service(bons_commande_qs, request.user)
+
+        bons_commande = bons_commande_qs
         
         # Debug: Afficher les clés disponibles dans la première occurrence
         debug_first_occurrence = None
@@ -120,8 +128,11 @@ def export_po_progress_monitoring(request):
             premiere_occurrence = first_occurrence_cache.get(bon.numero)
             
             # Récupérer l'évaluation fournisseur depuis la base de données
-            from .models import VendorEvaluation
+            from .models import VendorEvaluation, TimelineDelay
             vendor_evaluation = VendorEvaluation.objects.filter(bon_commande=bon).first()
+            
+            # Récupérer les commentaires Timeline Delays
+            timeline_delay = TimelineDelay.objects.filter(bon_commande=bon).first()
             
             # Debug: Stocker la première occurrence pour inspection
             if debug_first_occurrence is None and premiere_occurrence:
@@ -327,6 +338,10 @@ def export_po_progress_monitoring(request):
                     float(vendor_evaluation.vendor_final_rating) if vendor_evaluation else
                     get_value_tolerant(premiere_occurrence, exact_candidates=['Vendor Final Rating'], tokens=['vendor', 'final', 'rating']) or ''
                 ),
+                # Commentaires Timeline Delays
+                'comment_mtn': timeline_delay.comment_mtn if timeline_delay else '',
+                'comment_force_majeure': timeline_delay.comment_force_majeure if timeline_delay else '',
+                'comment_vendor': timeline_delay.comment_vendor if timeline_delay else '',
             })
 
         # Création du DataFrame à partir des données préparées
@@ -380,6 +395,9 @@ def export_po_progress_monitoring(request):
             'After_Sales_Services_QOS': 'After Sales Services QOS',
             'Vendor_Relationship': 'Vendor Relationship',
             'Vendor_Final_Rating': 'Vendor Final Rating',
+            'comment_mtn': 'Commentaire Part MTN',
+            'comment_force_majeure': 'Commentaire Part Force Majeure',
+            'comment_vendor': 'Commentaire Part Fournisseur',
         }
         df.rename(columns=column_mapping, inplace=True)
 
@@ -492,6 +510,17 @@ def export_po_progress_monitoring(request):
                 for row in range(2, worksheet.max_row + 1):
                     cell = worksheet.cell(row=row, column=inv_idx)
                     cell.number_format = '0'
+            
+            # Format des colonnes de commentaires (largeur plus grande et wrap text)
+            comment_cols = ['Commentaire Part MTN', 'Commentaire Part Force Majeure', 'Commentaire Part Fournisseur']
+            for col_name in comment_cols:
+                if col_name in df.columns:
+                    col_idx = df.columns.get_loc(col_name) + 1
+                    col_letter = get_column_letter(col_idx)
+                    worksheet.column_dimensions[col_letter].width = 50  # Largeur plus grande pour les commentaires
+                    for row in range(2, worksheet.max_row + 1):
+                        cell = worksheet.cell(row=row, column=col_idx)
+                        cell.alignment = Alignment(wrap_text=True, vertical='top', horizontal='left')
 
         # Préparer la réponse HTTP
         output.seek(0)
@@ -778,6 +807,12 @@ def export_vendor_evaluations(request):
     evaluations = VendorEvaluation.objects.select_related(
         'bon_commande', 'evaluator'
     ).prefetch_related('bon_commande__fichiers__lignes').order_by('supplier', '-date_evaluation')
+
+    # Filtrer par service/CPU (Option A) pour les non-superusers
+    if not request.user.is_superuser:
+        from .views import filter_bons_by_user_service
+        allowed_bons = filter_bons_by_user_service(NumeroBonCommande.objects.all(), request.user)
+        evaluations = evaluations.filter(bon_commande__in=allowed_bons)
     
     # Appliquer les filtres de la requête
     supplier_filter = request.GET.get('supplier', '').strip()
@@ -1075,10 +1110,17 @@ def export_vendor_ranking(request):
         from decimal import Decimal
         from django.http import HttpResponse
         
-        # Récupérer TOUS les bons de commande (pas seulement ceux évalués)
-        bons_commande = NumeroBonCommande.objects.prefetch_related(
+        # Récupérer les bons de commande
+        bons_commande_qs = NumeroBonCommande.objects.prefetch_related(
             'fichiers__lignes'
         ).all()
+
+        # Filtrer par service/CPU (Option A) pour les non-superusers
+        if not request.user.is_superuser:
+            from .views import filter_bons_by_user_service
+            bons_commande_qs = filter_bons_by_user_service(bons_commande_qs, request.user)
+
+        bons_commande = bons_commande_qs
         
         if not bons_commande.exists():
             messages.warning(request, "Aucun bon de commande disponible pour l'export.")
@@ -1087,6 +1129,12 @@ def export_vendor_ranking(request):
         # Créer un dictionnaire des évaluations par bon de commande
         evaluations_dict = {}
         evaluations = VendorEvaluation.objects.select_related('bon_commande', 'evaluator').all()
+
+        # Filtrer les évaluations par POs autorisés (Option A)
+        if not request.user.is_superuser:
+            from .views import filter_bons_by_user_service
+            allowed_bons = filter_bons_by_user_service(NumeroBonCommande.objects.all(), request.user)
+            evaluations = evaluations.filter(bon_commande__in=allowed_bons)
         for evaluation in evaluations:
             evaluations_dict[evaluation.bon_commande.numero] = evaluation
         

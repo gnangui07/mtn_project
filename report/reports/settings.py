@@ -25,10 +25,10 @@ DEBUG = (DJANGO_ENV == 'development')
 
 if DJANGO_ENV == 'production':
     ALLOWED_HOSTS = ['ton-domaine.com', 'www.ton-domaine.com', '127.0.0.1']
-    print("🚀 Mode PRODUCTION activé")
+    print("Mode PRODUCTION active")
 else:
-    ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '192.168.8.119']
-    print("🔧 Mode DÉVELOPPEMENT activé")
+    ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '192.168.8.104']
+    print("Mode DEVELOPPEMENT active")
 
 # ==================== APPLICATIONS ====================
 
@@ -59,6 +59,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'core.middleware.UtilisateurActuelMiddleware',
+    'core.middleware.NoCacheMiddleware',  # Anti-cache pour empêcher le retour après déconnexion
 ]
 
 ROOT_URLCONF = 'reports.urls'
@@ -126,7 +127,31 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = '/connexion/'
 LOGIN_REDIRECT_URL = 'core:accueil'
 LOGOUT_REDIRECT_URL = '/connexion/'
-AUTH_USER_MODEL = 'users.CustomUser'
+AUTH_USER_MODEL = 'users.User'
+
+# ==================== CONFIGURATION DES SESSIONS ====================
+
+# Expiration de la session après 3 heures d'inactivité (en secondes)
+SESSION_COOKIE_AGE = 10800  # 3 heures = 3 * 60 * 60 = 10800 secondes
+
+# La session expire quand le navigateur se ferme
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+
+# Sauvegarder la session à chaque requête (pour mettre à jour le temps d'inactivité)
+SESSION_SAVE_EVERY_REQUEST = True
+
+# Nom du cookie de session
+SESSION_COOKIE_NAME = 'msrn_sessionid'
+
+# HttpOnly pour empêcher l'accès JavaScript au cookie de session
+SESSION_COOKIE_HTTPONLY = True
+
+# SameSite pour protection CSRF
+SESSION_COOKIE_SAMESITE = 'Lax'
+
+# Sécurité: empêcher la mise en cache des pages protégées
+# (sera renforcé par le middleware)
+CACHE_MIDDLEWARE_SECONDS = 0
 
 # ==================== CONFIGURATION EMAIL ====================
 

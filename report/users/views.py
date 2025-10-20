@@ -6,21 +6,16 @@ et utilitaires anti-cache, exposées via des FBV/CBV. Aucune logique
 métiers critique n'est implémentée ici.
 """
  
-from django.shortcuts import render, redirect
-from django.views.generic import View
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.urls import reverse_lazy
-from django.contrib import messages
-from django.utils import timezone
-from .models import CustomUser, UserVoicePreference
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth import logout
+from django.contrib import messages
+from django.urls import reverse
+from django.utils import timezone
+from django.http import JsonResponse
+from .models import User, UserVoicePreference
 from functools import wraps
 from django.views.decorators.csrf import csrf_protect
-from django.views.generic.edit import FormView
-from django.contrib.auth.forms import SetPasswordForm
-from django import forms
-from django.http import JsonResponse
 
 # Mixin pour ajouter des en-têtes anti-cache aux CBV (Class-Based Views)
 class NoCacheMixin:
@@ -61,13 +56,23 @@ def deconnexion_view(request):
             if hasattr(user, 'date_derniere_connexion'):
                 user.date_derniere_connexion = timezone.now()
             user.save()
+        
+        # Vider complètement la session avant la déconnexion
+        request.session.flush()
+        
         # Déconnecter l'utilisateur
         logout(request)
-        # Ajouter des en-têtes pour éviter la mise en cache
+        
+        # Créer la réponse de redirection avec en-têtes anti-cache renforcés
         response = redirect('/connexion/')
-        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0, private'
         response['Pragma'] = 'no-cache'
         response['Expires'] = '0'
+        
+        # Supprimer explicitement le cookie de session
+        response.delete_cookie('msrn_sessionid')
+        response.delete_cookie('sessionid')  # Cookie par défaut de Django
+        
         return response
     return redirect('/connexion/')
 
@@ -76,7 +81,7 @@ def deconnexion_view(request):
 def play_welcome_sound(request):
     if request.method == 'POST' and request.user.is_authenticated:
         # Préparer le texte à prononcer
-        username = request.user.get_full_name() or request.user.username
+        username = request.user.get_full_name() or request.user.email
         welcome_text = f"Bienvenue {username}"
         
         return JsonResponse({
@@ -123,132 +128,125 @@ def set_voice_prefs(request):
     except Exception as e:
         return JsonResponse({'status': 'error', 'detail': str(e)}, status=400)
 
-class FormulaireActivation(forms.Form):
-    """Formulaire pour l'activation du compte utilisateur"""
-    username = forms.CharField(
-        label="Nom d'utilisateur", 
-        max_length=150,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': "Nom d'utilisateur"})
-    )
-    mot_de_passe_temporaire = forms.CharField(
-        label="Mot de passe temporaire", 
-        max_length=100,
-        widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Mot de passe temporaire'})
-    )
-    
-    def clean(self):
-        cleaned_data = super().clean()
-        username = cleaned_data.get('username')
-        mot_de_passe_temporaire = cleaned_data.get('mot_de_passe_temporaire')
-        
-        if username and mot_de_passe_temporaire:
-            # Vérifier si l'utilisateur existe
-            try:
-                user = CustomUser.objects.get(username=username)
-            except CustomUser.DoesNotExist:
-                raise forms.ValidationError("Nom d'utilisateur invalide.")
-            
-            # Vérifier si le token d'activation est valide
-            if not user.jeton_activation:
-                raise forms.ValidationError("Ce compte n'a pas de jeton d'activation valide.")
-                
-            # Vérifier si le mot de passe temporaire correspond
-            if not user.check_password(mot_de_passe_temporaire):
-                raise forms.ValidationError("Mot de passe temporaire invalide.")
-                
-            # Vérifier si le compte est déjà activé
-            if user.active_manuellement:
-                raise forms.ValidationError("Ce compte a déjà été activé.")
-                
-            # Vérifier si le jeton n'a pas expiré
-            if user.date_expiration_jeton and user.date_expiration_jeton < timezone.now():
-                raise forms.ValidationError("Le jeton d'activation a expiré. Veuillez contacter l'administrateur.")
-                
-            # Stocker l'utilisateur pour l'utiliser dans form_valid
-            self.user = user
-            
-        return cleaned_data
 
-class ActivationCompteView(FormView):
-    """Vue pour l'activation du compte utilisateur"""
-    template_name = 'users/activation.html'  # Mis à jour vers le template dans users
-    form_class = FormulaireActivation
-    success_url = reverse_lazy('users:confirmer_activation')
+def activate_account(request, token):
+    """Page d'activation du compte avec le token"""
+    user = get_object_or_404(User, activation_token=token)
     
-    def get_initial(self):
-        initial = super().get_initial()
-        # Pré-remplir le nom d'utilisateur s'il est fourni dans l'URL
-        username = self.request.GET.get('username', '')
-        if username:
-            initial['username'] = username
-            # Ajouter un message pour indiquer à l'utilisateur qu'il doit saisir son mot de passe temporaire
-            messages.info(self.request, "Veuillez saisir le mot de passe temporaire qui vous a été communiqué par email pour activer votre compte.")
-        return initial
-        
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        # Ajouter des informations supplémentaires au contexte
-        context['activation_info'] = "Pour activer votre compte, vous devez saisir votre nom d'utilisateur et le mot de passe temporaire qui vous ont été communiqués par email."
-        return context
+    # Vérifie si le token est encore valide
+    if not user.is_token_valid():
+        messages.error(request, "Ce lien d'activation a expiré. Veuillez contacter l'administrateur.")
+        return redirect('users:login')
     
-    def form_valid(self, form):
-        # Récupérer l'utilisateur du formulaire
-        user = form.user
+    # Vérifie si le compte est déjà activé
+    if user.is_active:
+        messages.info(request, "Votre compte est déjà activé. Vous pouvez vous connecter.")
+        return redirect('users:login')
+    
+    if request.method == 'POST':
+        email = request.POST.get('email')
+        temp_password = request.POST.get('temp_password')
         
-        # Stocker l'utilisateur dans la session pour la vue suivante
-        self.request.session['activation_user_id'] = user.id
+        # Vérifie les identifiants
+        if email != user.email:
+            messages.error(request, "L'adresse email ne correspond pas.")
+            return render(request, 'users/activation.html', {'user': user})
         
-        # Marquer le jeton comme utilisé
-        user.active_manuellement = True
-        user.save()
+        if not user.check_temporary_password(temp_password):
+            messages.error(request, "Le mot de passe temporaire est incorrect.")
+            return render(request, 'users/activation.html', {'user': user})
         
-        messages.success(self.request, "Compte vérifié avec succès. Veuillez définir votre nouveau mot de passe.")
-        return super().form_valid(form)
+        # Redirige vers la page de confirmation pour créer le nouveau mot de passe
+        return redirect('users:confirm_password', token=token)
+    
+    return render(request, 'users/activation.html', {'user': user})
 
-class ConfirmerActivationView(FormView):
-    """Vue pour confirmer l'activation et définir un nouveau mot de passe"""
-    template_name = 'users/confirmer_activation.html'  # Mis à jour vers le template dans users
-    form_class = SetPasswordForm
-    success_url = '/connexion/'
-    
-    def dispatch(self, request, *args, **kwargs):
-        # Vérifier si l'ID de l'utilisateur est dans la session
-        if 'activation_user_id' not in request.session:
-            messages.error(request, "Vous devez d'abord activer votre compte.")
-            return redirect('users:activation')
-        return super().dispatch(request, *args, **kwargs)
-    
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        # Récupérer l'utilisateur de la session
-        user_id = self.request.session['activation_user_id']
-        user = CustomUser.objects.get(id=user_id)
-        kwargs['user'] = user
-        return kwargs
-    
-    def form_valid(self, form):
-        # Enregistrer le nouveau mot de passe
-        form.save()
-        
-        # Nettoyer la session
-        if 'activation_user_id' in self.request.session:
-            del self.request.session['activation_user_id']
-        
-        messages.success(self.request, "Votre mot de passe a été défini avec succès. Vous pouvez maintenant vous connecter.")
-        return super().form_valid(form)
 
-@login_required
-def enregistrer_activite_utilisateur(request):
-    """Enregistre l'activité d'un utilisateur"""
-    # Créer ou mettre à jour l'activité de l'utilisateur
-    try:
-        # Rechercher une activité active existante
-        activite = UserActivity.objects.get(utilisateur=request.user, active=True)
-        # Mettre à jour la date de dernière action
-        activite.date_derniere_action = timezone.now()
-        activite.save(update_fields=['date_derniere_action'])
-    except UserActivity.DoesNotExist:
-        # Créer une nouvelle activité
-        UserActivity.objects.create(utilisateur=request.user)
+def confirm_password(request, token):
+    """Page de confirmation et création du nouveau mot de passe"""
+    user = get_object_or_404(User, activation_token=token)
     
-    return JsonResponse({'status': 'success'})
+    # Vérifie si le token est encore valide
+    if not user.is_token_valid():
+        messages.error(request, "Ce lien d'activation a expiré. Veuillez contacter l'administrateur.")
+        return redirect('users:login')
+    
+    # Vérifie si le compte est déjà activé
+    if user.is_active:
+        messages.info(request, "Votre compte est déjà activé. Vous pouvez vous connecter.")
+        return redirect('users:login')
+    
+    if request.method == 'POST':
+        new_password = request.POST.get('new_password')
+        confirm_password = request.POST.get('confirm_password')
+        
+        # Validation des mots de passe
+        if not new_password or not confirm_password:
+            messages.error(request, "Veuillez remplir tous les champs.")
+            return render(request, 'users/confirmer_activation.html', {'user': user})
+        
+        if new_password != confirm_password:
+            messages.error(request, "Les mots de passe ne correspondent pas.")
+            return render(request, 'users/confirmer_activation.html', {'user': user})
+        
+        if len(new_password) < 8:
+            messages.error(request, "Le mot de passe doit contenir au moins 8 caractères.")
+            return render(request, 'users/confirmer_activation.html', {'user': user})
+        
+        # Définit le nouveau mot de passe et active le compte
+        user.set_password(new_password)
+        user.activate_account()
+        
+        messages.success(request, "Votre compte a été activé avec succès ! Vous pouvez maintenant vous connecter.")
+        return redirect('users:login')
+    
+    return render(request, 'users/confirmer_activation.html', {'user': user})
+
+
+@never_cache_view
+def login_view(request):
+    """Page de connexion"""
+    if request.user.is_authenticated:
+        return redirect('core:accueil')
+    
+    if request.method == 'POST':
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+        
+        # Authentification
+        user = authenticate(request, username=email, password=password)
+        
+        if user is not None:
+            if user.is_active:
+                # Vider l'ancienne session si elle existe
+                request.session.flush()
+                
+                # Connecter l'utilisateur (crée une nouvelle session)
+                login(request, user)
+                
+                # Régénérer la clé de session pour sécurité
+                request.session.cycle_key()
+                
+                messages.success(request, f"Bienvenue {user.get_full_name()} !")
+                
+                # Redirige vers la page demandée ou la page d'accueil
+                next_url = request.GET.get('next', 'core:accueil')
+                
+                # Créer la réponse avec anti-cache
+                response = redirect(next_url)
+                response['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+                response['Pragma'] = 'no-cache'
+                response['Expires'] = '0'
+                
+                return response
+            else:
+                messages.error(request, "Votre compte n'est pas encore activé. Veuillez vérifier votre email.")
+        else:
+            messages.error(request, "Email ou mot de passe incorrect.")
+    
+    # Ajouter anti-cache à la page de connexion aussi
+    response = render(request, 'users/connexion.html')
+    response['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+    response['Pragma'] = 'no-cache'
+    response['Expires'] = '0'
+    return response

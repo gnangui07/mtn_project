@@ -63,3 +63,27 @@ class UtilisateurActuelMiddleware:
             delattr(_thread_locals, 'user')
 
         return response
+
+
+class NoCacheMiddleware:
+    """
+    Middleware qui ajoute des en-têtes anti-cache à toutes les réponses
+    pour les utilisateurs authentifiés. Cela empêche le navigateur de mettre
+    en cache les pages et donc empêche l'accès aux pages via le bouton retour
+    après déconnexion.
+    """
+    
+    def __init__(self, get_response):
+        self.get_response = get_response
+    
+    def __call__(self, request):
+        response = self.get_response(request)
+        
+        # Appliquer les en-têtes anti-cache pour toutes les pages
+        # sauf les fichiers statiques et media
+        if not request.path.startswith('/static/') and not request.path.startswith('/media/'):
+            response['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+            response['Pragma'] = 'no-cache'
+            response['Expires'] = '0'
+        
+        return response

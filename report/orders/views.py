@@ -31,7 +31,48 @@ from .models import FichierImporte, LigneFichier, NumeroBonCommande, Reception, 
 from .forms import UploadFichierForm
 from django.db.models import Q, F, Count
 
+logger = logging.getLogger(__name__)
 
+
+def filter_bons_by_user_service(queryset, user):
+    """
+    Filtre un queryset de NumeroBonCommande selon les services de l'utilisateur.
+    Utilise le champ 'cpu' pour des performances optimales.
+    Supporte plusieurs services par utilisateur (séparés par des virgules).
+    
+    - Si l'utilisateur est superuser : retourne tout le queryset
+    - Si l'utilisateur a un ou plusieurs services : filtre les bons dont le CPU correspond
+    - Sinon : retourne un queryset vide
+    
+    Args:
+        queryset: QuerySet de NumeroBonCommande
+        user: Utilisateur connecté
+    
+    Returns:
+        QuerySet filtré
+    """
+    # Le superuser voit tout
+    if user.is_superuser:
+        return queryset
+    
+    # Récupérer la liste des services de l'utilisateur
+    services_list = user.get_services_list() if hasattr(user, 'get_services_list') else []
+    
+    # Si l'utilisateur n'a pas de service, il ne voit rien
+    if not services_list:
+        return queryset.none()
+    
+    # Filtrer par CPU en utilisant une requête SQL directe (très rapide)
+    # Utilise __in pour chercher dans la liste des services autorisés
+    # Avec __iexact pour chaque service (insensible à la casse)
+    from django.db.models import Q
+    
+    # Construire une requête OR pour chaque service
+    query = Q()
+    for service in services_list:
+        query |= Q(cpu__iexact=service)
+    
+    return queryset.filter(query)
 
 
 @login_required
@@ -44,10 +85,18 @@ def msrn_archive(request):
     # Imports locaux pour éviter d'altérer les imports globaux existants
     from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
     from django.db.models import Q
-    from .models import MSRNReport
+    from .models import MSRNReport, NumeroBonCommande
 
     base_qs = MSRNReport.objects.select_related('bon_commande').order_by('-created_at')
     qs = base_qs
+
+    # Restreindre l'archive MSRN aux POs accessibles par l'utilisateur (filtrage par service/CPU)
+    if not request.user.is_superuser:
+        allowed_bons = filter_bons_by_user_service(
+            NumeroBonCommande.objects.all(),
+            request.user
+        )
+        qs = qs.filter(bon_commande__in=allowed_bons)
 
     # Recherche simple (numéro de rapport, PO) + recherche par taux d'avancement (numérique)
     q = (request.GET.get('q') or '').strip()
@@ -137,16 +186,27 @@ def download_msrn_report(request, report_id):
         return redirect('orders:msrn_archive')
 
 
+@login_required
 def accueil(request):
     """
     Page d'accueil qui sert de point d'entrée principal pour l'application.
     Affiche les options pour importer un fichier ou consulter les fichiers existants.
-    Inclut la liste des numéros de bons de commande pour le popup.
+    Inclut la liste des numéros de bons de commande pour le popup (filtrés par service).
     """
     from .models import NumeroBonCommande
     
-    # Récupérer tous les numéros de bons de commande pour le popup
+    # Récupérer les numéros de bons de commande filtrés par service de l'utilisateur
     numeros_bons = NumeroBonCommande.objects.all().order_by('numero')
+    numeros_bons = filter_bons_by_user_service(numeros_bons, request.user)
+    
+    # Afficher un message informatif si aucun bon n'est accessible
+    if not numeros_bons.exists() and not request.user.is_superuser:
+        services_list = request.user.get_services_list() if hasattr(request.user, 'get_services_list') else []
+        if not services_list:
+            messages.info(request, "⚠️ Votre compte n'est pas associé à un service. Veuillez contacter l'administrateur.")
+        else:
+            services_str = ', '.join(services_list)
+            messages.info(request, f"ℹ️ Aucun bon de commande disponible pour vos services ({services_str}).")
     
     return render(request, 'orders/reception.html', {
         'numeros_bons': numeros_bons,
@@ -198,6 +258,13 @@ def details_bon(request, bon_id):
         selected_order_number = request.GET.get('order_number')
         try:
             bon_commande = NumeroBonCommande.objects.get(numero=selected_order_number)
+            
+            # Vérifier que l'utilisateur a accès à ce bon (filtrage par service)
+            bons_accessibles = filter_bons_by_user_service(NumeroBonCommande.objects.filter(id=bon_commande.id), request.user)
+            if not bons_accessibles.exists():
+                messages.error(request, f'You do not have access to purchase order {selected_order_number}.')
+                return redirect('orders:accueil')
+            
             fichier = bon_commande.fichiers.order_by('-date_importation').first()
             if not fichier:
                 messages.warning(request, f'Purchase order {selected_order_number} exists but is not associated with any file.')
@@ -671,6 +738,9 @@ def search_bon(request):
         qs = NumeroBonCommande.objects.all()
         if q:
             qs = qs.filter(numero__icontains=q)
+        
+        # Filtrer par service de l'utilisateur
+        qs = filter_bons_by_user_service(qs, request.user)
 
         # For each bon, also provide most recent associated fichier id if exists (for direct redirect)
         bons = []
@@ -721,11 +791,23 @@ def po_progress_monitoring(request):
 def vendor_evaluation(request, bon_commande_id):
     """
     Vue pour créer ou modifier l'évaluation d'un fournisseur
+    Vérification d'accès par service (CPU)
     """
     from .models import VendorEvaluation
     
     # Récupérer le bon de commande
     bon_commande = get_object_or_404(NumeroBonCommande, id=bon_commande_id)
+    
+    # 🔒 SÉCURITÉ : Vérifier que l'utilisateur a accès à ce bon
+    if not request.user.is_superuser:
+        cpu = bon_commande.get_cpu()
+        services_list = request.user.get_services_list() if hasattr(request.user, 'get_services_list') else []
+        
+        # Vérifier si le CPU du bon est dans la liste des services autorisés
+        if not services_list or cpu.strip().upper() not in services_list:
+            messages.error(request, f"❌ Vous n'avez pas accès au bon de commande {bon_commande.numero}.")
+            return redirect('orders:accueil')
+    
     supplier = bon_commande.get_supplier()
     
     # Récupérer le fichier_id depuis la requête (d'où vient l'utilisateur)
@@ -735,15 +817,27 @@ def vendor_evaluation(request, bon_commande_id):
         fichier = bon_commande.fichiers.order_by('-date_importation').first()
         fichier_id = fichier.id if fichier else None
     
-    # Vérifier si une évaluation existe déjà
+    # Vérifier si une évaluation existe déjà POUR CET UTILISATEUR
     evaluation = None
     try:
         evaluation = VendorEvaluation.objects.get(
             bon_commande=bon_commande,
-            supplier=supplier
+            supplier=supplier,
+            evaluator=request.user  # Chaque utilisateur a sa propre évaluation
         )
     except VendorEvaluation.DoesNotExist:
         pass
+    
+    # Vérifier s'il existe une évaluation d'un autre utilisateur (pour affichage)
+    other_evaluation = None
+    if not evaluation:
+        try:
+            other_evaluation = VendorEvaluation.objects.filter(
+                bon_commande=bon_commande,
+                supplier=supplier
+            ).exclude(evaluator=request.user).first()
+        except VendorEvaluation.DoesNotExist:
+            pass
     
     if request.method == 'POST':
         try:
@@ -756,16 +850,16 @@ def vendor_evaluation(request, bon_commande_id):
             
             # Créer ou mettre à jour l'évaluation
             if evaluation:
-                # Mise à jour
+                # Mise à jour de SA PROPRE évaluation
                 evaluation.delivery_compliance = delivery_compliance
                 evaluation.delivery_timeline = delivery_timeline
                 evaluation.advising_capability = advising_capability
                 evaluation.after_sales_qos = after_sales_qos
                 evaluation.vendor_relationship = vendor_relationship
-                evaluation.evaluator = request.user
+                # Ne pas changer l'évaluateur !
                 evaluation.save()
                 
-                messages.success(request, f'Évaluation du fournisseur "{supplier}" mise à jour avec succès.')
+                messages.success(request, f'Votre évaluation du fournisseur "{supplier}" a été mise à jour avec succès.')
             else:
                 # Création
                 evaluation = VendorEvaluation.objects.create(
@@ -796,7 +890,8 @@ def vendor_evaluation(request, bon_commande_id):
     context = {
         'bon_commande': bon_commande,
         'supplier': supplier,
-        'evaluation': evaluation,
+        'evaluation': evaluation,  # L'évaluation de l'utilisateur actuel
+        'other_evaluation': other_evaluation,  # L'évaluation d'un collègue (si existe)
         'fichier_id': fichier_id,
     }
     
@@ -807,6 +902,7 @@ def vendor_evaluation(request, bon_commande_id):
 def vendor_evaluation_list(request):
     """
     Vue pour lister toutes les évaluations de fournisseurs avec filtres
+    Filtrées par service (CPU) : chaque utilisateur voit les évaluations des bons de son service
     """
     from .models import VendorEvaluation
     from django.core.paginator import Paginator
@@ -816,6 +912,16 @@ def vendor_evaluation_list(request):
     evaluations = VendorEvaluation.objects.select_related(
         'bon_commande', 'evaluator'
     ).order_by('-date_evaluation')
+    
+    # Filtrage par service (CPU) : ne garder que les évaluations des bons accessibles
+    if not request.user.is_superuser:
+        # Récupérer les IDs des bons accessibles par l'utilisateur
+        bons_accessibles = filter_bons_by_user_service(
+            NumeroBonCommande.objects.all(), 
+            request.user
+        )
+        bon_ids = list(bons_accessibles.values_list('id', flat=True))
+        evaluations = evaluations.filter(bon_commande_id__in=bon_ids)
     
     # Filtrage par fournisseur
     supplier_filter = request.GET.get('supplier', '').strip()
@@ -880,10 +986,21 @@ def vendor_evaluation_list(request):
 def vendor_evaluation_detail(request, evaluation_id):
     """
     Vue pour afficher les détails d'une évaluation de fournisseur
+    Vérification d'accès par service (CPU)
     """
     from .models import VendorEvaluation
     
     evaluation = get_object_or_404(VendorEvaluation, id=evaluation_id)
+    
+    # Vérifier que l'utilisateur a accès à ce bon de commande (filtrage par CPU)
+    if not request.user.is_superuser:
+        bons_accessibles = filter_bons_by_user_service(
+            NumeroBonCommande.objects.filter(id=evaluation.bon_commande.id),
+            request.user
+        )
+        if not bons_accessibles.exists():
+            messages.error(request, "You do not have access to this evaluation.")
+            return redirect('orders:vendor_evaluation_list')
     
     # Calculer les statistiques
     total_score = evaluation.get_total_score()
@@ -918,11 +1035,24 @@ def vendor_evaluation_detail(request, evaluation_id):
 
 @login_required
 def timeline_delays(request, bon_commande_id):
-    """Vue simple pour gérer les retards d'un bon de commande"""
+    """
+    Vue simple pour gérer les retards d'un bon de commande
+    Vérification d'accès par service (CPU)
+    """
     from .models import TimelineDelay, LigneFichier, NumeroBonCommande
     from datetime import datetime
     
     bon = get_object_or_404(NumeroBonCommande, id=bon_commande_id)
+    
+    # Vérifier que l'utilisateur a accès à ce bon de commande (filtrage par CPU)
+    if not request.user.is_superuser:
+        bons_accessibles = filter_bons_by_user_service(
+            NumeroBonCommande.objects.filter(id=bon.id),
+            request.user
+        )
+        if not bons_accessibles.exists():
+            messages.error(request, f"You do not have access to purchase order {bon.numero}.")
+            return redirect('orders:accueil')
     
     # Récupérer le fichier_id depuis la requête (d'où vient l'utilisateur)
     fichier_id = request.GET.get('fichier_id')
@@ -1030,6 +1160,9 @@ def timeline_delays(request, bon_commande_id):
         'po_amount': float(po_amount),
         'retention_amount_timeline': float(timeline.retention_amount_timeline),
         'retention_rate_timeline': float(timeline.retention_rate_timeline),
+        'comment_mtn': timeline.comment_mtn or '',
+        'comment_force_majeure': timeline.comment_force_majeure or '',
+        'comment_vendor': timeline.comment_vendor or '',
     }
     
     return render(request, 'orders/timeline_delays.html', {'data': data, 'bon': bon, 'fichier_id': fichier_id})
@@ -1045,9 +1178,35 @@ def update_delays(request, timeline_id):
         timeline = get_object_or_404(TimelineDelay, id=timeline_id)
         data = json.loads(request.body)
         
+        # Récupérer et valider les commentaires
+        comment_mtn = data.get('comment_mtn', '').strip()
+        comment_force_majeure = data.get('comment_force_majeure', '').strip()
+        comment_vendor = data.get('comment_vendor', '').strip()
+        
+        # Validation : les commentaires sont obligatoires
+        errors = []
+        if not comment_mtn:
+            errors.append("Le commentaire Part MTN est obligatoire")
+        if not comment_force_majeure:
+            errors.append("Le commentaire Part Force Majeure est obligatoire")
+        if not comment_vendor:
+            errors.append("Le commentaire Part Fournisseur est obligatoire")
+        
+        if errors:
+            return JsonResponse({
+                'success': False,
+                'errors': errors,
+                'message': ' | '.join(errors)
+            }, status=400)
+        
+        # Mettre à jour les valeurs
         timeline.delay_part_mtn = int(data.get('mtn', 0))
         timeline.delay_part_force_majeure = int(data.get('fm', 0))
         timeline.delay_part_vendor = int(data.get('vendor', 0))
+        timeline.comment_mtn = comment_mtn
+        timeline.comment_force_majeure = comment_force_majeure
+        timeline.comment_vendor = comment_vendor
+        
         timeline.save()
         
         return JsonResponse({'success': True})
@@ -1059,17 +1218,27 @@ def vendor_ranking(request):
     """
     Vue pour afficher le classement des fournisseurs avec statistiques consolidées
     """
-    from .models import VendorEvaluation, LigneFichier
+    from .models import VendorEvaluation, LigneFichier, NumeroBonCommande
     from django.db.models import Avg, Count
     from decimal import Decimal
     
-    # Récupérer toutes les évaluations
-    evaluations = VendorEvaluation.objects.all()
+    # Déterminer les bons autorisés (Option A: par CPU du PO)
+    allowed_ids = None
+    allowed_numbers = None
+    if not request.user.is_superuser:
+        allowed_qs = filter_bons_by_user_service(NumeroBonCommande.objects.all(), request.user)
+        allowed_ids = set(allowed_qs.values_list('id', flat=True))
+        allowed_numbers = set(allowed_qs.values_list('numero', flat=True))
+
+    # Récupérer les évaluations (filtrées si nécessaire)
+    evaluations_qs = VendorEvaluation.objects.all()
+    if allowed_ids is not None:
+        evaluations_qs = evaluations_qs.filter(bon_commande_id__in=allowed_ids)
     
     # Grouper par supplier et calculer les statistiques
     suppliers_data = {}
     
-    for eval in evaluations:
+    for eval in evaluations_qs:
         supplier = eval.supplier
         if supplier not in suppliers_data:
             suppliers_data[supplier] = {
@@ -1092,7 +1261,6 @@ def vendor_ranking(request):
     
     # Pré-calculer le mapping supplier -> nombre de PO (une seule fois pour tous les suppliers)
     # Utiliser LigneFichier directement pour plus de performance
-    from .models import NumeroBonCommande
     supplier_po_count = {}
     
     # Récupérer toutes les lignes avec leurs fichiers et bons de commande en une seule requête
@@ -1128,6 +1296,9 @@ def vendor_ranking(request):
                     break
             
             if order_number:
+                # Limiter aux POs autorisés si nécessaire
+                if allowed_numbers is not None and order_number not in allowed_numbers:
+                    continue
                 if supplier_value not in supplier_po_numbers:
                     supplier_po_numbers[supplier_value] = set()
                 supplier_po_numbers[supplier_value].add(order_number)

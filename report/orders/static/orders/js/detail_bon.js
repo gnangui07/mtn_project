@@ -29,6 +29,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const retentionRate = retentionBtn ? retentionBtn.getAttribute('data-retention-rate') || 0 : 0;
             const retentionCause = retentionBtn ? retentionBtn.getAttribute('data-retention-cause') || '' : '';
             
+            // Récupérer les valeurs actuelles depuis l'en-tête de la page (mises à jour après chaque réception)
+            const montantTotalRecuElement = document.querySelector('.montant-total-recue');
+            const tauxAvancementElement = document.querySelector('.taux-avancement');
+            
+            // Extraire le texte et le nettoyer
+            const currentAmountDelivered = montantTotalRecuElement ? montantTotalRecuElement.textContent.trim() : amountDelivered;
+            const currentDeliveryRate = tauxAvancementElement ? tauxAvancementElement.textContent.trim().replace('%', '') : deliveryRate;
+            
             // Afficher une alerte de confirmation avec les informations du PO
             Swal.fire({
                 title: 'Generate MSRN Report?',
@@ -50,11 +58,11 @@ document.addEventListener('DOMContentLoaded', function() {
                             </tr>
                             <tr style="border-bottom: 1px solid #ddd;">
                                 <td style="padding: 8px; font-weight: bold;">Amount Delivered:</td>
-                                <td style="padding: 8px;">${parseFloat(amountDelivered).toLocaleString()} ${currency}</td>
+                                <td style="padding: 8px;">${currentAmountDelivered} ${currency}</td>
                             </tr>
                             <tr style="border-bottom: 1px solid #ddd;">
                                 <td style="padding: 8px; font-weight: bold;">Delivery Rate:</td>
-                                <td style="padding: 8px;"><strong style="color: #28a745;">${deliveryRate}%</strong></td>
+                                <td style="padding: 8px;"><strong style="color: #28a745;">${currentDeliveryRate}%</strong></td>
                             </tr>
                             <tr style="border-bottom: 1px solid #ddd;">
                                 <td style="padding: 8px; font-weight: bold;">Payment Retention Rate:</td>

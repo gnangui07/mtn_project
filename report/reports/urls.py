@@ -18,9 +18,8 @@ from django.contrib import admin
 from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
-from django.contrib.auth import views as auth_views
-from users.forms import FormulaireConnexion
 from django.views.generic import RedirectView
+from users import views as user_views
 
 # Pas d'espace de noms pour les URLs principales
 
@@ -34,14 +33,11 @@ urlpatterns = [
     
     path('orders/', include('orders.urls')),  # Gestion des bons de commande
     
-    # URL de connexion directe à la racine
-    path('connexion/', auth_views.LoginView.as_view(
-        template_name='users/connexion.html',
-        authentication_form=FormulaireConnexion
-    ), name='connexion'),
+    # URL de connexion directe à la racine (redirection vers users:login)
+    path('connexion/', user_views.login_view, name='connexion'),
     
     # URL de déconnexion directe à la racine
-    path('deconnexion/', auth_views.LogoutView.as_view(next_page='/connexion/'), name='deconnexion')
+    path('deconnexion/', user_views.deconnexion_view, name='deconnexion')
 ]
 
 # Favicon to avoid 404s (point to existing static logo as fallback)

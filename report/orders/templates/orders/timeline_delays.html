@@ -80,6 +80,46 @@
             </tbody>
         </table>
     </div>
+
+    <!-- Section Commentaires/Observations -->
+    <div class="card mt-4">
+        <div class="card-header" style="background-color: #FFCC00; color: #000;">
+            <h5 class="mb-0"><i class="fas fa-comment-alt me-2"></i>Commentaires et Observations</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <!-- Commentaire Part MTN -->
+                <div class="col-md-4 mb-3">
+                    <label for="comment-mtn" class="form-label fw-bold">
+                        <i class="fas fa-building me-1"></i>Commentaire Part MTN <span class="text-danger">*</span>
+                    </label>
+                    <textarea id="comment-mtn" class="form-control" rows="4" required
+                              placeholder="Saisir les observations concernant les retards dus à MTN...">{{ data.comment_mtn }}</textarea>
+                    <small class="text-muted">Expliquez les raisons des {{ data.delay_part_mtn }} jours de retard MTN</small>
+                </div>
+
+                <!-- Commentaire Part Force Majeure -->
+                <div class="col-md-4 mb-3">
+                    <label for="comment-force-majeure" class="form-label fw-bold">
+                        <i class="fas fa-exclamation-triangle me-1"></i>Commentaire Part Force Majeure <span class="text-danger">*</span>
+                    </label>
+                    <textarea id="comment-force-majeure" class="form-control" rows="4" required
+                              placeholder="Saisir les observations concernant les cas de force majeure...">{{ data.comment_force_majeure }}</textarea>
+                    <small class="text-muted">Expliquez les raisons des {{ data.delay_part_force_majeure }} jours de force majeure</small>
+                </div>
+
+                <!-- Commentaire Part Fournisseur -->
+                <div class="col-md-4 mb-3">
+                    <label for="comment-vendor" class="form-label fw-bold">
+                        <i class="fas fa-truck me-1"></i>Commentaire Part Fournisseur <span class="text-danger">*</span>
+                    </label>
+                    <textarea id="comment-vendor" class="form-control" rows="4" required
+                              placeholder="Saisir les observations concernant les retards dus au fournisseur...">{{ data.comment_vendor }}</textarea>
+                    <small class="text-muted">Expliquez les raisons des <span id="vendor-days-display">{{ data.delay_part_vendor }}</span> jours de retard fournisseur</small>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -120,6 +160,12 @@
         var vendor = Math.max(0, totalDays - mtn - fm);
         document.getElementById('vendor-' + evalId).textContent = vendor;
         
+        // Mettre à jour l'affichage des jours dans le commentaire fournisseur
+        var vendorDaysDisplay = document.getElementById('vendor-days-display');
+        if (vendorDaysDisplay) {
+            vendorDaysDisplay.textContent = vendor;
+        }
+        
         // Calculer le montant de rétention timeline : PO Amount * 0.3% * Part Fournisseur
         var retentionAmountTimeline = poAmount * 0.003 * vendor;
         
@@ -149,32 +195,70 @@
         var fm = parseInt(document.querySelector('[data-field="fm"]').value) || 0;
         var vendor = parseInt(document.getElementById('vendor-' + evalId).textContent) || 0;
         
+        // Récupérer les commentaires
+        var commentMtn = document.getElementById('comment-mtn').value.trim();
+        var commentForceMajeure = document.getElementById('comment-force-majeure').value.trim();
+        var commentVendor = document.getElementById('comment-vendor').value.trim();
+        
+        // Validation frontend
+        if (!commentMtn || !commentForceMajeure || !commentVendor) {
+            var missingFields = [];
+            if (!commentMtn) missingFields.push('Commentaire Part MTN');
+            if (!commentForceMajeure) missingFields.push('Commentaire Part Force Majeure');
+            if (!commentVendor) missingFields.push('Commentaire Part Fournisseur');
+            
+            Swal.fire({
+                icon: 'warning',
+                title: 'Champs obligatoires manquants',
+                html: 'Veuillez remplir les champs suivants :<br><strong>' + missingFields.join('<br>') + '</strong>',
+                confirmButtonColor: '#FFCC00'
+            });
+            return;
+        }
+        
         fetch('/orders/api/update-delays/' + evalId + '/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken')
             },
-            body: JSON.stringify({mtn: mtn, fm: fm, vendor: vendor})
+            body: JSON.stringify({
+                mtn: mtn, 
+                fm: fm, 
+                vendor: vendor,
+                comment_mtn: commentMtn,
+                comment_force_majeure: commentForceMajeure,
+                comment_vendor: commentVendor
+            })
         })
         .then(function(r) { return r.json(); })
         .then(function(d) {
             if(d.success) {
                 Swal.fire({
                     icon: 'success',
-                    title: 'Saved!',
-                    text: 'Delays updated successfully',
+                    title: 'Enregistré !',
+                    text: 'Les retards et commentaires ont été mis à jour avec succès',
                     confirmButtonColor: '#FFCC00',
                     confirmButtonText: 'OK'
                 });
             }
         })
         .catch(function(error) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Error!',
-                text: 'Failed to save delays',
-                confirmButtonColor: '#d33'
+            // Gérer les erreurs de validation backend
+            error.response?.json().then(function(errorData) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erreur de validation',
+                    html: errorData.message || 'Échec de la sauvegarde',
+                    confirmButtonColor: '#d33'
+                });
+            }).catch(function() {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erreur!',
+                    text: 'Échec de la sauvegarde des retards',
+                    confirmButtonColor: '#d33'
+                });
             });
         });
     };

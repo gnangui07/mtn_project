@@ -188,7 +188,7 @@ def update_quantity_delivered(request, fichier_id):
                         'quantity_delivered': total_quantity_delivered,
                         'ordered_quantity': original_quantity,
                         'quantity_not_delivered': quantity_not_delivered,
-                        'user': request.user.username if hasattr(request, 'user') and request.user.is_authenticated else None,
+                        'user': request.user.email if hasattr(request, 'user') and request.user.is_authenticated else None,
                         'date_modification': timezone.now(),
                         'unit_price': unit_price,
                         # Forcer le recalcul de ces champs dans save()
@@ -346,7 +346,7 @@ def bulk_update_receptions(request, fichier_id):
                     'quantity_delivered': total_quantity_delivered,
                     'ordered_quantity': original_quantity,
                     'quantity_not_delivered': quantity_not_delivered,
-                    'user': request.user.username if hasattr(request, 'user') and request.user.is_authenticated else None,
+                    'user': request.user.email if hasattr(request, 'user') and request.user.is_authenticated else None,
                     'date_modification': timezone.now(),
                     'unit_price': unit_price
                 }
@@ -437,7 +437,7 @@ def reset_quantity_delivered(request, fichier_id):
             ).delete()
             
             # Journaliser l'action de réinitialisation
-            user = request.user.username if hasattr(request, 'user') and request.user.is_authenticated else 'Utilisateur anonyme'
+            user = request.user.email if hasattr(request, 'user') and request.user.is_authenticated else 'Utilisateur anonyme'
             logger.info(f"Réinitialisation des quantités Quantity Delivered pour le bon {bon_number} par {user}")
             
             # Créer une entrée dans le journal d'activité pour la réinitialisation
@@ -778,7 +778,7 @@ def bulk_correction_quantity_delivered(request, fichier_id):
                         'quantity_delivered': new_total,
                         'ordered_quantity': original_quantity,
                         'quantity_not_delivered': quantity_not_delivered,
-                        'user': request.user.username if hasattr(request, 'user') and request.user.is_authenticated else None,
+                        'user': request.user.email if hasattr(request, 'user') and request.user.is_authenticated else None,
                         'date_modification': timezone.now(),
                         'unit_price': unit_price
                     }

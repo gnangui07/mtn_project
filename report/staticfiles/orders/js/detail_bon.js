@@ -29,18 +29,74 @@ document.addEventListener('DOMContentLoaded', function() {
             const retentionRate = retentionBtn ? retentionBtn.getAttribute('data-retention-rate') || 0 : 0;
             const retentionCause = retentionBtn ? retentionBtn.getAttribute('data-retention-cause') || '' : '';
             
-            // Afficher un indicateur de chargement
-            Swal.fire({
-                title: 'Generating MSRN report',
-                text: 'Please wait...',
-                allowOutsideClick: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
-            });
+            // Récupérer les valeurs actuelles depuis l'en-tête de la page (mises à jour après chaque réception)
+            const montantTotalRecuElement = document.querySelector('.montant-total-recue');
+            const tauxAvancementElement = document.querySelector('.taux-avancement');
             
-            // Appeler l'API pour générer le rapport MSRN
-            fetch(`/orders/api/generate-msrn/${bonId}/`, {
+            // Extraire le texte et le nettoyer
+            const currentAmountDelivered = montantTotalRecuElement ? montantTotalRecuElement.textContent.trim() : amountDelivered;
+            const currentDeliveryRate = tauxAvancementElement ? tauxAvancementElement.textContent.trim().replace('%', '') : deliveryRate;
+            
+            // Afficher une alerte de confirmation avec les informations du PO
+            Swal.fire({
+                title: 'Generate MSRN Report?',
+                html: `
+                    <div style="text-align: left; padding: 10px;">
+                        <p style="margin-bottom: 15px;"><strong>Please confirm the following information:</strong></p>
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr style="border-bottom: 1px solid #ddd;">
+                                <td style="padding: 8px; font-weight: bold;">Purchase Order:</td>
+                                <td style="padding: 8px;">${bonNumber}</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid #ddd;">
+                                <td style="padding: 8px; font-weight: bold;">Supplier:</td>
+                                <td style="padding: 8px;">${supplier}</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid #ddd;">
+                                <td style="padding: 8px; font-weight: bold;">PO Amount:</td>
+                                <td style="padding: 8px;">${parseFloat(poAmount).toLocaleString()} ${currency}</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid #ddd;">
+                                <td style="padding: 8px; font-weight: bold;">Amount Delivered:</td>
+                                <td style="padding: 8px;">${currentAmountDelivered} ${currency}</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid #ddd;">
+                                <td style="padding: 8px; font-weight: bold;">Delivery Rate:</td>
+                                <td style="padding: 8px;"><strong style="color: #28a745;">${currentDeliveryRate}%</strong></td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid #ddd;">
+                                <td style="padding: 8px; font-weight: bold;">Payment Retention Rate:</td>
+                                <td style="padding: 8px;"><strong style="color: ${parseFloat(retentionRate) > 0 ? '#dc3545' : '#6c757d'};">${retentionRate}%</strong></td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; font-weight: bold;">Retention Cause:</td>
+                                <td style="padding: 8px; font-style: italic;">${retentionCause}</td>
+                            </tr>
+                        </table>
+                    </div>
+                `,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#28a745',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'OK, Generate MSRN',
+                cancelButtonText: 'Cancel',
+                width: '650px'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // L'utilisateur a confirmé, procéder à la génération
+                    // Afficher un indicateur de chargement
+                    Swal.fire({
+                        title: 'Generating MSRN report',
+                        text: 'Please wait...',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+                    
+                    // Appeler l'API pour générer le rapport MSRN
+                    fetch(`/orders/api/generate-msrn/${bonId}/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -76,6 +132,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     text: 'An error occurred while generating the MSRN report.'
                 });
             });
+                }
+            });
         });
     }
     // Initialiser les tooltips Bootstrap si disponibles
@@ -85,6 +143,24 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     // Récupérer tous les champs de saisie de type Quantity Delivered
     const quantityDeliveredInputs = document.querySelectorAll('.quantity-delivered-input[data-row]'); // Mettre à jour le sélecteur pour les inputs recipe-input avec l'attribut data-row
+    
+    // Fonction pour appliquer la couleur à la cellule Quantity Not Delivered
+    function applyQuantityNotDeliveredColor(element, quantityNotDelivered) {
+        const parentCell = element.closest('td');
+        if (!parentCell) return;
+        
+        if (quantityNotDelivered === 0) {
+            // Rouge si Quantity Not Delivered = 0
+            parentCell.style.backgroundColor = '#f8d7da';
+            parentCell.style.color = '#721c24';
+            parentCell.style.fontWeight = 'bold';
+        } else if (quantityNotDelivered > 0) {
+            // Vert s'il reste des quantités à livrer
+            parentCell.style.backgroundColor = '#d4edda';
+            parentCell.style.color = '#155724';
+            parentCell.style.fontWeight = 'bold';
+        }
+    }
     
     // Calculer automatiquement les quantités restantes au chargement de la page
     quantityDeliveredInputs.forEach(input => {
@@ -99,6 +175,9 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Mettre à jour la quantité restante
             quantityNotDeliveredElement.textContent = quantityNotDelivered;
+            
+            // Appliquer la couleur selon la valeur de Quantity Not Delivered
+            applyQuantityNotDeliveredColor(quantityNotDeliveredElement, quantityNotDelivered);
         }
     });
     
@@ -333,6 +412,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const quantityDeliveredInput = document.querySelector(`.quantity-delivered-input[data-row="${row}"]`);
         const quantityNotDeliveredElement = document.querySelector(`.quantity-not-delivered[data-row="${row}"]`);
         const amountDeliveredElement = document.querySelector(`.amount-delivered[data-row="${row}"]`);
+        const amountNotDeliveredElement = document.querySelector(`.amount-not-delivered[data-row="${row}"]`);
         const quantityPayableElement = document.querySelector(`.quantity-payable[data-row="${row}"]`);
         const amountPayableElement = document.querySelector(`.amount-payable[data-row="${row}"]`);
         
@@ -377,6 +457,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     quantityDeliveredInput.value = quantityDeliveredQty.toString();
                     quantityNotDeliveredElement.textContent = quantityNotDeliveredQty.toString();
                     
+                    // Appliquer la couleur à Quantity Not Delivered
+                    applyQuantityNotDeliveredColor(quantityNotDeliveredElement, quantityNotDeliveredQty);
+                    
                     // Mettre à jour les attributs data avec les valeurs numériques
                     quantityDeliveredInput.setAttribute('data-original', orderedQty.toString());
                     quantityDeliveredInput.setAttribute('data-ordered', orderedQty.toString());
@@ -405,8 +488,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }
                     
-                    // Mettre à jour Amount Delivered et Quantity Payable
+                    // Mettre à jour Amount Delivered, Amount Not Delivered et Quantity Payable
                     amountDeliveredElement.textContent = data.amount_delivered.toFixed(2);
+                    if (amountNotDeliveredElement) {
+                        amountNotDeliveredElement.textContent = data.amount_not_delivered.toFixed(2);
+                    }
                     quantityPayableElement.textContent = data.quantity_payable.toFixed(2);
                     amountPayableElement.textContent = data.amount_payable.toFixed(2);
                     
@@ -622,6 +708,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const quantityDeliveredInput = document.querySelector(`.quantity-delivered-input[data-row="${businessId}"]`);
                     const quantityNotDeliveredElement = document.querySelector(`.quantity-not-delivered[data-row="${businessId}"]`);
                     const amountDeliveredElement = document.querySelector(`.amount-delivered[data-row="${businessId}"]`);
+                    const amountNotDeliveredElement = document.querySelector(`.amount-not-delivered[data-row="${businessId}"]`);
                     const quantityPayableElement = document.querySelector(`.quantity-payable[data-row="${businessId}"]`);
                     const amountPayableElement = document.querySelector(`.amount-payable[data-row="${businessId}"]`);
                     
@@ -634,6 +721,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     if (amountDeliveredElement) {
                         amountDeliveredElement.textContent = reception.amount_delivered.toFixed(2);
+                    }
+                    if (amountNotDeliveredElement) {
+                        amountNotDeliveredElement.textContent = reception.amount_not_delivered.toFixed(2);
                     }
                     if (quantityPayableElement) {
                         quantityPayableElement.textContent = reception.quantity_payable.toFixed(2);
@@ -1020,6 +1110,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const orderedElement = document.querySelector(`.ordered-quantity[data-row="${businessId}"]`);
                     const quantityNotDeliveredElement = document.querySelector(`.quantity-not-delivered[data-row="${businessId}"]`);
                     const amountDeliveredElement = document.querySelector(`.amount-delivered[data-row="${businessId}"]`);
+                    const amountNotDeliveredElement = document.querySelector(`.amount-not-delivered[data-row="${businessId}"]`);
                     const quantityPayableElement = document.querySelector(`.quantity-payable[data-row="${businessId}"]`);
                     const amountPayableElement = document.querySelector(`.amount-payable[data-row="${businessId}"]`);
                     
@@ -1037,8 +1128,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         quantityDeliveredInput.setAttribute('data-original', data.receptions[businessId].ordered_quantity);
                         quantityDeliveredInput.setAttribute('data-ordered', data.receptions[businessId].ordered_quantity);
                         
-                        // Mettre à jour Amount Delivered et Quantity Payable
+                        // Mettre à jour Amount Delivered, Amount Not Delivered et Quantity Payable
                         amountDeliveredElement.textContent = data.receptions[businessId].amount_delivered.toFixed(2);
+                        if (amountNotDeliveredElement) {
+                            amountNotDeliveredElement.textContent = data.receptions[businessId].amount_not_delivered.toFixed(2);
+                        }
                         quantityPayableElement.textContent = data.receptions[businessId].quantity_payable.toFixed(2);
                         amountPayableElement.textContent = data.receptions[businessId].amount_payable.toFixed(2);
                     }
@@ -1311,6 +1405,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         const quantityDeliveredInput = document.querySelector(`.quantity-delivered-input[data-row="${businessId}"]`);
                         const quantityNotDeliveredElement = document.querySelector(`.quantity-not-delivered[data-row="${businessId}"]`);
                         const amountDeliveredElement = document.querySelector(`.amount-delivered[data-row="${businessId}"]`);
+                        const amountNotDeliveredElement = document.querySelector(`.amount-not-delivered[data-row="${businessId}"]`);
                         const quantityPayableElement = document.querySelector(`.quantity-payable[data-row="${businessId}"]`);
                         const amountPayableElement = document.querySelector(`.amount-payable[data-row="${businessId}"]`);
                         
@@ -1323,6 +1418,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                         if (amountDeliveredElement) {
                             amountDeliveredElement.textContent = result.amount_delivered.toFixed(2);
+                        }
+                        if (amountNotDeliveredElement) {
+                            amountNotDeliveredElement.textContent = result.amount_not_delivered.toFixed(2);
                         }
                         if (quantityPayableElement) {
                             quantityPayableElement.textContent = result.quantity_payable.toFixed(2);
@@ -1564,4 +1662,122 @@ document.addEventListener('DOMContentLoaded', function() {
             closeSidebar();
         });
     }
+
+    // ========================================
+    // GESTION DES FILTRES DE LIVRAISON
+    // ========================================
+    
+    function updateDeliveryCounts() {
+        const allRows = document.querySelectorAll('.data-row');
+        let partialCount = 0;
+        let fullCount = 0;
+        
+        allRows.forEach(row => {
+            const qtyDelivered = parseFloat(row.dataset.quantityDelivered || 0);
+            const qtyOrdered = parseFloat(row.dataset.orderedQuantity || 0);
+            
+            if (qtyDelivered > 0 && qtyDelivered < qtyOrdered) {
+                partialCount++;
+            } else if (qtyDelivered > 0 && qtyDelivered >= qtyOrdered) {
+                fullCount++;
+            }
+        });
+        
+        // Mettre à jour les badges de comptage
+        document.getElementById('count-all').textContent = allRows.length;
+        document.getElementById('count-partial').textContent = partialCount;
+        document.getElementById('count-full').textContent = fullCount;
+    }
+    
+    function applyDeliveryFilter(filterType) {
+        const allRows = document.querySelectorAll('.data-row');
+        let visibleCount = 0;
+        
+        allRows.forEach(row => {
+            const qtyDelivered = parseFloat(row.dataset.quantityDelivered || 0);
+            const qtyOrdered = parseFloat(row.dataset.orderedQuantity || 0);
+            let shouldShow = false;
+            
+            switch(filterType) {
+                case 'all':
+                    shouldShow = true;
+                    break;
+                case 'partially-delivered':
+                    // Quantity Delivered > 0 ET < Ordered Quantity
+                    shouldShow = qtyDelivered > 0 && qtyDelivered < qtyOrdered;
+                    break;
+                case 'fully-delivered':
+                    // Quantity Delivered >= Ordered Quantity (et > 0)
+                    shouldShow = qtyDelivered > 0 && qtyDelivered >= qtyOrdered;
+                    break;
+            }
+            
+            if (shouldShow) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+        
+        // Mettre à jour le badge du tableau
+        const tableBadge = document.querySelector('.card-header .badge');
+        if (tableBadge) {
+            tableBadge.textContent = `${visibleCount} items`;
+        }
+    }
+    
+    // Initialiser les compteurs au chargement
+    updateDeliveryCounts();
+    
+    // Gérer les clics sur les boutons de filtre
+    const filterButtons = document.querySelectorAll('.filter-btn');
+    filterButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            // Retirer la classe active de tous les boutons
+            filterButtons.forEach(b => b.classList.remove('active'));
+            // Ajouter la classe active au bouton cliqué
+            this.classList.add('active');
+            
+            // Appliquer le filtre
+            const filterType = this.dataset.filter;
+            applyDeliveryFilter(filterType);
+        });
+    });
+    
+    // Mettre à jour les compteurs quand Quantity Delivered change
+    const quantityInputs = document.querySelectorAll('.quantity-delivered-input');
+    quantityInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            // Mettre à jour l'attribut data de la ligne parente
+            const row = this.closest('.data-row');
+            if (row) {
+                row.dataset.quantityDelivered = this.value;
+                updateDeliveryCounts();
+                
+                // Réappliquer le filtre actif
+                const activeFilter = document.querySelector('.filter-btn.active');
+                if (activeFilter) {
+                    applyDeliveryFilter(activeFilter.dataset.filter);
+                }
+                
+                // Mettre à jour la couleur de Quantity Not Delivered
+                const rowId = this.getAttribute('data-row');
+                const orderedElement = document.querySelector(`.ordered-quantity[data-row="${rowId}"]`);
+                const quantityNotDeliveredElement = document.querySelector(`.quantity-not-delivered[data-row="${rowId}"]`);
+                
+                if (orderedElement && quantityNotDeliveredElement) {
+                    const orderedQuantity = parseFloat(orderedElement.textContent) || 0;
+                    const quantityDelivered = parseFloat(this.value) || 0;
+                    const quantityNotDelivered = Math.max(0, orderedQuantity - quantityDelivered);
+                    
+                    // Mettre à jour la valeur affichée
+                    quantityNotDeliveredElement.textContent = quantityNotDelivered;
+                    
+                    // Réappliquer la couleur
+                    applyQuantityNotDeliveredColor(quantityNotDeliveredElement, quantityNotDelivered);
+                }
+            }
+        });
+    });
 });

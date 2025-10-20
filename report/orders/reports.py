@@ -30,7 +30,7 @@ MODERN_BLUE = colors.HexColor('#1F5C99')  # Bleu foncé professionnel
 ACCENT_BLUE = colors.HexColor('#4A90E2')  # Bleu plus clair pour accents
 LIGHT_BLUE = colors.HexColor('#E6F0FA')   # Bleu très clair pour fonds
 
-def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, username=None):
+def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, user_email=None):
     """
     Génère un rapport MSRN (Material Service Receipt Note) au format PDF.
     Optimisé pour tenir sur une seule page avec toutes les informations.
@@ -456,9 +456,15 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
                 
                 if ligne and ligne.contenu:
                     contenu = ligne.contenu
-                    # Chercher directement 'Payment Terms' (clé exacte du fichier)
-                    if 'Payment Terms' in contenu and contenu['Payment Terms']:
-                        val = str(contenu['Payment Terms']).strip()
+                    # Chercher 'Payment Terms' avec ou sans espace à la fin
+                    payment_key = None
+                    if 'Payment Terms ' in contenu:  # Avec espace (clé réelle dans les données)
+                        payment_key = 'Payment Terms '
+                    elif 'Payment Terms' in contenu:  # Sans espace (fallback)
+                        payment_key = 'Payment Terms'
+                    
+                    if payment_key and contenu[payment_key]:
+                        val = str(contenu[payment_key]).strip()
                         if val and val.lower() not in ['n/a', 'na', '', 'none']:
                             payment_terms = val
         except Exception as e:
@@ -752,8 +758,8 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
     retard_condition = "Le délai de livraison étant d'une importance capitale, le Fournisseur reconnaît le droit à MTN-CI, en cas de retard lui incombant, d'annuler irrévocablement la commande aux torts exclusifs du Fournisseur ou d'appliquer des pénalités de retard à raison de 0.3% du prix total de la marchandise, par jour calendaire de retard, sauf cas de force majeure prouvé par le Fournisseur et formellement reconnu par MTN-CI."
     elements.append(Paragraph(f"• {retard_condition}", compact_normal_style))
 
-    # Ajouter le nom de l'utilisateur qui a généré le rapport
-    if username:
+    # Ajouter l'email de l'utilisateur qui a généré le rapport
+    if user_email:
         user_style = ParagraphStyle(
             'UserStyle',
             parent=styles['Normal'],
@@ -762,7 +768,7 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
             alignment=TA_RIGHT,
             textColor=colors.grey
         )
-        user_text = f"Requested By: {username}"
+        user_text = f"Requested By: {user_email}"
         elements.append(Spacer(1, 10))  # Ajouter un espace de 10 points
         elements.append(Paragraph(user_text, user_style))
     

@@ -75,6 +75,15 @@ class NumeroBonCommande(models.Model):
         verbose_name="Numéro de bon de commande"
     )
     
+    # CPU (dénormalisé pour performance)
+    cpu = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        db_index=True,  # Index pour les requêtes rapides
+        verbose_name="CPU/Service"
+    )
+    
     # Champs de cache pour les montants
     _montant_total = models.DecimalField(
         max_digits=20,
@@ -359,13 +368,26 @@ class NumeroBonCommande(models.Model):
 
         return "N/A"
 
-    def get_cpu(self):
-        """Récupère la valeur CPU depuis les lignes correspondant au bon de commande.
-        Nettoie la valeur en supprimant le préfixe numérique et le tiret (ex: '02 - ITS' devient 'ITS').
+    def get_cpu(self, force_refresh=False):
         """
+        Récupère la valeur CPU depuis le champ stocké ou depuis les lignes si non disponible.
+        Nettoie la valeur en supprimant le préfixe numérique et le tiret (ex: '02 - ITS' devient 'ITS').
+        
+        Args:
+            force_refresh: Si True, force la récupération depuis les fichiers même si le champ est rempli
+        
+        Returns:
+            str: La valeur CPU nettoyée ou "N/A" si non trouvée
+        """
+        # Si le CPU est déjà stocké et qu'on ne force pas le refresh, le retourner
+        if self.cpu and not force_refresh:
+            return self.cpu
+        
+        # Sinon, le récupérer depuis les fichiers
         if not self.fichiers.exists():
             return "N/A"
 
+        cpu_value = None
         for fichier in self.fichiers.all():
             for ligne in fichier.lignes.all():
                 contenu = ligne.contenu
@@ -388,6 +410,12 @@ class NumeroBonCommande(models.Model):
                             if ' - ' in cpu_value:
                                 # Prendre la partie après le dernier tiret et supprimer les espaces
                                 cpu_value = cpu_value.split('-')[-1].strip()
+                            
+                            # Sauvegarder dans le champ pour les prochaines fois
+                            if cpu_value and cpu_value != "N/A":
+                                self.cpu = cpu_value
+                                self.save(update_fields=['cpu'])
+                            
                             return cpu_value
 
         return "N/A"
@@ -1071,10 +1099,39 @@ class FichierImporte(models.Model):
             # Associer ce fichier au bon de commande
             bon_commande.fichiers.add(self)
             
+            # Extraire et sauvegarder le CPU pour ce bon
+            cpu_found = False
+            for ligne in lignes:
+                contenu = ligne.contenu
+                if contenu and colonne_order in contenu and str(contenu[colonne_order]).strip() == numero:
+                    # Chercher la colonne CPU
+                    for key, value in contenu.items():
+                        if key and value:
+                            key_normalized = key.strip().upper()
+                            if key_normalized == 'CPU':
+                                # Nettoyer la valeur CPU (ex: '02 - ITS' -> 'ITS')
+                                cpu_value = str(value).strip()
+                                if ' - ' in cpu_value:
+                                    # Prendre la partie après le dernier tiret et supprimer les espaces
+                                    cpu_value = cpu_value.split('-')[-1].strip()
+                                
+                                # Mettre à jour le CPU
+                                if cpu_value and cpu_value.upper() not in ('N/A', 'NA', 'NULL', 'NONE', ''):
+                                    bon_commande.cpu = cpu_value
+                                    bon_commande.save(update_fields=['cpu'])
+                                    cpu_found = True
+                                    print(f"CPU extrait pour {numero}: {cpu_value}")
+                                break
+                    if cpu_found:
+                        break
+            
             if created:
                 print(f"Nouveau bon de commande créé: {numero}")
             else:
                 print(f"Bon de commande existant associé: {numero}")
+            
+            if not cpu_found:
+                print(f"⚠ CPU non trouvé pour {numero}")
 
     class Meta:
         verbose_name = "Imported File"
@@ -1261,7 +1318,7 @@ class FichierImporte(models.Model):
                                         received_quantity=received_qty_dec,
                                         quantity_delivered=received_qty_dec,
                                         quantity_not_delivered=quantity_not_delivered_val,
-                                        user=self.utilisateur.username if self.utilisateur else 'system_import',
+                                        user=self.utilisateur.email if self.utilisateur else 'system_import',
                                         date_modification=timezone.now(),
                                         unit_price=unit_price
                                     )
@@ -1440,10 +1497,49 @@ def import_or_update_fichier(fichier_upload, utilisateur=None):
                 if numero and numero.lower() not in ('', 'false', 'true', 'none', 'null', 'nan', '0'):
                     numeros_bons.add(numero)
 
-    # Associer ou créer les bons
+    # Associer ou créer les bons et extraire le CPU
     for numero in numeros_bons:
         bon, created = NumeroBonCommande.objects.get_or_create(numero=numero)
         bon.fichiers.add(fichier_importe)  # toujours lier le fichier au bon
+        
+        # Extraire et mettre à jour le CPU à chaque import (pour refléter les changements)
+        cpu_found = False
+        for ligne in fichier_importe.lignes.all():
+            if isinstance(ligne.contenu, dict):
+                contenu = ligne.contenu
+                
+                # Vérifier que cette ligne correspond à ce bon
+                order_key = None
+                for key in contenu.keys():
+                    key_lower = key.lower() if key else ''
+                    if 'order' in key_lower or 'commande' in key_lower or 'bon' in key_lower or 'bc' in key_lower:
+                        order_key = key
+                        break
+                
+                if order_key and str(contenu.get(order_key, '')).strip() == numero:
+                    # Chercher la colonne CPU (recherche insensible à la casse)
+                    for key, value in contenu.items():
+                        if key and value:
+                            key_normalized = key.strip().upper()
+                            if key_normalized == 'CPU':
+                                # Nettoyer la valeur CPU (ex: '02 - ITS' -> 'ITS')
+                                cpu_value = str(value).strip()
+                                if ' - ' in cpu_value:
+                                    # Prendre la partie après le dernier tiret et supprimer les espaces
+                                    cpu_value = cpu_value.split('-')[-1].strip()
+                                
+                                # Mettre à jour le CPU à chaque import (même s'il existe déjà)
+                                if cpu_value and cpu_value.upper() not in ('N/A', 'NA', 'NULL', 'NONE', ''):
+                                    bon.cpu = cpu_value
+                                    bon.save(update_fields=['cpu'])
+                                    cpu_found = True
+                                    print(f"CPU extrait pour {numero}: {cpu_value}")
+                                break
+                    if cpu_found:
+                        break
+        
+        if not cpu_found:
+            print(f"⚠ CPU non trouvé pour {numero}")
 
     return fichier_importe, True
 
@@ -1880,9 +1976,15 @@ class MSRNReport(models.Model):
                         
                         if ligne and ligne.contenu:
                             contenu = ligne.contenu
-                            # Chercher directement 'Payment Terms'
-                            if 'Payment Terms' in contenu and contenu['Payment Terms']:
-                                val = str(contenu['Payment Terms']).strip()
+                            # Chercher 'Payment Terms' avec ou sans espace à la fin
+                            payment_key = None
+                            if 'Payment Terms ' in contenu:  # Avec espace (clé réelle dans les données)
+                                payment_key = 'Payment Terms '
+                            elif 'Payment Terms' in contenu:  # Sans espace (fallback)
+                                payment_key = 'Payment Terms'
+                            
+                            if payment_key and contenu[payment_key]:
+                                val = str(contenu[payment_key]).strip()
                                 if val and val.lower() not in ['n/a', 'na', '', 'none']:
                                     self.payment_terms_snapshot = val
                 except Exception:
@@ -2147,6 +2249,11 @@ class TimelineDelay(models.Model):
     delay_part_mtn = models.IntegerField(default=0, verbose_name="Part MTN (jours)")
     delay_part_force_majeure = models.IntegerField(default=0, verbose_name="Part Force Majeure (jours)")
     delay_part_vendor = models.IntegerField(default=0, verbose_name="Part Fournisseur (jours)")
+    
+    # Commentaires/Observations pour chaque part (obligatoires)
+    comment_mtn = models.TextField(verbose_name="Commentaire Part MTN", help_text="Commentaire obligatoire")
+    comment_force_majeure = models.TextField(verbose_name="Commentaire Part Force Majeure", help_text="Commentaire obligatoire")
+    comment_vendor = models.TextField(verbose_name="Commentaire Part Fournisseur", help_text="Commentaire obligatoire")
     
     # Montants calculés pour la timeline
     retention_amount_timeline = models.DecimalField(

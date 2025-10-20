@@ -209,7 +209,7 @@
                                 <td>
                                     <small class="text-muted">
                                         {% if evaluation.evaluator %}
-                                            <i class="fas fa-user me-1"></i>{{ evaluation.evaluator.username }}
+                                            <i class="fas fa-user me-1"></i>{{ evaluation.evaluator.get_full_name|default:evaluation.evaluator.email }}
                                         {% else %}
                                             System
                                         {% endif %}

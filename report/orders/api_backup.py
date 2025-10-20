@@ -344,7 +344,7 @@ def update_recipe_quantity(request, fichier_id):
                         'recipe_quantity': total_recipe_quantity,
                         'ordered_quantity': original_quantity,
                         'remaining_quantity': remaining_quantity,
-                        'user': request.user.username if hasattr(request, 'user') and request.user.is_authenticated else None
+                        'user': request.user.email if hasattr(request, 'user') and request.user.is_authenticated else None
                     }
                 )
                 
@@ -378,7 +378,7 @@ def update_recipe_quantity(request, fichier_id):
                     report.save()
                     
                     # Générer le PDF avec le numéro de rapport qui vient d'être créé
-                    pdf_buffer = generate_msrn_report(bon_commande, report.report_number)
+                    pdf_buffer = generate_msrn_report(bon_commande, report.report_number, user_email=request.user.email if hasattr(request, 'user') and request.user.is_authenticated else None)
                     
                     # Mettre à jour le fichier PDF avec le bon numéro
                     report.pdf_file.save(
@@ -946,7 +946,7 @@ def reset_recipe_quantity(request, fichier_id):
             ).delete()
             
             # Journaliser l'action de réinitialisation
-            user = request.user.username if hasattr(request, 'user') and request.user.is_authenticated else 'Utilisateur anonyme'
+            user = request.user.email if hasattr(request, 'user') and request.user.is_authenticated else 'Utilisateur anonyme'
             logger.info(f"Réinitialisation des quantités Recipe pour le bon {bon_number} par {user}")
             
             # Créer une entrée dans le journal d'activité pour la réinitialisation

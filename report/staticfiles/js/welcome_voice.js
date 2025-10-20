@@ -25,6 +25,19 @@
     const isES = lang.startsWith('es');
     const isDE = lang.startsWith('de');
 
+    // Message de bienvenue simple
+    let welcomeMsg = '';
+    if (isFR) welcomeMsg = `Bienvenue ${username}, j'espère que vous allez bien !`;
+    else if (isEN) welcomeMsg = `Welcome ${username}, I hope you're well!`;
+    else if (isES) welcomeMsg = `Bienvenido ${username}, ¡espero que esté bien!`;
+    else if (isDE) welcomeMsg = `Willkommen ${username}, ich hoffe, es geht Ihnen gut!`;
+    else welcomeMsg = `Welcome ${username}!`;
+
+    return welcomeMsg;
+  }
+
+  // Code mort supprimé - garder seulement le message de bienvenue
+  function buildMessage_OLD(username, prefs, payload){
     const importY = payload.has_imports_yesterday;
     const importYDate = fmtDateISOToLocale(payload.import_date_yesterday, prefs.lang);
     const lastImportDate = fmtDateISOToLocale(payload.last_import_date, prefs.lang);
@@ -264,36 +277,28 @@
   }
 
   async function play(username){
+    // Ne pas jouer si l'utilisateur n'est pas authentifié (username vide)
+    if (!username || username.trim() === '') return;
     if (global.__WELCOME_TTS_SPOKEN__) return;
     const prefs = getPrefs(username);
     // If user has pressed stop in this session, do not start
     try { if (sessionStorage.getItem(getStopKey(username))) return; } catch {}
-    try {
-      const res = await fetch('/users/activity-summary/', { headers: { 'Cache-Control': 'no-cache' } });
-      const json = res.ok ? await res.json() : {};
-      const text = buildMessage(username, prefs, json || {});
-      // Re-check stop just before speaking (handles race if user clicked Stop during fetch)
-      try { if (sessionStorage.getItem(getStopKey(username))) return; } catch {}
-      global.__WELCOME_TTS_SPOKEN__ = true;
-      global.__WELCOME_USER__ = username;
-      try { sessionStorage.setItem(getPlayKey(username), 'true'); } catch {}
-      await speak(text, prefs, 0);
-    } catch (e) {
-      // Fallback: simple welcome
-      const lang = (prefs.lang || 'fr-FR').toLowerCase();
-      const isFR = lang.startsWith('fr');
-      const fallback = isFR ? `Bienvenue ${username}, j'espère que vous allez bien !` : `Welcome ${username}!`;
-      // Re-check stop before speaking fallback
-      try { if (sessionStorage.getItem(getStopKey(username))) return; } catch {}
-      global.__WELCOME_TTS_SPOKEN__ = true;
-      global.__WELCOME_USER__ = username;
-      try { sessionStorage.setItem(getPlayKey(username), 'true'); } catch {}
-      await speak(fallback, prefs, 0);
-    }
+    
+    // Message de bienvenue simple (plus besoin d'appeler l'API)
+    const text = buildMessage(username, prefs, {});
+    
+    // Re-check stop just before speaking
+    try { if (sessionStorage.getItem(getStopKey(username))) return; } catch {}
+    global.__WELCOME_TTS_SPOKEN__ = true;
+    global.__WELCOME_USER__ = username;
+    try { sessionStorage.setItem(getPlayKey(username), 'true'); } catch {}
+    await speak(text, prefs, 0);
   }
 
   // Resume if a previous speech was interrupted by navigation
   function resumeIfNeeded(username){
+    // Ne pas reprendre si l'utilisateur n'est pas authentifié
+    if (!username || username.trim() === '') return;
     try {
       // Do not resume if user explicitly stopped in this tab/session
       if (sessionStorage.getItem(getStopKey(username))) {

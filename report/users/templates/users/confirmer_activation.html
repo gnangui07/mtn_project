@@ -1,177 +1,207 @@
-{% extends 'base.html' %}
-{% load static %}
+{% extends 'users/base_auth.html' %}
 
-{% block title %}Définir votre mot de passe - Gestion des Bons de Commande{% endblock %}
+{% block title %}Créer votre mot de passe - MTN CI{% endblock %}
 
-{% block extra_css %}
-<style>
-    :root {
-        --mtn-yellow: #FFCC00;
-        --mtn-dark: #111827;
-        --mtn-black: #000000;
-    }
-
-    body {
-        margin: 0;
-        padding: 0;
-        background: linear-gradient(135deg, var(--mtn-black), #222, var(--mtn-dark), var(--mtn-yellow));
-        background-size: 400% 400%;
-        animation: gradientFlow 15s ease infinite;
-        min-height: 100vh;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        font-family: 'Segoe UI', sans-serif;
-        overflow-x: hidden;
-        color: #fff;
-        /* Désactive le padding-top du fichier base.html */
-        padding-top: 0 !important;
-    }
-    
-    @keyframes gradientFlow {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-    }
-
-    .activation-container {
-        width: 100%;
-        max-width: 500px;
-        padding: 2rem;
-        background-color: #1a1a1a;
-        border-radius: 10px;
-        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
-        position: relative;
-        overflow: hidden;
-        z-index: 1;
-    }
-    
-    .activation-container::before {
-        content: '';
-        position: absolute;
-        top: -5px;
-        left: -5px;
-        right: -5px;
-        bottom: -5px;
-        background: linear-gradient(45deg, var(--mtn-yellow), var(--mtn-dark), var(--mtn-yellow));
-        z-index: -1;
-        border-radius: 15px;
-        animation: borderGlow 3s ease-in-out infinite alternate;
-    }
-    
-    @keyframes borderGlow {
-        0% { filter: blur(10px); opacity: 0.8; }
-        100% { filter: blur(20px); opacity: 1; }
-    }
-</style>
-{% endblock %}
+{% block header_title %}Créer votre mot de passe{% endblock %}
+{% block header_subtitle %}Dernière étape pour accéder à CAPEX Works Valuation{% endblock %}
 
 {% block content %}
-<div style="height: 100vh; width: 100%; display: flex; justify-content: center; align-items: center;">
-    <div class="activation-container">
-        <div style="text-align: center; margin-bottom: 1.5rem;">
-            <img src="{% static 'logo_mtn.jpeg' %}" alt="Logo MTN" style="width: 120px; height: auto; margin-bottom: 1rem;">
-            <h2 style="color: var(--mtn-yellow); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0;">Définir votre mot de passe</h2>
-            <div style="width: 50px; height: 4px; background-color: var(--mtn-yellow); margin: 15px auto;"></div>
-        </div>
-
-        <div style="background-color: rgba(255, 204, 0, 0.1); border-left: 4px solid var(--mtn-yellow); padding: 15px; margin-bottom: 20px; border-radius: 4px;">
-            <i class="fas fa-info-circle" style="color: var(--mtn-yellow);"></i> 
-            <span style="color: #fff;">Veuillez choisir un nouveau mot de passe pour finaliser l'activation de votre compte.</span>
-        </div>
-        
-        {% if messages %}
-        <div class="messages">
-            {% for message in messages %}
-            <div style="background-color: {% if message.tags == 'error' %}rgba(220, 53, 69, 0.1); border-left: 4px solid #dc3545{% elif message.tags == 'success' %}rgba(40, 167, 69, 0.1); border-left: 4px solid #28a745{% else %}rgba(255, 204, 0, 0.1); border-left: 4px solid var(--mtn-yellow){% endif %}; padding: 15px; margin-bottom: 15px; border-radius: 4px;">
-                <i class="fas {% if message.tags == 'error' %}fa-exclamation-circle{% elif message.tags == 'success' %}fa-check-circle{% else %}fa-info-circle{% endif %}" style="color: {% if message.tags == 'error' %}#dc3545{% elif message.tags == 'success' %}#28a745{% else %}var(--mtn-yellow){% endif %};"></i>
-                <span style="color: #fff;">{{ message }}</span>
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
-        
-        {% if form.non_field_errors %}
-        <div style="background-color: rgba(220, 53, 69, 0.1); border-left: 4px solid #dc3545; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
-            <i class="fas fa-exclamation-circle" style="color: #dc3545;"></i>
-            <span style="color: #fff;">{{ form.non_field_errors }}</span>
-        </div>
-        {% endif %}
-        
-        <form method="post">
-            {% csrf_token %}
-            
-            <div style="margin-bottom: 25px; position: relative;">
-                <div style="position: relative; margin-bottom: 5px;">
-                    <i class="fas fa-lock" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--mtn-yellow);"></i>
-                    <input 
-                        type="password" 
-                        style="width: 100%; padding: 15px 15px 15px 45px; background-color: #2a2a2a; border: 1px solid #3a3a3a; border-radius: 5px; color: #fff; font-size: 16px; transition: all 0.3s ease;" 
-                        placeholder="Nouveau mot de passe" 
-                        name="new_password1" 
-                        id="id_new_password1"
-                        required>
-                    <i class="fas fa-eye" id="togglePassword1" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: var(--mtn-yellow); cursor: pointer;"></i>
-                </div>
-                {% if form.new_password1.errors %}
-                <div style="color: #dc3545; font-size: 0.85rem; margin-top: 5px;">
-                    {{ form.new_password1.errors }}
-                </div>
-                {% endif %}
-                <div style="color: #999; font-size: 0.8rem; margin-top: 5px;">
-                    <p>Votre mot de passe doit contenir au moins 8 caractères.</p>
-                </div>
-            </div>
-            
-            <div style="margin-bottom: 25px; position: relative;">
-                <div style="position: relative; margin-bottom: 5px;">
-                    <i class="fas fa-lock" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--mtn-yellow);"></i>
-                    <input 
-                        type="password" 
-                        style="width: 100%; padding: 15px 15px 15px 45px; background-color: #2a2a2a; border: 1px solid #3a3a3a; border-radius: 5px; color: #fff; font-size: 16px; transition: all 0.3s ease;" 
-                        placeholder="Confirmer le mot de passe" 
-                        name="new_password2" 
-                        id="id_new_password2"
-                        required>
-                    <i class="fas fa-eye" id="togglePassword2" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: var(--mtn-yellow); cursor: pointer;"></i>
-                </div>
-                {% if form.new_password2.errors %}
-                <div style="color: #dc3545; font-size: 0.85rem; margin-top: 5px;">
-                    {{ form.new_password2.errors }}
-                </div>
-                {% endif %}
-                <div style="color: #999; font-size: 0.8rem; margin-top: 5px;">
-                    <p>Entrez le même mot de passe que précédemment, pour vérification.</p>
-                </div>
-            </div>
-            
-            <div style="text-align: center; margin-top: 30px;">
-                <button type="submit" style="background-color: var(--mtn-yellow); color: var(--mtn-black); border: none; padding: 15px 30px; border-radius: 5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 5px 15px rgba(255, 204, 0, 0.3);" onmouseover="this.style.backgroundColor='#e6b800'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 20px rgba(255, 204, 0, 0.4)';" onmouseout="this.style.backgroundColor='var(--mtn-yellow)'; this.style.transform='translateY(0)'; this.style.boxShadow='0 5px 15px rgba(255, 204, 0, 0.3)';">
-                    <i class="fas fa-check-circle" style="margin-right: 8px;"></i>Activer mon compte
-                </button>
-            </div>
-            
-
-        </form>
-    </div>
+<div class="alert alert-success mb-4">
+    <i class="fas fa-check-circle"></i>
+    <strong>Identifiants vérifiés !</strong><br>
+    Créez maintenant votre mot de passe sécurisé pour finaliser l'activation de votre compte.
 </div>
 
+<form method="post" id="confirmForm">
+    {% csrf_token %}
+    
+    <div class="mb-3">
+        <label for="new_password" class="form-label">
+            <i class="fas fa-lock"></i> Nouveau mot de passe
+        </label>
+        <div class="input-group">
+            <span class="input-group-text">
+                <i class="fas fa-key"></i>
+            </span>
+            <input 
+                type="password" 
+                class="form-control" 
+                id="new_password" 
+                name="new_password" 
+                placeholder="Minimum 8 caractères"
+                required
+                autofocus
+            >
+            <button class="btn btn-outline-secondary" type="button" id="togglePassword1">
+                <i class="fas fa-eye"></i>
+            </button>
+        </div>
+        <div class="password-strength" id="strengthBar"></div>
+        <small class="text-muted" id="strengthText"></small>
+        <div id="passwordErrors" class="mt-2"></div>
+    </div>
+    
+    <div class="mb-4">
+        <label for="confirm_password" class="form-label">
+            <i class="fas fa-lock"></i> Confirmer le mot de passe
+        </label>
+        <div class="input-group">
+            <span class="input-group-text">
+                <i class="fas fa-key"></i>
+            </span>
+            <input 
+                type="password" 
+                class="form-control" 
+                id="confirm_password" 
+                name="confirm_password" 
+                placeholder="Retapez votre mot de passe"
+                required
+            >
+            <button class="btn btn-outline-secondary" type="button" id="togglePassword2">
+                <i class="fas fa-eye"></i>
+            </button>
+        </div>
+        <small class="text-muted" id="matchText"></small>
+        <div id="confirmErrors" class="mt-2"></div>
+    </div>
+    
+    <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
+        <i class="fas fa-check-double"></i> Activer mon compte
+    </button>
+</form>
+{% endblock %}
+
+{% block extra_js %}
 <script>
-    // Script pour afficher/masquer le mot de passe
+    const newPasswordInput = document.getElementById('new_password');
+    const confirmPasswordInput = document.getElementById('confirm_password');
+    const strengthBar = document.getElementById('strengthBar');
+    const strengthText = document.getElementById('strengthText');
+    const matchText = document.getElementById('matchText');
+    const submitBtn = document.getElementById('submitBtn');
+    const passwordErrors = document.getElementById('passwordErrors');
+    const confirmErrors = document.getElementById('confirmErrors');
+    
+    // Toggle password visibility
     document.getElementById('togglePassword1').addEventListener('click', function() {
-        const passwordField = document.getElementById('id_new_password1');
-        const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
-        passwordField.setAttribute('type', type);
-        this.classList.toggle('fa-eye');
-        this.classList.toggle('fa-eye-slash');
+        togglePasswordVisibility('new_password', this);
     });
     
     document.getElementById('togglePassword2').addEventListener('click', function() {
-        const passwordField = document.getElementById('id_new_password2');
-        const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
-        passwordField.setAttribute('type', type);
-        this.classList.toggle('fa-eye');
-        this.classList.toggle('fa-eye-slash');
+        togglePasswordVisibility('confirm_password', this);
     });
+    
+    function togglePasswordVisibility(inputId, button) {
+        const input = document.getElementById(inputId);
+        const icon = button.querySelector('i');
+        
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        }
+    }
+    
+    // Password strength checker
+    newPasswordInput.addEventListener('input', function() {
+        const password = this.value;
+        let strength = 0;
+        let errors = [];
+        
+        // Check criteria
+        const checks = {
+            length: { test: password.length >= 8, message: 'Au moins 8 caractères' },
+            uppercase: { test: /[A-Z]/.test(password), message: 'Au moins une majuscule' },
+            lowercase: { test: /[a-z]/.test(password), message: 'Au moins une minuscule' },
+            number: { test: /[0-9]/.test(password), message: 'Au moins un chiffre' },
+            special: { test: /[!@#$%^&*(),.?":{}|<>]/.test(password), message: 'Au moins un caractère spécial (!@#$%^&*)' }
+        };
+        
+        // Collect errors
+        for (const [key, check] of Object.entries(checks)) {
+            if (check.test) {
+                strength++;
+            } else if (password.length > 0) {
+                errors.push(check.message);
+            }
+        }
+        
+        // Display errors as alert
+        if (errors.length > 0 && password.length > 0) {
+            passwordErrors.innerHTML = `
+                <div class="alert alert-danger alert-dismissible fade show py-2 px-3" role="alert" style="font-size: 13px;">
+                    <i class="fas fa-exclamation-triangle"></i> <strong>Critères manquants :</strong>
+                    <ul class="mb-0 mt-1 ps-3">
+                        ${errors.map(err => `<li>${err}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        } else {
+            passwordErrors.innerHTML = '';
+        }
+        
+        // Update strength bar
+        strengthBar.className = 'password-strength';
+        if (password.length === 0) {
+            strengthText.textContent = '';
+        } else if (strength < 3) {
+            strengthBar.classList.add('strength-weak');
+            strengthText.textContent = 'Mot de passe faible';
+            strengthText.style.color = '#dc3545';
+        } else if (strength < 5) {
+            strengthBar.classList.add('strength-medium');
+            strengthText.textContent = 'Mot de passe moyen';
+            strengthText.style.color = '#ffc107';
+        } else {
+            strengthBar.classList.add('strength-strong');
+            strengthText.textContent = 'Mot de passe fort ✓';
+            strengthText.style.color = '#28a745';
+        }
+        
+        checkFormValidity();
+    });
+    
+    // Password match checker
+    confirmPasswordInput.addEventListener('input', function() {
+        const password = newPasswordInput.value;
+        const confirm = this.value;
+        
+        if (confirm === '') {
+            matchText.textContent = '';
+            confirmErrors.innerHTML = '';
+        } else if (password === confirm) {
+            matchText.textContent = '✓ Les mots de passe correspondent';
+            matchText.style.color = 'green';
+            confirmErrors.innerHTML = '';
+        } else {
+            matchText.textContent = '';
+            confirmErrors.innerHTML = `
+                <div class="alert alert-warning py-2 px-3" role="alert" style="font-size: 13px;">
+                    <i class="fas fa-exclamation-circle"></i> Les mots de passe ne correspondent pas
+                </div>
+            `;
+        }
+        
+        checkFormValidity();
+    });
+    
+    // Form validation
+    function checkFormValidity() {
+        const password = newPasswordInput.value;
+        const confirm = confirmPasswordInput.value;
+        
+        const isValid = password.length >= 8 &&
+                       /[A-Z]/.test(password) &&
+                       /[a-z]/.test(password) &&
+                       /[0-9]/.test(password) &&
+                       /[!@#$%^&*(),.?":{}|<>]/.test(password) &&
+                       password === confirm;
+        
+        submitBtn.disabled = !isValid;
+    }
 </script>
 {% endblock %}
