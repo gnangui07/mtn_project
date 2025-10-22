@@ -335,65 +335,61 @@
       data-username="{% if user.is_authenticated %}{{ user.get_full_name|default:user.email|escapejs }}{% endif %}">
     <!-- Barre de navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top navbar-modern">
-        <div class="container">
-            <a class="navbar-brand d-flex align-items-center" href="{% url 'core:accueil' %}">
-                <img src="{% static 'logo_mtn.jpeg' %}" alt="Logo MTN">
-                <span class="ms-2">CAPEX Works Valuation Tool </span>
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-
-            <div class="collapse navbar-collapse" id="navbarNav">
-                {% if user.is_authenticated %}
-                <!-- Primary links -->
-                <ul class="navbar-nav primary-nav mx-lg-auto ms-lg-5 gap-lg-3">
-                    <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'accueil' %}active{% endif %}" href="{% url 'core:accueil' %}"><i class="fas fa-home me-1"></i> Home</a></li>
-                    <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'reception' %}active{% endif %}" href="{% url 'orders:reception' %}"><i class="fas fa-truck me-1"></i> Delivery</a></li>
-                    <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'consultation' %}active{% endif %}" href="{% url 'orders:consultation' %}"><i class="fas fa-search me-1"></i> Overview</a></li>
-                    <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'msrn_archive' %}active{% endif %}" href="{% url 'orders:msrn_archive' %}"><i class="fas fa-file-pdf me-1"></i> Overview_MSRN </a></li>
-                    <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'po_progress_monitoring' %}active{% endif %}" href="{% url 'orders:po_progress_monitoring' %}"><i class="fas fa-chart-line me-1"></i> PO Progress</a></li>
-                    <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'vendor_evaluation_list' %}active{% endif %}" href="{% url 'orders:vendor_evaluation_list' %}"><i class="fas fa-star me-1"></i> Vendor Evaluations</a></li>
-                </ul>
-                <!-- Utilities on the right -->
-                <ul class="navbar-nav utilities-nav ms-auto align-items-lg-center gap-lg-2 mt-2 mt-lg-0">
-                    <li class="nav-item">
-                        <button type="button" id="btn-replay-welcome" class="nav-link btn btn-link px-lg-2" title="Réécouter le message de bienvenue">
-                            <i class="fas fa-volume-up me-1"></i><span class="d-lg-none"> Réécouter</span>
-                        </button>
-                    </li>
-                    <li class="nav-item">
-                        <button type="button" id="btn-stop-welcome" class="nav-link btn btn-link px-lg-2" title="Arrêter la note vocale">
-                            <i class="fas fa-stop me-1"></i><span class="d-lg-none"> Stop</span>
-                        </button>
-                    </li>
-                    <li class="nav-item">
-                        <button type="button" id="btn-voice-settings" class="nav-link btn btn-link px-lg-2" title="Paramètres de la voix d'accueil" data-bs-toggle="modal" data-bs-target="#voiceSettingsModal">
-                            <i class="fas fa-cog me-1"></i><span class="d-lg-none"> Voix d'accueil</span>
-                        </button>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle d-flex align-items-center px-lg-2" href="#" id="userMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <span class="avatar-badge">{{ user.first_name|default:'U'|slice:':1'|upper }}</span>
-                            <span class="ms-2 d-none d-xl-inline">{{ user.get_full_name|default:user.email }}</span>
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
-                            <li class="px-3 py-2 small text-muted">Connected as<br><strong>{{ user.get_full_name|default:user.email }}</strong></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <form method="post" action="{% url 'deconnexion' %}" class="px-3 py-2">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-outline-dark w-100"><i class="fas fa-sign-out-alt me-2"></i> Logout</button>
-                                </form>
-                            </li>
-                        </ul>
-                    </li>
-                </ul>
-                {% else %}
-                
-                {% endif %}
-            </div>
+      <div class="container-fluid px-3">
+        <a class="navbar-brand d-flex align-items-center" href="{% url 'core:accueil' %}">
+          <img src="{% static 'logo_mtn.jpeg' %}" alt="Logo MTN">
+          <span class="ms-2">CAPEX Works Valuation Tool </span>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar" aria-controls="mainNavbar" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="mainNavbar">
+          {% if user.is_authenticated %}
+          <ul class="navbar-nav primary-nav ms-lg-4 me-auto gap-lg-2">
+            <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'accueil' %}active{% endif %}" href="{% url 'core:accueil' %}"><i class="fas fa-home me-1"></i> Home</a></li>
+            <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'reception' %}active{% endif %}" href="{% url 'orders:reception' %}"><i class="fas fa-truck me-1"></i> Delivery</a></li>
+            <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'consultation' %}active{% endif %}" href="{% url 'orders:consultation' %}"><i class="fas fa-search me-1"></i> Overview</a></li>
+            <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'msrn_archive' %}active{% endif %}" href="{% url 'orders:msrn_archive' %}"><i class="fas fa-file-pdf me-1"></i> Overview_MSRN</a></li>
+            <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'po_progress_monitoring' %}active{% endif %}" href="{% url 'orders:po_progress_monitoring' %}"><i class="fas fa-chart-line me-1"></i> PO Progress</a></li>
+            <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'vendor_evaluation_list' %}active{% endif %}" href="{% url 'orders:vendor_evaluation_list' %}"><i class="fas fa-star me-1"></i> Vendor Evaluations</a></li>
+          </ul>
+          <ul class="navbar-nav utilities-nav ms-auto align-items-lg-center gap-lg-2 mt-2 mt-lg-0">
+            <li class="nav-item">
+              <button type="button" id="btn-replay-welcome" class="nav-link btn btn-link px-lg-2" title="Réécouter le message de bienvenue">
+                <i class="fas fa-volume-up me-1"></i><span class="d-lg-none"> Réécouter</span>
+              </button>
+            </li>
+            <li class="nav-item">
+              <button type="button" id="btn-stop-welcome" class="nav-link btn btn-link px-lg-2" title="Arrêter la note vocale">
+                <i class="fas fa-stop me-1"></i><span class="d-lg-none"> Stop</span>
+              </button>
+            </li>
+            <li class="nav-item">
+              <button type="button" id="btn-voice-settings" class="nav-link btn btn-link px-lg-2" title="Paramètres de la voix d'accueil" data-bs-toggle="modal" data-bs-target="#voiceSettingsModal">
+                <i class="fas fa-cog me-1"></i><span class="d-lg-none"> Voix d'accueil</span>
+              </button>
+            </li>
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle d-flex align-items-center px-lg-2" href="#" id="userMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <span class="avatar-badge">{{ user.first_name|default:'U'|slice:':1'|upper }}</span>
+                <span class="ms-2 d-none d-xl-inline">{{ user.get_full_name|default:user.email }}</span>
+              </a>
+              <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
+                <li class="px-3 py-2 small text-muted">Connected as<br><strong>{{ user.get_full_name|default:user.email }}</strong></li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                  <form method="post" action="{% url 'deconnexion' %}" class="px-3 py-2">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-dark w-100"><i class="fas fa-sign-out-alt me-2"></i> Logout</button>
+                  </form>
+                </li>
+              </ul>
+            </li>
+          </ul>
+          {% else %}
+          {% endif %}
         </div>
+      </div>
     </nav>
     
 

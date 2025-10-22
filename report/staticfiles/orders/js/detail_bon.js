@@ -113,8 +113,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Fermer l'indicateur de chargement
                     Swal.close();
                     
-                    // Rediriger directement vers l'URL de téléchargement
-                    window.location.href = data.download_url;
+                    // Ne pas télécharger automatiquement. Informer l'utilisateur et proposer des actions.
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'MSRN généré',
+                        html: `Le rapport MSRN <strong>MSRN-${data.report_number}</strong> a été généré.<br>
+                               Un email de notification a été envoyé aux destinataires et vous avez été mis en copie.<br><br>
+                               <a href="${data.download_url}" class="btn btn-outline-primary">Ouvrir le rapport</a>`,
+                        showConfirmButton: true,
+                        confirmButtonText: 'Fermer'
+                    });
                 } else {
                     // Afficher un message d'erreur
                     Swal.fire({
@@ -1026,6 +1034,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         confirmButtonColor: '#3085d6',
                     });
                     this.value = this.getAttribute('data-original-value') || '0';
+                    const quantityNotDeliveredElement = document.querySelector(`.quantity-not-delivered[data-row="${row}"]`);
+                    if (quantityNotDeliveredElement) {
+                        const restoredDelivered = parseFloat(this.getAttribute('data-original-value') || '0') || 0;
+                        const quantityNotDelivered = Math.max(0, orderedQuantity - restoredDelivered);
+                        quantityNotDeliveredElement.textContent = quantityNotDelivered;
+                        applyQuantityNotDeliveredColor(quantityNotDeliveredElement, quantityNotDelivered);
+                    }
                     return;
                 }
             }
@@ -1619,7 +1634,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialiser les préférences de colonnes
     // Par défaut, seules certaines colonnes spécifiques sont sélectionnées
-    const defaultColumns = ['Order', 'Order Description', 'Ordered','Price', 'Ordered Quantity','Quantity Delivered', 'Quantity Not Delivered', 'Receipt','Amount Delivered','Quantity Payable','Amount Payable'];
+    const defaultColumns = ['Line Description', 'Ordered','Price', 'Ordered Quantity','Quantity Delivered', 'Quantity Not Delivered','Amount Delivered','Amount Not Delivered','Quantity Payable','Amount Payable'];
     selectedColumns = defaultColumns;
     updateCheckboxes(selectedColumns);
     applyColumnVisibility(selectedColumns);

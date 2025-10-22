@@ -133,6 +133,11 @@ def msrn_archive(request):
             if progress_ids:
                 qs = qs | base_qs.filter(id__in=progress_ids)
 
+    # Filtre optionnel par email/identifiant du générateur du MSRN
+    user_email = (request.GET.get('user_email') or '').strip()
+    if user_email:
+        qs = qs.filter(user__icontains=user_email)
+
     # Filtre optionnel: with_retention=1 (seulement >0), =0 (aucune), sinon tous
     with_retention = request.GET.get('with_retention')
     if with_retention == '1':
@@ -154,6 +159,7 @@ def msrn_archive(request):
         'reports': reports,
         'q': q,
         'with_retention': with_retention,
+        'user_email': user_email,
     }
     return render(request, 'orders/msrn_archive.html', context)
 
@@ -630,6 +636,28 @@ def details_bon(request, bon_id):
                 is_migration_ifs = True
                 break
     
+    # Extraire Order Description et Project Coordinator (si présents)
+    order_description = None
+    project_coordinator = None
+    if raw_data:
+        first_item = raw_data[0] if isinstance(raw_data, list) else {}
+        try:
+            order_description = get_value_tolerant(
+                first_item,
+                exact_candidates=['Order Description', 'Item Description', 'Description'],
+                tokens=['order', 'description']
+            )
+        except Exception:
+            order_description = None
+        try:
+            project_coordinator = get_value_tolerant(
+                first_item,
+                exact_candidates=['Project Coordinator', 'Project Manager', 'Coordinator'],
+                tokens=['project', 'coordinator']
+            )
+        except Exception:
+            project_coordinator = None
+
     context = {
         'fichier': fichier,
         'bon': fichier,  
@@ -657,6 +685,8 @@ def details_bon(request, bon_id):
         'retention_cause': bon_commande.retention_cause if selected_order_number and hasattr(bon_commande, 'retention_cause') else '',
         'vendor_evaluations': vendor_evaluations,
         'is_migration_ifs': is_migration_ifs,  # Flag pour désactiver les actions
+        'order_description': order_description,
+        'project_coordinator': project_coordinator,
 
     }
     

@@ -18,6 +18,10 @@
       <input type="text" id="q" name="q" value="{{ q }}" class="form-control" placeholder="MSRN Number, PO...">
     </div>
     <div class="col-sm-3">
+      <label for="user_email" class="form-label">User Email</label>
+      <input type="text" id="user_email" name="user_email" value="{{ user_email }}" class="form-control" placeholder="name@domain.com">
+    </div>
+    <div class="col-sm-3">
       <label for="with_retention" class="form-label">Retention</label>
       <select name="with_retention" id="with_retention" class="form-select">
         <option value="" {% if not with_retention %}selected{% endif %}>All</option>
@@ -110,7 +114,7 @@
     <ul class="pagination justify-content-center">
       {% if reports.has_previous %}
       <li class="page-item">
-        <a class="page-link" href="?page={{ reports.previous_page_number }}&q={{ q }}&with_retention={{ with_retention }}" aria-label="Previous">
+        <a class="page-link" href="?page={{ reports.previous_page_number }}&q={{ q }}&with_retention={{ with_retention }}&user_email={{ user_email }}" aria-label="Previous">
           <span aria-hidden="true">&laquo;</span>
         </a>
       </li>
@@ -122,13 +126,13 @@
         {% if p == reports.number %}
           <li class="page-item active" aria-current="page"><span class="page-link">{{ p }}</span></li>
         {% else %}
-          <li class="page-item"><a class="page-link" href="?page={{ p }}&q={{ q }}&with_retention={{ with_retention }}">{{ p }}</a></li>
+          <li class="page-item"><a class="page-link" href="?page={{ p }}&q={{ q }}&with_retention={{ with_retention }}&user_email={{ user_email }}">{{ p }}</a></li>
         {% endif %}
       {% endfor %}
 
       {% if reports.has_next %}
       <li class="page-item">
-        <a class="page-link" href="?page={{ reports.next_page_number }}&q={{ q }}&with_retention={{ with_retention }}" aria-label="Next">
+        <a class="page-link" href="?page={{ reports.next_page_number }}&q={{ q }}&with_retention={{ with_retention }}&user_email={{ user_email }}" aria-label="Next">
           <span aria-hidden="true">&raquo;</span>
         </a>
       </li>

@@ -214,6 +214,17 @@ body {
     font-size: 0.9rem;
 }
 
+/* Make all Font Awesome icons in the header meta-info yellow */
+.page-header .meta-info i {
+    color: var(--mtn-yellow);
+}
+
+/* Make the Order Description label and value yellow (first .col-12 block) */
+.page-header .meta-info .row > .col-12:first-child strong,
+.page-header .meta-info .row > .col-12:first-child span {
+    color: var(--mtn-yellow);
+}
+
 .info-card {
     background-color: white;
     border-radius: 5px;

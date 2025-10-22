@@ -576,8 +576,8 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
             bon_commande.get_project_manager(),
             bon_commande.get_senior_pm(),
             bon_commande.get_gm_epmo(),
-            bon_commande.get_manager_portfolio(),
             bon_commande.get_senior_technical_lead(),
+            bon_commande.get_manager_portfolio(),
             "N/A"
         ]
         num_cols = 7

@@ -16,30 +16,67 @@
   <header class="page-header">
     <h1><i class="fas fa-file-invoice"></i> Purchase Order: {{ bon_number }}</h1>
     <div class="meta-info">
-      <span class="ms-2"><i class="far fa-calendar-alt"></i> 
-        {% language 'en' %}
-        {{ date_creation|date:"F d, Y H:i" }}
-        {% endlanguage %}
-      </span>
-      <span class="ms-3"><i class="fas fa-coins"></i> PO AMOUNT: <strong>{{ montant_total|floatformat|intcomma }} {{ devise }}</strong></span>
-      <span class="ms-3"><i class="fas fa-check-circle"></i> Amount Delivered: <strong class="montant-total-recue">{{ montant_total_recu|floatformat:0|intcomma }}</strong> {{ devise }}</span>
-      <span class="ms-3"><i class="fas fa-list-ol"></i> Lines: {{ nb_lignes }}</span>
-      <span class="ms-3"><i class="fas fa-exclamation-triangle"></i> Delivery Rate: <strong class="taux-avancement">{{ taux_avancement|floatformat:2 }}&#37;</strong></span>
-      <span class="ms-3"><i class="fas fa-tag"></i> Status: 
-        {% if statut %}
-          {% if statut|upper == 'APPROVED' or statut|upper == 'COMPLETED' or statut|upper == 'CLOSED' %}
-            <span class="badge bg-success">{{ statut }}</span>
-          {% elif statut|upper == 'PENDING' or statut|upper == 'WAITING' or statut|upper == 'IN PROGRESS' %}
-            <span class="badge bg-warning text-dark">{{ statut }}</span>
-          {% elif statut|upper == 'REJECTED' or statut|upper == 'CANCELLED' or statut|upper == 'FAILED' %}
-            <span class="badge bg-danger">{{ statut }}</span>
+      <div class="row g-2 align-items-center">
+        <div class="col-12">
+          <i class="fas fa-info me-1"></i>
+          <strong>Order Description:</strong>
+          <span>{{ order_description|default:'N/A' }}</span>
+        </div>
+
+        <div class="col-md-6 col-12">
+          <i class="fas fa-user-tie me-1"></i>
+          <strong>Project Coordinator:</strong>
+          <span>{{ project_coordinator|default:'N/A' }}</span>
+        </div>
+
+        <div class="col-md-6 col-12">
+          <i class="far fa-calendar-alt me-1"></i>
+          {% language 'en' %}
+          {{ date_creation|date:"F d, Y H:i" }}
+          {% endlanguage %}
+        </div>
+
+        <div class="col-md-6 col-12">
+          <i class="fas fa-tag me-1"></i>
+          <strong>Status:</strong>
+          {% if statut %}
+            {% if statut|upper == 'APPROVED' or statut|upper == 'COMPLETED' or statut|upper == 'CLOSED' %}
+              <span class="badge bg-success">{{ statut }}</span>
+            {% elif statut|upper == 'PENDING' or statut|upper == 'WAITING' or statut|upper == 'IN PROGRESS' %}
+              <span class="badge bg-warning text-dark">{{ statut }}</span>
+            {% elif statut|upper == 'REJECTED' or statut|upper == 'CANCELLED' or statut|upper == 'FAILED' %}
+              <span class="badge bg-danger">{{ statut }}</span>
+            {% else %}
+              <span class="badge bg-info">{{ statut }}</span>
+            {% endif %}
           {% else %}
-            <span class="badge bg-info">{{ statut }}</span>
+            <span class="badge bg-secondary">Unknown</span>
           {% endif %}
-        {% else %}
-          <span class="badge bg-secondary">Unknown</span>
-        {% endif %}
-      </span>
+        </div>
+
+        <div class="col-md-6 col-12">
+          <i class="fas fa-list-ol me-1"></i>
+          <strong>Lines:</strong> {{ nb_lignes }}
+        </div>
+
+        <div class="col-md-6 col-12">
+          <i class="fas fa-coins me-1"></i>
+          <strong>PO AMOUNT:</strong>
+          <span>{{ montant_total|floatformat|intcomma }} {{ devise }}</span>
+        </div>
+
+        <div class="col-md-6 col-12">
+          <i class="fas fa-check-circle me-1"></i>
+          <strong>Amount Delivered:</strong>
+          <span class="montant-total-recue">{{ montant_total_recu|floatformat:0|intcomma }}</span> {{ devise }}
+        </div>
+
+        <div class="col-md-6 col-12">
+          <i class="fas fa-exclamation-triangle me-1"></i>
+          <strong>Delivery Rate:</strong>
+          <span class="taux-avancement">{{ taux_avancement|floatformat:2 }}&#37;</span>
+        </div>
+      </div>
     </div>
     
     <!-- Bannière d'avertissement pour Migration IFS -->

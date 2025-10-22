@@ -1,6 +1,7 @@
 """
 Module de gestion des notifications par email pour les rapports MSRN
 """
+import os
 from django.core.mail import send_mail, EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.conf import settings
@@ -82,13 +83,35 @@ This is an automated notification from the MSRN System.
         """
         
         # Créer l'email avec version HTML et texte
+        # Ajouter l'utilisateur générateur en CC s'il a un email valide
+        cc_list = []
+        try:
+            generator_email = (msrn_report.user or '').strip()
+            if generator_email and '@' in generator_email and generator_email not in recipient_list:
+                cc_list.append(generator_email)
+        except Exception:
+            pass
+
         email = EmailMultiAlternatives(
             subject=f'MSRN Generated: {msrn_report.report_number} - PO {context["purchase_order"]}',
             body=text_content,
             from_email=settings.DEFAULT_FROM_EMAIL,
             to=recipient_list,
+            cc=cc_list or None,
         )
         email.attach_alternative(html_content, "text/html")
+        
+        # Joindre le PDF du MSRN si disponible
+        try:
+            if getattr(msrn_report, 'pdf_file', None) and getattr(msrn_report.pdf_file, 'path', None):
+                pdf_path = msrn_report.pdf_file.path
+                if os.path.exists(pdf_path):
+                    with open(pdf_path, 'rb') as f:
+                        pdf_bytes = f.read()
+                    filename = f"MSRN-{msrn_report.report_number}.pdf"
+                    email.attach(filename, pdf_bytes, 'application/pdf')
+        except Exception as attach_err:
+            logger.warning(f"Impossible d'attacher le PDF MSRN au courriel: {attach_err}")
         
         # Envoyer l'email
         email.send(fail_silently=False)
