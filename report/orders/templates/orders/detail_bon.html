@@ -37,21 +37,9 @@
         </div>
 
         <div class="col-md-6 col-12">
-          <i class="fas fa-tag me-1"></i>
-          <strong>Status:</strong>
-          {% if statut %}
-            {% if statut|upper == 'APPROVED' or statut|upper == 'COMPLETED' or statut|upper == 'CLOSED' %}
-              <span class="badge bg-success">{{ statut }}</span>
-            {% elif statut|upper == 'PENDING' or statut|upper == 'WAITING' or statut|upper == 'IN PROGRESS' %}
-              <span class="badge bg-warning text-dark">{{ statut }}</span>
-            {% elif statut|upper == 'REJECTED' or statut|upper == 'CANCELLED' or statut|upper == 'FAILED' %}
-              <span class="badge bg-danger">{{ statut }}</span>
-            {% else %}
-              <span class="badge bg-info">{{ statut }}</span>
-            {% endif %}
-          {% else %}
-            <span class="badge bg-secondary">Unknown</span>
-          {% endif %}
+          <i class="fas fa-briefcase me-1"></i>
+          <strong>Order Status:</strong>
+          <span>{{ order_status|default:'N/A' }}</span>
         </div>
 
         <div class="col-md-6 col-12">
@@ -62,19 +50,43 @@
         <div class="col-md-6 col-12">
           <i class="fas fa-coins me-1"></i>
           <strong>PO AMOUNT:</strong>
-          <span>{{ montant_total|floatformat|intcomma }} {{ devise }}</span>
+          <span class="metric-chip metric-chip--amount">{{ montant_total|floatformat|intcomma }} {{ devise }}</span>
         </div>
 
         <div class="col-md-6 col-12">
           <i class="fas fa-check-circle me-1"></i>
           <strong>Amount Delivered:</strong>
-          <span class="montant-total-recue">{{ montant_total_recu|floatformat:0|intcomma }}</span> {{ devise }}
+          <span class="metric-chip metric-chip--delivered montant-total-recue">{{ montant_total_recu|floatformat:0|intcomma }} {{ devise }}</span>
         </div>
 
         <div class="col-md-6 col-12">
           <i class="fas fa-exclamation-triangle me-1"></i>
           <strong>Delivery Rate:</strong>
-          <span class="taux-avancement">{{ taux_avancement|floatformat:2 }}&#37;</span>
+          <span class="metric-chip metric-chip--progress taux-avancement">{{ taux_avancement|floatformat:2 }}&#37;</span>
+        </div>
+
+        <div class="col-md-6 col-12">
+          <i class="fas fa-briefcase me-1"></i>
+          <strong>Project Name:</strong>
+          <span>{{ project_name|default:'N/A' }}</span>
+        </div>
+
+        <div class="col-md-6 col-12">
+          <i class="fas fa-flag-checkered me-1"></i>
+          <strong>PIP END DATE:</strong>
+          <span>{{ pip_end_date|default:'N/A' }}</span>
+        </div>
+        
+        <div class="col-md-6 col-12">
+          <i class="fas fa-flag-checkered me-1"></i>
+          <strong>ACTUAL END DATE:</strong>
+          <span>{{ actual_end_date|default:'N/A' }}</span>
+        </div>
+
+        <div class="col-md-6 col-12">
+          <i class="fas fa-percent me-1"></i>
+          <strong>Retention Rate:</strong>
+          <span class="metric-chip metric-chip--retention">{{ retention_rate|default:'0' }}&#37;</span>
         </div>
       </div>
     </div>
@@ -177,24 +189,6 @@
                 {% language 'en' %}
                 {{ date_creation|date:"F d, Y H:i" }}
                 {% endlanguage %}
-              </div>
-            </div>
-            <div class="info-item">
-              <div class="info-label">Status:</div>
-              <div class="info-value">
-                {% if statut %}
-                  {% if statut|upper == 'APPROVED' or statut|upper == 'COMPLETED' or statut|upper == 'CLOSED' %}
-                    <span class="badge bg-success">{{ statut }}</span>
-                  {% elif statut|upper == 'PENDING' or statut|upper == 'WAITING' or statut|upper == 'IN PROGRESS' %}
-                    <span class="badge bg-warning text-dark">{{ statut }}</span>
-                  {% elif statut|upper == 'REJECTED' or statut|upper == 'CANCELLED' or statut|upper == 'FAILED' %}
-                    <span class="badge bg-danger">{{ statut }}</span>
-                  {% else %}
-                    <span class="badge bg-info">{{ statut }}</span>
-                  {% endif %}
-                {% else %}
-                  <span class="badge bg-secondary">Unknown</span>
-                {% endif %}
               </div>
             </div>
             <div class="info-item">

@@ -299,6 +299,13 @@
             background: var(--mtn-yellow);
             color: var(--mtn-black);
         }
+        .avatar-badge-lg {
+            width: 48px;
+            height: 48px;
+            font-size: 1.1rem;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+            border: 2px solid rgba(255,255,255,0.4);
+        }
         /* Modern navbar look */
         .navbar.navbar-modern {
             box-shadow: 0 4px 16px rgba(0,0,0,0.15);
@@ -322,6 +329,56 @@
             border-radius: .75rem;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             overflow: hidden;
+        }
+        .navbar.navbar-modern .dropdown-menu.user-menu {
+            min-width: 300px;
+            padding: 0;
+            background: linear-gradient(160deg, rgba(0,0,0,0.92) 0%, rgba(34,34,34,0.92) 60%, rgba(0,0,0,0.92) 100%);
+            border: 1px solid rgba(255,255,255,0.08);
+            color: #f8f9fa;
+        }
+        .user-menu .user-card {
+            background: linear-gradient(135deg, rgba(255,204,0,0.18), rgba(255,204,0,0));
+        }
+        .user-menu .user-card h6,
+        .user-menu .user-card small {
+            color: #f8f9fa;
+        }
+        .user-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            background: rgba(255,255,255,0.12);
+            color: #f0f0f0;
+        }
+        .user-chip .fas,
+        .user-chip .far {
+            color: inherit;
+        }
+        .user-menu .dropdown-item {
+            color: #f8f9fa;
+            border-radius: 0.65rem;
+            margin: 0.2rem 0.75rem;
+            padding: 0.55rem 0.85rem;
+            transition: all 0.2s ease;
+        }
+        .user-menu .dropdown-item .fas,
+        .user-menu .dropdown-item .far {
+            color: inherit;
+        }
+        .user-menu .dropdown-item:hover,
+        .user-menu .dropdown-item:focus {
+            background: rgba(255,204,0,0.18);
+            color: #FFCC00;
+        }
+        .user-menu hr.dropdown-divider {
+            margin: 0;
+            border-color: rgba(255,255,255,0.08);
         }
         @media (min-width: 992px){
             .primary-nav .nav-link { padding: .35rem .75rem; }
@@ -374,16 +431,24 @@
                 <span class="avatar-badge">{{ user.first_name|default:'U'|slice:':1'|upper }}</span>
                 <span class="ms-2 d-none d-xl-inline">{{ user.get_full_name|default:user.email }}</span>
               </a>
-              <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
-                <li class="px-3 py-2 small text-muted">Connected as<br><strong>{{ user.get_full_name|default:user.email }}</strong></li>
-                <li><hr class="dropdown-divider"></li>
-                <li>
-                  <form method="post" action="{% url 'deconnexion' %}" class="px-3 py-2">
+              <div class="dropdown-menu dropdown-menu-end user-menu" aria-labelledby="userMenu">
+                <div class="user-card px-4 py-3">
+                  <div class="d-flex align-items-center gap-3">
+                    <span class="avatar-badge avatar-badge-lg">{{ user.first_name|default:'U'|slice:':1'|upper }}</span>
+                    <div>
+                      <h6 class="mb-0">{{ user.get_full_name|default:user.email }}</h6>
+                      <small class="text-muted">{{ user.email }}</small>
+                      <div class="mt-2 user-chip"><i class="fas fa-shield-alt"></i> Connected</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="px-3 pb-3 pt-2">
+                  <form method="post" action="{% url 'deconnexion' %}">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-sm btn-outline-dark w-100"><i class="fas fa-sign-out-alt me-2"></i> Logout</button>
+                    <button type="submit" class="btn btn-warning w-100"><i class="fas fa-sign-out-alt me-2"></i> Logout</button>
                   </form>
-                </li>
-              </ul>
+                </div>
+              </div>
             </li>
           </ul>
           {% else %}

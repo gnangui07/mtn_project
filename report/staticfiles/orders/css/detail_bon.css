@@ -214,6 +214,54 @@ body {
     font-size: 0.9rem;
 }
 
+/* Make all Font Awesome icons in the header meta-info yellow */
+.page-header .meta-info i {
+    color: var(--mtn-yellow);
+}
+
+/* Make the Order Description label and value yellow (first .col-12 block) */
+.page-header .meta-info .row > .col-12:first-child strong,
+.page-header .meta-info .row > .col-12:first-child span {
+    color: var(--mtn-yellow);
+}
+
+/* Metric chips pour les indicateurs clés */
+.metric-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #000000;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    background-color: rgba(255, 255, 255, 0.4);
+}
+
+.metric-chip--amount {
+    background-color: #FFCC00;
+    color: #000000;
+    border-color: #FFFFFF;
+}
+
+.metric-chip--delivered {
+    background-color: rgba(255, 255, 255, 0.85);
+    color: #000000;
+    border-color: rgba(0, 0, 0, 0.15);
+}
+
+.metric-chip--progress {
+    background-color: rgba(255, 255, 255, 0.85);
+    color: #000000;
+    border-color: rgba(0, 0, 0, 0.15);
+}
+
+.metric-chip--retention {
+    background-color: rgba(0, 0, 0, 0.35);
+    color: #FFFFFF;
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
 .info-card {
     background-color: white;
     border-radius: 5px;

@@ -636,15 +636,19 @@ def details_bon(request, bon_id):
                 is_migration_ifs = True
                 break
     
-    # Extraire Order Description et Project Coordinator (si présents)
+    # Extraire Order Description, Project Coordinator, Project Name et PIP END DATE (si présents)
     order_description = None
     project_coordinator = None
+    project_name = None
+    pip_end_date = None
+    order_status_extracted = None
+    actual_en_date = None
     if raw_data:
         first_item = raw_data[0] if isinstance(raw_data, list) else {}
         try:
             order_description = get_value_tolerant(
                 first_item,
-                exact_candidates=['Order Description', 'Item Description', 'Description'],
+                exact_candidates=['Order Description',],
                 tokens=['order', 'description']
             )
         except Exception:
@@ -652,11 +656,43 @@ def details_bon(request, bon_id):
         try:
             project_coordinator = get_value_tolerant(
                 first_item,
-                exact_candidates=['Project Coordinator', 'Project Manager', 'Coordinator'],
+                exact_candidates=['Project Coordinator'],
                 tokens=['project', 'coordinator']
             )
         except Exception:
             project_coordinator = None
+        try:
+            project_name = get_value_tolerant(
+                first_item,
+                exact_candidates=['Project Name'],
+                tokens=['project', 'name']
+            )
+        except Exception:
+            project_name = None
+        try:
+            pip_end_date = get_value_tolerant(
+                first_item,
+                exact_candidates=['PIP END DATE', 'PIP END'],
+                tokens=['pip', 'end']
+            )
+        except Exception:
+            pip_end_date = None
+        try:
+            order_status_extracted = get_value_tolerant(
+                first_item,
+                exact_candidates=['Order Status'],
+                tokens=['status']
+            )
+        except Exception:
+            order_status_extracted = None
+        try:
+            actual_end_date = get_value_tolerant(
+                first_item,
+                exact_candidates=['ACTUAL END DATE', 'ACTUAL END'],
+                tokens=['actual', 'end']
+            )
+        except Exception:
+            actual_end_date = None        
 
     context = {
         'fichier': fichier,
@@ -677,6 +713,7 @@ def details_bon(request, bon_id):
         'nb_lignes': len(raw_data) if selected_order_number and colonne_order else (fichier.nombre_lignes if hasattr(fichier, 'nombre_lignes') else len(raw_data)),
         'date_creation': fichier.date_importation if hasattr(fichier, 'date_importation') else None,
         'status_value': status_value,
+        'order_status': order_status_extracted if order_status_extracted not in (None, '') else status_value,
         'receptions': receptions,
         'supplier': supplier,
         'currency': currency,
@@ -687,6 +724,9 @@ def details_bon(request, bon_id):
         'is_migration_ifs': is_migration_ifs,  # Flag pour désactiver les actions
         'order_description': order_description,
         'project_coordinator': project_coordinator,
+        'project_name': project_name,
+        'pip_end_date': pip_end_date,
+        'actual_end_date': actual_end_date,
 
     }
     
