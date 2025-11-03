@@ -1,4 +1,24 @@
 {% extends 'users/base_auth.html' %}
+<!--
+  Template: users/confirmer_activation.html
+  Rôle: Dernière étape d'activation. L'utilisateur choisit son mot de passe.
+  Hérite de: users/base_auth.html (gabarit d'authentification)
+
+  Blocs utilisés:
+  - title: titre de l'onglet
+  - header_title / header_subtitle: en-tête de la page
+  - content: formulaire de création du mot de passe (POST + CSRF)
+  - extra_js: scripts pour vérifier la force et la correspondance des mots de passe
+
+  Données échangées:
+  - POST { new_password, confirm_password } → vue `users:confirm_password`
+  - CSRF token inclus pour sécurité
+
+  Composants UI:
+  - Alerte succès: rappelle que l'email/temp password ont été validés.
+  - Deux champs mot de passe + boutons œil pour afficher/masquer.
+  - Barre de force, messages d’erreur clairs et bouton désactivé tant que non valide.
+-->
 
 {% block title %}Créer votre mot de passe - MTN CI{% endblock %}
 
@@ -73,6 +93,8 @@
 
 {% block extra_js %}
 <script>
+    // Section: Références DOM
+    // On récupère les éléments nécessaires pour les interactions et validations.
     const newPasswordInput = document.getElementById('new_password');
     const confirmPasswordInput = document.getElementById('confirm_password');
     const strengthBar = document.getElementById('strengthBar');
@@ -82,6 +104,8 @@
     const passwordErrors = document.getElementById('passwordErrors');
     const confirmErrors = document.getElementById('confirmErrors');
     
+    // Section: Affichage/masquage des mots de passe
+    // Permet à l'utilisateur de vérifier ce qu'il tape facilement.
     // Toggle password visibility
     document.getElementById('togglePassword1').addEventListener('click', function() {
         togglePasswordVisibility('new_password', this);
@@ -106,6 +130,9 @@
         }
     }
     
+    // Section: Vérification de la force du mot de passe
+    // Critères: longueur, majuscule, minuscule, chiffre, caractère spécial.
+    // Affiche une barre (faible/moyen/fort) + liste des critères manquants.
     // Password strength checker
     newPasswordInput.addEventListener('input', function() {
         const password = this.value;
@@ -130,7 +157,7 @@
             }
         }
         
-        // Display errors as alert
+        // Afficher les erreurs si des critères manquent
         if (errors.length > 0 && password.length > 0) {
             passwordErrors.innerHTML = `
                 <div class="alert alert-danger alert-dismissible fade show py-2 px-3" role="alert" style="font-size: 13px;">
@@ -144,7 +171,7 @@
             passwordErrors.innerHTML = '';
         }
         
-        // Update strength bar
+        // Mettre à jour l'affichage de la force
         strengthBar.className = 'password-strength';
         if (password.length === 0) {
             strengthText.textContent = '';
@@ -165,6 +192,8 @@
         checkFormValidity();
     });
     
+    // Section: Vérification de la correspondance des deux mots de passe
+    // Affiche un message si ça ne correspond pas, et désactive le bouton.
     // Password match checker
     confirmPasswordInput.addEventListener('input', function() {
         const password = newPasswordInput.value;
@@ -189,6 +218,9 @@
         checkFormValidity();
     });
     
+    // Section: Validation globale du formulaire
+    // Le bouton est activé uniquement si tous les critères sont valides
+    // et si les deux champs sont identiques.
     // Form validation
     function checkFormValidity() {
         const password = newPasswordInput.value;

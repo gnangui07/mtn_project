@@ -28,8 +28,20 @@ logger = logging.getLogger(__name__)
 @login_required
 def export_po_progress_monitoring(request):
     """
-    Export Excel optimisé pour le suivi des bons de commande
-    Une seule ligne par numéro de bon de commande avec toutes les colonnes demandées
+    But:
+    - Exporter en Excel un tableau récapitulatif des bons (1 ligne par PO) pour le suivi.
+
+    Étapes:
+    1) Charger les bons + fichiers liés (et filtrer par service si non‑superuser).
+    2) Chercher la “première occurrence” de chaque PO pour lire les infos.
+    3) Calculer les montants/taux utiles (retards, retenues, livraisons…).
+    4) Construire un DataFrame et formater un fichier Excel propre (titres, nombres, %).
+
+    Entrées:
+    - request (HttpRequest): utilisateur connecté requis (login_required).
+
+    Sorties:
+    - HttpResponse: fichier .xlsx en téléchargement (Content-Disposition: attachment).
     """
     try:
         from .models import NumeroBonCommande, InitialReceptionBusiness, LigneFichier
@@ -542,7 +554,21 @@ def export_po_progress_monitoring(request):
 @login_required
 def export_msrn_po_lines(request, msrn_id):
     """
-    Exporte les Purchase Order Lines d'un rapport MSRN en Excel
+    But:
+    - Exporter en Excel les lignes d’un rapport MSRN (PO Lines) avec les montants utiles.
+
+    Étapes:
+    1) Retrouver le MSRN, son PO, et charger les réceptions.
+    2) Préparer un DataFrame pour les lignes (quantités, montants, payables…).
+    3) Préparer un onglet d’information MSRN (en‑tête simple).
+    4) Écrire les 2 onglets dans un .xlsx et le renvoyer.
+
+    Entrées:
+    - request (HttpRequest)
+    - msrn_id (int): identifiant du rapport MSRN.
+
+    Sorties:
+    - HttpResponse: fichier .xlsx contenant 2 onglets (MSRN Information, Purchase Order Lines).
     """
     try:
         from .models import MSRNReport, Reception, LigneFichier

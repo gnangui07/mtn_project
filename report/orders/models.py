@@ -1069,7 +1069,7 @@ class FichierImporte(models.Model):
         if lignes and lignes[0].contenu:
             # Vérifier la première ligne pour trouver le nom de la colonne (cas insensible)
             for cle in lignes[0].contenu.keys():
-                if cle.upper() in ['ORDER', 'ORDRE', 'BON', 'BON_COMMANDE', 'COMMANDE', 'BC', 'NUM_BC']:
+                if cle.upper() in ['Order', 'ORDER']:
                     colonne_order = cle
                     break
                     
@@ -2249,7 +2249,12 @@ class TimelineDelay(models.Model):
     delay_part_mtn = models.IntegerField(default=0, verbose_name="Part MTN (jours)")
     delay_part_force_majeure = models.IntegerField(default=0, verbose_name="Part Force Majeure (jours)")
     delay_part_vendor = models.IntegerField(default=0, verbose_name="Part Fournisseur (jours)")
-    
+    quotite_realisee = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('100.00'),
+        verbose_name="Quotité réalisée (%)"
+    )
     # Commentaires/Observations pour chaque part (obligatoires)
     comment_mtn = models.TextField(verbose_name="Commentaire Part MTN", help_text="Commentaire obligatoire")
     comment_force_majeure = models.TextField(verbose_name="Commentaire Part Force Majeure", help_text="Commentaire obligatoire")

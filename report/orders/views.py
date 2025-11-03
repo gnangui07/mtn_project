@@ -36,20 +36,21 @@ logger = logging.getLogger(__name__)
 
 def filter_bons_by_user_service(queryset, user):
     """
-    Filtre un queryset de NumeroBonCommande selon les services de l'utilisateur.
-    Utilise le champ 'cpu' pour des performances optimales.
-    Supporte plusieurs services par utilisateur (séparés par des virgules).
-    
-    - Si l'utilisateur est superuser : retourne tout le queryset
-    - Si l'utilisateur a un ou plusieurs services : filtre les bons dont le CPU correspond
-    - Sinon : retourne un queryset vide
-    
-    Args:
-        queryset: QuerySet de NumeroBonCommande
-        user: Utilisateur connecté
-    
-    Returns:
-        QuerySet filtré
+    But:
+    - Ne montrer que les bons (PO) que l’utilisateur a le droit de voir (par service).
+
+    Étapes:
+    1) Si superuser → retourner tout.
+    2) Sinon, lire la liste des services de l’utilisateur.
+    3) Si liste vide → retourner rien.
+    4) Sinon, filtrer les bons dont le CPU correspond à l’un de ces services.
+
+    Entrées:
+    - queryset (QuerySet[NumeroBonCommande]): liste de départ des bons.
+    - user (User): utilisateur connecté.
+
+    Sorties:
+    - QuerySet filtré (seulement les bons visibles par cet utilisateur).
     """
     # Le superuser voit tout
     if user.is_superuser:
@@ -78,9 +79,23 @@ def filter_bons_by_user_service(queryset, user):
 @login_required
 def msrn_archive(request):
     """
-    Page d'archive des rapports MSRN pour les utilisateurs (miroir de l'admin).
-    Affiche: report_number, bon_commande, user, created_at, lien de téléchargement.
-    Inclut une recherche simple et une pagination.
+    But:
+    - Afficher l’archive des rapports MSRN (liste paginée avec recherche et filtres).
+
+    Étapes:
+    1) Charger la liste des rapports triés par date.
+    2) Restreindre aux POs autorisés (services de l’utilisateur) si non‑superuser.
+    3) Appliquer les filtres de recherche (q, with_retention).
+    4) Paginer le résultat et rendre la page HTML.
+
+    Entrées:
+    - request (HttpRequest) GET:
+      - q (str, optionnel): recherche sur numéro de rapport/PO/valeur numérique proche.
+      - with_retention ('1'|'0'|None): filtre sur le taux de rétention.
+      - page (int, optionnel): numéro de page.
+
+    Sorties:
+    - Template HTML `orders/msrn_archive.html` avec la page de résultats.
     """
     # Imports locaux pour éviter d'altérer les imports globaux existants
     from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
@@ -168,7 +183,21 @@ def msrn_archive(request):
 @login_required
 def download_msrn_report(request, report_id):
     """
-    Télécharge un rapport MSRN existant depuis l'archive
+    But:
+    - Télécharger un rapport MSRN existant (PDF) depuis l’archive.
+
+    Étapes:
+    1) Retrouver le rapport par son id.
+    2) Vérifier que le fichier PDF existe.
+    3) S’il existe → renvoyer le PDF en téléchargement.
+    4) Sinon → message d’erreur et retour à l’archive.
+
+    Entrées:
+    - request (HttpRequest)
+    - report_id (int): identifiant du MSRNReport.
+
+    Sorties:
+    - HttpResponse (PDF en attachement) ou redirection avec message d’erreur.
     """
     try:
         # Récupérer le rapport MSRN
@@ -195,9 +224,20 @@ def download_msrn_report(request, report_id):
 @login_required
 def accueil(request):
     """
-    Page d'accueil qui sert de point d'entrée principal pour l'application.
-    Affiche les options pour importer un fichier ou consulter les fichiers existants.
-    Inclut la liste des numéros de bons de commande pour le popup (filtrés par service).
+    But:
+    - Page d’entrée: lister les POs accessibles selon le service de l’utilisateur.
+
+    Étapes:
+    1) Charger tous les numéros de POs.
+    2) Filtrer selon les services de l’utilisateur.
+    3) Afficher un message si rien n’est accessible.
+    4) Rendre la page ‘reception.html’.
+
+    Entrées:
+    - request (HttpRequest)
+
+    Sorties:
+    - Template HTML `orders/reception.html` avec la liste des POs.
     """
     from .models import NumeroBonCommande
     
@@ -221,8 +261,21 @@ def accueil(request):
 
 def import_fichier(request):
     """
-    Vue pour importer un fichier de n'importe quel type (Excel, CSV, JSON, etc.)
-    Le fichier est traité automatiquement lors de l'enregistrement (save method override)
+    But:
+    - Importer un fichier (Excel, CSV, etc.) et extraire automatiquement les données.
+
+    Étapes:
+    1) GET → afficher le formulaire d’upload.
+    2) POST → valider le formulaire et sauvegarder.
+    3) Après sauvegarde, afficher un message et rediriger vers les détails.
+
+    Entrées:
+    - request (HttpRequest) GET/POST (fichier dans request.FILES en POST).
+
+    Sorties:
+    - GET → template `orders/reception.html` avec le formulaire.
+    - POST valide → redirection `orders:details_bon`.
+    - POST invalide → ré-afficher le formulaire avec erreurs.
     """
     if request.method == 'POST':
         form = UploadFichierForm(request.POST, request.FILES)
@@ -241,8 +294,17 @@ def import_fichier(request):
 
 def consultation(request):
     """
-    Vue pour la page de consultation des bons de commande.
-    Utilise le template consultation.html existant.
+    But:
+    - Afficher la page de consultation (présentation simple pour l’instant).
+
+    Étapes:
+    1) Rendre le template existant.
+
+    Entrées:
+    - request (HttpRequest)
+
+    Sorties:
+    - Template HTML `orders/consultation.html`.
     """
     # Dans le futur, cette vue pourrait offrir des filtres et des fonctionnalités de recherche avancées
     # Pour l'instant, elle affiche simplement le template avec un message
@@ -251,9 +313,25 @@ def consultation(request):
 
 def details_bon(request, bon_id):
     """
-    Vue pour afficher les détails d'un fichier importé comme un bon de commande.
-    Filtre les lignes pour n'afficher que celles correspondant au numéro de bon de commande sélectionné.
-    Affiche les données brutes du fichier importé exactement comme elles apparaissent dans le fichier d'origine.
+    But:
+    - Afficher proprement les données d’un fichier importé (le “bon”).
+
+    Étapes:
+    1) Si `bon_id='search'`, retrouver le fichier à partir d’un numéro de PO.
+    2) Charger les lignes du fichier et leurs informations associées.
+    3) Normaliser les en‑têtes et valeurs pour un tableau lisible.
+    4) Joindre les réceptions existantes si présentes (quantités/montants).
+    5) Déduire et afficher des métriques (taux, montants, devise, etc.).
+    6) Rendre la page de détails.
+
+    Entrées:
+    - request (HttpRequest) GET:
+      - selected_order_number (str, optionnel)
+      - order_number (str, si bon_id='search')
+    - bon_id (int | 'search')
+
+    Sorties:
+    - Template HTML `orders/detail_bon.html` avec les données, entêtes et métriques.
     """
     selected_order_number = None
 
@@ -735,7 +813,21 @@ def details_bon(request, bon_id):
 
 def telecharger_fichier(request, fichier_id, format_export='xlsx'):
     """
-    Permet de télécharger les données d'un fichier dans différents formats
+    But:
+    - Exporter les données d’un fichier dans un format téléchargeable (ex: Excel).
+
+    Étapes:
+    1) Retrouver le fichier et ses lignes.
+    2) Préparer les données au bon format.
+    3) Renvoyer le fichier au navigateur.
+
+    Entrées:
+    - request (HttpRequest)
+    - fichier_id (int)
+    - format_export (str) par défaut 'xlsx'
+
+    Sorties:
+    - HttpResponse de fichier téléchargeable (ex: .xlsx).
     """
     fichier = get_object_or_404(FichierImporte, id=fichier_id)
     
@@ -775,23 +867,21 @@ def telecharger_fichier(request, fichier_id, format_export='xlsx'):
     return response
 
 
-def api_statistiques_commande(request, order):
-    """API pour les statistiques des commandes (pour compatibilité)"""
-    return JsonResponse({
-        'success': True,
-        'message': 'Fonction simplifiée',
-        'data': {
-            'nom_fichier': f'PO-{order}',
-            'lignes': 0,
-            'date': '2023-01-01',
-        }
-    })
-
-
 def search_bon(request):
     """
-    View for searching purchase orders by order number
-    Redirects to the details page if found, otherwise redirects to the home page with error
+    But:
+    - Rechercher un bon de commande (PO) par numéro et rediriger vers ses détails.
+
+    Étapes:
+    1) Lire le numéro saisi (GET: order_number).
+    2) Si trouvé → rediriger vers la page détails correspondante.
+    3) Sinon → message d'erreur et retour à l'accueil.
+
+    Entrées:
+    - request (HttpRequest) GET: order_number (str)
+
+    Sorties:
+    - Redirection vers `orders:details_bon` ou vers `orders:accueil` avec message.
     """
     from .models import NumeroBonCommande
     
@@ -851,7 +941,18 @@ def search_bon(request):
 @login_required
 def po_progress_monitoring(request):
     """
-    Vue pour la page de monitoring de progression des bons de commande
+    But:
+    - Afficher la page de suivi de progression des bons (vue globale).
+
+    Étapes:
+    1) Préparer le contexte minimal.
+    2) Rendre le template associé (graphes/tables côté front).
+
+    Entrées:
+    - request (HttpRequest)
+
+    Sorties:
+    - Template HTML de monitoring (progression des bons).
     """
     return render(request, 'orders/po_progress_monitoring.html')
 
@@ -860,8 +961,20 @@ def po_progress_monitoring(request):
 @login_required
 def vendor_evaluation(request, bon_commande_id):
     """
-    Vue pour créer ou modifier l'évaluation d'un fournisseur
-    Vérification d'accès par service (CPU)
+    But:
+    - Créer ou modifier l’évaluation d’un fournisseur pour un PO donné.
+
+    Étapes:
+    1) Vérifier l'accès (service/CPU de l’utilisateur).
+    2) Afficher le formulaire (GET) ou sauvegarder (POST).
+    3) Rediriger vers la page de détails ou lister les évaluations.
+
+    Entrées:
+    - request (HttpRequest)
+    - bon_commande_id (int)
+
+    Sorties:
+    - Template HTML du formulaire ou redirection après sauvegarde.
     """
     from .models import VendorEvaluation
     
@@ -971,8 +1084,19 @@ def vendor_evaluation(request, bon_commande_id):
 @login_required
 def vendor_evaluation_list(request):
     """
-    Vue pour lister toutes les évaluations de fournisseurs avec filtres
-    Filtrées par service (CPU) : chaque utilisateur voit les évaluations des bons de son service
+    But:
+    - Lister les évaluations de fournisseurs avec filtres simples.
+
+    Étapes:
+    1) Restreindre aux POs autorisés (service/CPU de l’utilisateur).
+    2) Appliquer les filtres (si présents) et trier.
+    3) Rendre la page de liste.
+
+    Entrées:
+    - request (HttpRequest)
+
+    Sorties:
+    - Template HTML listant les évaluations visibles.
     """
     from .models import VendorEvaluation
     from django.core.paginator import Paginator
@@ -1055,8 +1179,20 @@ def vendor_evaluation_list(request):
 @login_required
 def vendor_evaluation_detail(request, evaluation_id):
     """
-    Vue pour afficher les détails d'une évaluation de fournisseur
-    Vérification d'accès par service (CPU)
+    But:
+    - Afficher les détails d’une évaluation fournisseur précise.
+
+    Étapes:
+    1) Vérifier l'accès (service/CPU).
+    2) Charger l’évaluation et ses infos liées.
+    3) Rendre la page de détails.
+
+    Entrées:
+    - request (HttpRequest)
+    - evaluation_id (int)
+
+    Sorties:
+    - Template HTML de détail d’évaluation.
     """
     from .models import VendorEvaluation
     
@@ -1106,8 +1242,20 @@ def vendor_evaluation_detail(request, evaluation_id):
 @login_required
 def timeline_delays(request, bon_commande_id):
     """
-    Vue simple pour gérer les retards d'un bon de commande
-    Vérification d'accès par service (CPU)
+    But:
+    - Gérer les retards d’un bon de commande (timeline des étapes).
+
+    Étapes:
+    1) Vérifier l’accès (service/CPU).
+    2) Charger les étapes/retards existants.
+    3) Rendre la page pour visualiser/éditer.
+
+    Entrées:
+    - request (HttpRequest)
+    - bon_commande_id (int)
+
+    Sorties:
+    - Template HTML de gestion des retards.
     """
     from .models import TimelineDelay, LigneFichier, NumeroBonCommande
     from datetime import datetime
@@ -1216,9 +1364,19 @@ def timeline_delays(request, bon_commande_id):
     # Récupérer le PO Amount directement depuis le bon de commande
     po_amount = bon.montant_total()
     
-    total_days_late = get_total_days_late(bon)
+    # Récupérer le supplier directement depuis le bon de commande
     supplier = bon.get_supplier()
-    
+
+    total_days_late = get_total_days_late(bon)
+    vendor_days = timeline.delay_part_vendor
+    if vendor_days is None:
+        vendor_days = max(0, total_days_late - timeline.delay_part_mtn - timeline.delay_part_force_majeure)
+
+    quotite_realisee = timeline.quotite_realisee if timeline.quotite_realisee is not None else Decimal('100.00')
+    quotite_non_realisee = Decimal('100.00') - quotite_realisee
+    if quotite_non_realisee < Decimal('0'):
+        quotite_non_realisee = Decimal('0.00')
+
     data = {
         'id': timeline.id,
         'po_number': bon.numero,
@@ -1226,13 +1384,15 @@ def timeline_delays(request, bon_commande_id):
         'total_days_late': total_days_late,
         'delay_part_mtn': timeline.delay_part_mtn,
         'delay_part_force_majeure': timeline.delay_part_force_majeure,
-        'delay_part_vendor': max(0, total_days_late - timeline.delay_part_mtn - timeline.delay_part_force_majeure),
+        'delay_part_vendor': int(vendor_days),
         'po_amount': float(po_amount),
         'retention_amount_timeline': float(timeline.retention_amount_timeline),
         'retention_rate_timeline': float(timeline.retention_rate_timeline),
         'comment_mtn': timeline.comment_mtn or '',
         'comment_force_majeure': timeline.comment_force_majeure or '',
         'comment_vendor': timeline.comment_vendor or '',
+        'quotite_realisee': float(quotite_realisee),
+        'quotite_non_realisee': float(quotite_non_realisee),
     }
     
     return render(request, 'orders/timeline_delays.html', {'data': data, 'bon': bon, 'fichier_id': fichier_id})
@@ -1240,7 +1400,22 @@ def timeline_delays(request, bon_commande_id):
 
 @login_required
 def update_delays(request, timeline_id):
-    """API pour sauvegarder les parts"""
+    """
+    But:
+    - API pour sauvegarder les parts/étapes de retard (mise à jour via POST JSON).
+
+    Étapes:
+    1) Recevoir les données (POST JSON).
+    2) Valider et enregistrer les champs mis à jour.
+    3) Retourner un JSON de succès/erreur.
+
+    Entrées:
+    - request (HttpRequest) POST
+    - timeline_id (int)
+
+    Sorties:
+    - JsonResponse: { success: bool, ... }
+    """
     if request.method == 'POST':
         import json
         from .models import TimelineDelay
@@ -1273,20 +1448,57 @@ def update_delays(request, timeline_id):
         timeline.delay_part_mtn = int(data.get('mtn', 0))
         timeline.delay_part_force_majeure = int(data.get('fm', 0))
         timeline.delay_part_vendor = int(data.get('vendor', 0))
+        quotite_value = data.get('quotite', timeline.quotite_realisee)
+        try:
+            quotite_decimal = Decimal(str(quotite_value))
+        except (ArithmeticError, ValueError):
+            return JsonResponse({
+                'success': False,
+                'message': "La quotité réalisée est invalide.",
+                'fields': ['quotite_realisee']
+            }, status=400)
+
+        if quotite_decimal < Decimal('0') or quotite_decimal > Decimal('100'):
+            return JsonResponse({
+                'success': False,
+                'message': "La quotité réalisée doit être comprise entre 0 et 100%.",
+                'fields': ['quotite_realisee']
+            }, status=400)
+
+        timeline.quotite_realisee = quotite_decimal
         timeline.comment_mtn = comment_mtn
         timeline.comment_force_majeure = comment_force_majeure
         timeline.comment_vendor = comment_vendor
         
         timeline.save()
+        quotite_non_realisee = max(Decimal('0'), Decimal('100.00') - timeline.quotite_realisee)
         
-        return JsonResponse({'success': True})
+        return JsonResponse({
+            'success': True,
+            'quotite_realisee': float(timeline.quotite_realisee),
+            'quotite_non_realisee': float(quotite_non_realisee),
+            'retention_amount_timeline': float(timeline.retention_amount_timeline),
+            'retention_rate_timeline': float(timeline.retention_rate_timeline),
+        })
     return JsonResponse({'success': False}, status=400)
 
 
 @login_required
 def vendor_ranking(request):
     """
-    Vue pour afficher le classement des fournisseurs avec statistiques consolidées
+    But:
+    - Afficher un classement des fournisseurs (meilleurs/pire) avec stats par année.
+
+    Étapes:
+    1) Agréger les évaluations et calculer des scores.
+    2) Construire top 10 best/worst et stats annuelles.
+    3) Rendre la page de classement avec filtres.
+
+    Entrées:
+    - request (HttpRequest)
+
+    Sorties:
+    - Template HTML `orders/vendor_ranking.html` avec tableaux/graphes.
     """
     from .models import VendorEvaluation, LigneFichier, NumeroBonCommande
     from django.db.models import Avg, Count

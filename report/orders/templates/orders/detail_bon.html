@@ -100,53 +100,64 @@
     {% endif %}
     
     <div class="mt-3">
-      <a href="{% url 'orders:reception' %}" class="btn btn-secondary">
-        <i class="fas fa-arrow-left me-2"></i> Back to Register Delivery
-      </a>
-      
-      <!-- Bouton d'exportation Excel avec données mises à jour -->
-      <a href="{% url 'orders:export_bon_excel' bon_id=bon_id %}{% if selected_order_number %}?selected_order_number={{ selected_order_number }}{% endif %}" 
-         class="btn btn-success ms-2 {% if is_migration_ifs %}disabled{% endif %}"
-         {% if is_migration_ifs %}aria-disabled="true" onclick="return false;"{% endif %}
-         title="Export Updated Excel">
-        <i class="fas fa-file-excel me-2"></i> Export Delivery Report 
-      </a>
+      <div class="card shadow-sm overflow-visible">
+        <div class="card-body">
+          <div class="row g-3 align-items-center">
+            <div class="col-lg-8 d-flex flex-wrap gap-2 align-items-center">
+              <a href="{% url 'orders:reception' %}" class="btn btn-warning text-dark">
+                <i class="fas fa-arrow-left me-2"></i> Back to Register Delivery
+              </a>
+            </div>
 
-      <!-- Bouton pour générer un rapport MSRN -->
-      {% if bon_commande_id %}
-      <button id="generate-msrn-btn" class="btn btn-primary ms-2 {% if is_migration_ifs %}disabled{% endif %}" 
-              data-bon-id="{{ bon_commande_id }}"
-              {% if is_migration_ifs %}disabled{% endif %}>
-        <i class="fas fa-file-pdf me-2"></i> Generate MSRN
-      </button>
-      {% endif %}
-
-      <!-- Ajouter après les autres boutons dans la section d'en-tête -->
-      <button id="set-retention-btn" class="btn btn-info ms-2 {% if is_migration_ifs %}disabled{% endif %}" 
-              data-retention-rate="{{ retention_rate|default:0 }}"
-              data-retention-cause="{{ retention_cause|default:'' }}"
-              {% if is_migration_ifs %}disabled{% endif %}>
-          <i class="fas fa-exclamation-triangle me-2"></i> Define Retention on Payment 
-      </button>
-
-      <!-- Bouton pour générer l'évaluation fournisseur -->
-      {% if bon_commande_id and supplier != 'N/A' %}
-      <a href="{% url 'orders:vendor_evaluation' bon_commande_id=bon_commande_id %}?fichier_id={{ bon_id }}" 
-         class="btn btn-warning ms-2 {% if is_migration_ifs %}disabled{% endif %}"
-         {% if is_migration_ifs %}aria-disabled="true" onclick="return false;"{% endif %}>
-        <i class="fas fa-star me-2"></i> Generate Vendor Evaluation
-      </a>
-      {% endif %}
-      
-      <!-- Bouton Timeline Delays -->
-      {% if bon_commande_id %}
-      <a href="{% url 'orders:timeline_delays' bon_commande_id=bon_commande_id %}?fichier_id={{ bon_id }}" 
-         class="btn ms-2 {% if is_migration_ifs %}disabled{% endif %}" 
-         style="background-color: #FFCC00; color: #000; border: 2px solid #000;"
-         {% if is_migration_ifs %}aria-disabled="true" onclick="return false;"{% endif %}>
-        <i class="fas fa-clock me-2"></i> Timeline Delays
-      </a>
-      {% endif %}
+            <div class="col-lg-4">
+              <div class="d-flex justify-content-lg-end">
+                <div class="dropdown dropup position-static w-100 w-sm-auto">
+                  <button class="btn btn-warning text-dark dropdown-toggle w-100" type="button" id="moreActionsDropdown" data-bs-toggle="dropdown" data-bs-auto-close="outside" data-bs-display="static" aria-expanded="false">
+                    <i class="fas fa-ellipsis-h me-2"></i> MORE ACTIONS
+                  </button>
+                  <ul class="dropdown-menu shadow border-0 dropdown-menu-end mb-2" aria-labelledby="moreActionsDropdown" style="min-width: 18rem; z-index: 1050;">
+                    {% if bon_commande_id %}
+                      <li>
+                        <button class="dropdown-item" type="button" id="download-document"
+                                data-bon-id="{{ bon_commande_id|default_if_none:'' }}"
+                                data-bon-number="{{ selected_order.numero|default_if_none:'' }}">
+                          <i class="fas fa-file-download me-2 text-warning"></i> Generate
+                        </button>
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="{% url 'orders:timeline_delays' bon_commande_id=bon_commande_id %}?fichier_id={{ bon_id }}"
+                           {% if is_migration_ifs %}aria-disabled="true" onclick="return false;" class="disabled"{% endif %}>
+                          <i class="fas fa-clock me-2 text-warning"></i> Timeline Delays
+                        </a>
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="{% url 'orders:vendor_evaluation' bon_commande_id=bon_commande_id %}?fichier_id={{ bon_id }}"
+                           {% if is_migration_ifs %}aria-disabled="true" onclick="return false;" class="disabled"{% endif %}>
+                          <i class="fas fa-star me-2 text-warning"></i> Vendor Evaluation
+                        </a>
+                      </li>
+                    {% endif %}
+                    <li>
+                      <a class="dropdown-item" href="{% url 'orders:export_bon_excel' bon_id=bon_id %}{% if selected_order_number %}?selected_order_number={{ selected_order_number }}{% endif %}"
+                         {% if is_migration_ifs %}aria-disabled="true" onclick="return false;" class="disabled"{% endif %}>
+                        <i class="fas fa-file-excel me-2 text-success"></i> Export Delivery Report
+                      </a>
+                    </li>
+                    <li>
+                      <button class="dropdown-item" id="set-retention-btn" type="button"
+                              data-retention-rate="{{ retention_rate|default:0 }}"
+                              data-retention-cause="{{ retention_cause|default:'' }}"
+                              {% if is_migration_ifs %}disabled{% endif %}>
+                        <i class="fas fa-exclamation-triangle me-2 text-info"></i> Define Retention on Payment
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </header>
 

@@ -27,11 +27,11 @@
 
     // Message de bienvenue simple
     let welcomeMsg = '';
-    if (isFR) welcomeMsg = `Bienvenue ${username}, j'espère que vous allez bien !`;
-    else if (isEN) welcomeMsg = `Welcome ${username}, I hope you're well!`;
-    else if (isES) welcomeMsg = `Bienvenido ${username}, ¡espero que esté bien!`;
-    else if (isDE) welcomeMsg = `Willkommen ${username}, ich hoffe, es geht Ihnen gut!`;
-    else welcomeMsg = `Welcome ${username}!`;
+    if (isFR) welcomeMsg = `Yello ${username}, j'espère que vous allez bien ! Alors on fait quoi aujourd'hui ?`;
+    else if (isEN) welcomeMsg = `Yello ${username}, I hope you're well! So what are we doing today?`;
+    else if (isES) welcomeMsg = `Yello ${username}, ¡espero que esté bien! ¿Entonces qué hacemos hoy?`;
+    else if (isDE) welcomeMsg = `Yello ${username}, ich hoffe, es geht Ihnen gut! Also was machen wir heute?`;
+    else welcomeMsg = `Yello ${username}! So what are we doing today?`;
 
     return welcomeMsg;
   }

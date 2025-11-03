@@ -1,4 +1,18 @@
 {% extends 'users/base_auth.html' %}
+<!--
+  A quoi sert cette page ?
+  - Cette page sert à activer votre compte la toute première fois.
+  - Vous devez écrire votre email et le mot de passe temporaire reçu par email.
+  - Si tout est correct, vous passerez à l'étape suivante pour créer votre vrai mot de passe.
+
+  Ce que vous voyez ici:
+  - Un champ pour l'email.
+  - Un champ pour le mot de passe temporaire (avec un œil pour afficher/masquer).
+  - Un bouton pour valider et continuer.
+
+  Ce que fait le petit programme (en bas de page):
+  - Il permet d'afficher ou cacher le mot de passe temporaire quand vous cliquez sur l'icône œil.
+-->
 
 {% block title %}Activation du compte - MTN CI{% endblock %}
 
@@ -61,6 +75,7 @@
         </small>
     </div>
     
+    <!-- Cliquez ici pour envoyer vos informations et passer à la création du vrai mot de passe -->
     <button type="submit" class="btn btn-primary">
         <i class="fas fa-check-circle"></i> Valider et continuer
     </button>
@@ -78,6 +93,8 @@
 
 {% block extra_js %}
 <script>
+    // Montrer / cacher le mot de passe temporaire
+    // Explication simple: cliquez sur l'icône œil pour voir ce que vous tapez.
     // Toggle password visibility
     document.getElementById('togglePassword').addEventListener('click', function() {
         const passwordInput = document.getElementById('temp_password');

@@ -124,6 +124,102 @@ This is an automated notification from the MSRN System.
         return False
 
 
+def send_penalty_notification(bon_commande, pdf_buffer, user_email, report_type='penalty'):
+    """
+    Envoie une notification email pour les rapports de pénalité.
+    
+    Args:
+        bon_commande: Instance du bon de commande
+        pdf_buffer: Buffer du PDF généré
+        user_email: Email de l'utilisateur qui a généré le rapport
+        report_type: Type de rapport ('penalty', 'penalty_amendment', 'delay_evaluation', 'compensation_letter')
+        
+    Returns:
+        bool: True si l'email a été envoyé avec succès, False sinon
+    """
+    if not getattr(settings, 'ENABLE_EMAIL_NOTIFICATIONS', True):
+        logger.info(f"Notifications email désactivées pour {report_type}")
+        return False
+    
+    try:
+        superusers = User.objects.filter(is_superuser=True, email__isnull=False).exclude(email='')
+        
+        if not superusers.exists():
+            logger.warning(f"Aucun superuser avec email trouvé pour {report_type}")
+            return False
+        
+        recipient_list = [user.email for user in superusers]
+        
+        # Préparer les données
+        report_titles = {
+            'penalty': 'Fiche de Pénalité',
+            'penalty_amendment': 'Fiche d\'Amendement de Pénalité',
+            'delay_evaluation': 'Évaluation des Délais de Livraison',
+            'compensation_letter': 'Lettre de Demande de Compensation'
+        }
+        
+        report_title = report_titles.get(report_type, 'Rapport')
+        
+        context = {
+            'report_type': report_title,
+            'purchase_order': bon_commande.numero if bon_commande else 'N/A',
+            'supplier': bon_commande.get_supplier() if bon_commande and hasattr(bon_commande, 'get_supplier') else 'N/A',
+            'created_by': user_email,
+            'created_at': __import__('django.utils.timezone', fromlist=['now']).now(),
+        }
+        
+        # Générer le contenu texte
+        text_content = f"""
+{report_title} - Généré automatiquement
+
+Un nouveau rapport {report_title.lower()} a été généré:
+
+Bon de Commande: {context['purchase_order']}
+Fournisseur: {context['supplier']}
+Généré par: {context['created_by']}
+Date: {context['created_at'].strftime('%Y-%m-%d %H:%M:%S')}
+
+---
+Ceci est une notification automatique du système de gestion des rapports.
+        """
+        
+        # Ajouter l'utilisateur générateur en CC
+        cc_list = []
+        try:
+            if user_email and '@' in user_email and user_email not in recipient_list:
+                cc_list.append(user_email)
+        except Exception:
+            pass
+        
+        # Créer l'email
+        email = EmailMultiAlternatives(
+            subject=f'{report_title} - PO {context["purchase_order"]}',
+            body=text_content,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=recipient_list,
+            cc=cc_list or None,
+        )
+        
+        # Joindre le PDF
+        try:
+            pdf_buffer.seek(0)
+            pdf_bytes = pdf_buffer.read()
+            filename = f"{report_type.upper()}-{bon_commande.numero}.pdf"
+            email.attach(filename, pdf_bytes, 'application/pdf')
+        except Exception as attach_err:
+            logger.warning(f"Impossible d'attacher le PDF au courriel: {attach_err}")
+        
+        # Envoyer l'email
+        email.send(fail_silently=False)
+        
+        logger.info(f"Notification {report_type} envoyée avec succès à {len(recipient_list)} destinataire(s)")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Erreur lors de l'envoi de la notification {report_type}: {str(e)}", exc_info=True)
+        return False
+
+
 def send_test_email(recipient_email):
     """
     Envoie un email de test pour vérifier la configuration.

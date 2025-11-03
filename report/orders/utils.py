@@ -8,8 +8,19 @@ from django.core.files.storage import default_storage
 
 def _lire_csv(chemin_absolu):
     """
-    Lit un CSV en DataFrame pandas, remplace NaN par None, et renvoie
-    (liste_de_dicts, nb_lignes).
+    But:
+    - Lire un fichier CSV et retourner son contenu simplement utilisable.
+
+    Étapes:
+    1) Lire avec pandas.
+    2) Remplacer les valeurs manquantes (NaN) par None.
+    3) Convertir en liste de dictionnaires.
+
+    Entrées:
+    - chemin_absolu (str): chemin complet vers le fichier CSV.
+
+    Sorties:
+    - (list[dict], int): contenu sous forme de liste de lignes + nombre de lignes.
     """
     df = pd.read_csv(chemin_absolu, dtype=str, keep_default_na=False)
     df = df.where(pd.notnull(df), None)
@@ -18,12 +29,20 @@ def _lire_csv(chemin_absolu):
 
 def _lire_excel(chemin_absolu, engine_name):
     """
-    Lit un fichier Excel (.xlsx, .xls, .xlsb, .ods) avec le moteur spécifié,
-    convertit les booléens en chaînes, remplace NaN par None, et renvoie (liste_de_dicts, nb_lignes).
-    - engine='openpyxl' pour .xlsx
-    - engine='xlrd' pour .xls (xlrd==1.2.0 recommandé)
-    - engine='pyxlsb' pour .xlsb
-    - engine='odf' pour .ods
+    But:
+    - Lire un fichier Excel (xlsx/xls/xlsb/ods) et le rendre en liste de dicts.
+
+    Étapes:
+    1) Lire avec le moteur indiqué (openpyxl/xlrd/pyxlsb/odf).
+    2) Convertir les booléens en chaînes.
+    3) Remplacer NaN/valeurs vides par None.
+
+    Entrées:
+    - chemin_absolu (str): chemin du fichier.
+    - engine_name (str): nom du moteur ('openpyxl', 'xlrd', 'pyxlsb', 'odf').
+
+    Sorties:
+    - (list[dict], int): contenu + nombre de lignes.
     """
     # Lire en gardant les types originaux d'abord
     df = pd.read_excel(chemin_absolu, engine=engine_name)
@@ -41,8 +60,20 @@ def _lire_excel(chemin_absolu, engine_name):
 
 def _lire_json(chemin_absolu):
     """
-    Lit un fichier JSON. Si c'est un tableau → DataFrame pandas → liste_de_dicts.
-    Sinon → on lit le texte brut et on renvoie {"raw_text": ...}.
+    But:
+    - Lire un JSON et retourner une structure simple (liste de dicts ou dict).
+
+    Étapes:
+    1) Essayer de parser via pandas (tableau → DataFrame → liste).
+    2) Si liste d'objets → normaliser et retourner.
+    3) Si objet unique → retourner tel quel.
+    4) En cas d’erreur → lire comme texte brut.
+
+    Entrées:
+    - chemin_absolu (str)
+
+    Sorties:
+    - (list|dict|{"raw_text": str}, int): contenu extrait + estimation du nombre de lignes.
     """
     try:
         df_or_obj = pd.read_json(chemin_absolu, dtype=str)
@@ -74,7 +105,18 @@ def _lire_json(chemin_absolu):
 
 def _lire_txt(chemin_absolu):
     """
-    Lit un fichier texte (.txt ou .log) et renvoie ({"lines": [...]} , nb_lignes).
+    But:
+    - Lire un .txt/.log et retourner chaque ligne simplement.
+
+    Étapes:
+    1) Ouvrir le fichier en UTF‑8 (tolérant).
+    2) Lire toutes les lignes et enlever le retour à la ligne.
+
+    Entrées:
+    - chemin_absolu (str)
+
+    Sorties:
+    - ({"lines": list[str]}, int): contenu + nombre de lignes.
     """
     with open(chemin_absolu, 'r', encoding='utf-8', errors='ignore') as f:
         lignes = [l.rstrip('\n') for l in f]
@@ -83,19 +125,21 @@ def _lire_txt(chemin_absolu):
 
 def extraire_depuis_fichier_relatif(chemin_relatif, ext):
     """
-    À partir du chemin relatif (par exemple 'uploads/monfichier.xlsb') et de l’extension :
-      1) On essaye d'accéder directement au chemin local (MEDIA_ROOT/chemin_relatif).
-      2) S’il est absent (storage distant), on télécharge dans un fichier temporaire local.
-      3) Selon ext, on appelle :
-         - 'csv'   → _lire_csv
-         - 'xlsx'  → _lire_excel(engine='openpyxl')
-         - 'xls'   → _lire_excel(engine='xlrd')
-         - 'xlsb'  → _lire_excel(engine='pyxlsb')
-         - 'ods'   → _lire_excel(engine='odf')
-         - 'json'  → _lire_json
-         - 'txt', 'log' → _lire_txt
-         - Tout autre → lecture binaire + hexdigest
-      4) On renvoie toujours (contenu_extrait, nb_lignes).
+    But:
+    - Extraire le contenu d’un fichier connu par son chemin relatif (dans MEDIA_ROOT).
+
+    Étapes:
+    1) Tenter d’ouvrir localement (MEDIA_ROOT/chemin_relatif).
+    2) Sinon, télécharger via le storage dans un fichier temporaire.
+    3) Selon l’extension, appeler le bon lecteur (_lire_csv/_lire_excel/_lire_json/_lire_txt).
+    4) Renvoyer le contenu + le nombre de lignes.
+
+    Entrées:
+    - chemin_relatif (str): ex. 'uploads/monfichier.xlsx'
+    - ext (str): extension sans le point (csv, xlsx, xls, xlsb, ods, json, txt, log…)
+
+    Sorties:
+    - (any, int): contenu extrait (liste/dict/texte/binaire hex) + nb_lignes estimé.
     """
     from django.conf import settings
 
@@ -148,9 +192,14 @@ def extraire_depuis_fichier_relatif(chemin_relatif, ext):
 
 def generate_report_number():
     """
-    Génère un numéro de rapport unique à 4 chiffres.
-    
-    Returns:
-        str: Un nombre aléatoire entre 1000 et 9999 sous forme de chaîne
+    But:
+    - Générer un petit numéro de rapport aléatoire (4 chiffres).
+
+    Étapes:
+    1) Tirer un nombre entre 1000 et 9999.
+    2) Le convertir en chaîne.
+
+    Sorties:
+    - str: ex. '5831'
     """
     return str(random.randint(1000, 9999))

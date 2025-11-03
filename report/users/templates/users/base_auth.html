@@ -1,4 +1,24 @@
 {% load static %}
+<!--
+  A quoi sert ce fichier ?
+  - C'est le modèle de base pour les pages d'authentification (connexion, activation, etc.).
+  - Il dessine le cadre: un panneau gauche (présentation MTN) et un panneau droit (formulaire).
+  - Les pages enfants remplissent seulement quelques zones (titres, formulaire).
+
+  Comment lire cette page ?
+  - Panneau gauche: logo, nom, et une liste courte de fonctionnalités.
+  - Panneau droit: un titre, un sous-titre, des messages, puis le contenu du formulaire.
+
+  Blocs que les pages enfants peuvent remplir:
+  - title: titre de l'onglet du navigateur.
+  - header_title / header_subtitle: textes en haut du panneau droit.
+  - content: le formulaire lui-même (ex: email + mot de passe).
+  - footer: un petit texte en bas.
+  - extra_css / extra_js: styles ou scripts en plus si besoin.
+
+  Petit programme en bas (JS):
+  - Ferme automatiquement les messages (alertes) après 5 secondes.
+-->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -533,7 +553,7 @@
 <body>
     <div class="auth-wrapper">
         <div class="auth-container animate-fade-in">
-            <!-- Left Panel - Branding -->
+            <!-- Panneau gauche: présentation (logo, nom, points clés) -->
             <div class="auth-brand animate-slide-in-left">
                 <div class="brand-logo">
                     <img src="{% static 'logo_mtn.jpeg' %}" alt="MTN Logo">
@@ -561,14 +581,14 @@
                 </ul>
             </div>
             
-            <!-- Right Panel - Form -->
+            <!-- Panneau droit: titres, messages, et zone pour le formulaire -->
             <div class="auth-form-wrapper animate-slide-in-right">
                 <div class="auth-header">
                     <h1>{% block header_title %}Bienvenue{% endblock %}</h1>
                     <p>{% block header_subtitle %}Connectez-vous pour accéder à votre espace{% endblock %}</p>
                 </div>
                 
-                <!-- Messages d'alerte -->
+                <!-- Messages: informations, erreurs ou succès s'affichent ici -->
                 {% if messages %}
                     {% for message in messages %}
                         <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
@@ -587,10 +607,10 @@
                     {% endfor %}
                 {% endif %}
                 
-                {% block content %}{% endblock %}
+                {% block content %}{% endblock %} <!-- Ici, les pages enfants placent le formulaire -->
                 
                 <div class="auth-footer">
-                    {% block footer %}
+                    {% block footer %} <!-- Zone de bas de page optionnelle -->
                         <p style="color: var(--mtn-gray); font-size: 13px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e9ecef;">&copy; 2025 MTN Côte d'Ivoire. Tous droits réservés.</p>
                     {% endblock %}
                 </div>
@@ -601,7 +621,7 @@
     <!-- Bootstrap 5 JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
-    <!-- Auto-dismiss alerts -->
+    <!-- Petit programme: ferme les messages automatiquement au bout de 5s -->
     <script>
         // Auto-dismiss alerts after 5 seconds
         setTimeout(function() {

@@ -1,6 +1,17 @@
 from django.urls import path, include
 from django.views.generic.base import RedirectView
-from . import views, api, reception_api, msrn_api, views_export
+from . import (
+    api,
+    compensation_letter_api,
+    delay_evaluation_api,
+    msrn_api,
+    penalty_amount_api,
+    penalty_amendment_api,
+    penalty_api,
+    reception_api,
+    views,
+    views_export,
+)
 
 
 app_name = 'orders'
@@ -14,6 +25,7 @@ urlpatterns = [
     path('bons/<int:bon_id>/', views.details_bon, name='details_bon'),
     path('bons/search/', views.search_bon, name='search_bon'),
     path('consultation/', views.consultation, name='consultation'),
+    path('import/', views.import_fichier, name='import_fichier'),
     path('po-progress-monitoring/', views.po_progress_monitoring, name='po_progress_monitoring'),
    
     # Téléchargement des fichiers
@@ -24,7 +36,6 @@ urlpatterns = [
     path('export-po-progress-monitoring/', views_export.export_po_progress_monitoring, name='export_po_progress_monitoring'),
 
     # API endpoints (pour compatibilité)
-    path('api/order-statistics/<str:order>/', views.api_statistiques_commande, name='api_statistiques_commande'),
     path('api/update-quantity-delivered/<int:fichier_id>/', reception_api.update_quantity_delivered, name='update_quantity_delivered'),
     path('api/receptions/<int:fichier_id>/bulk_update/', reception_api.bulk_update_receptions, name='bulk_update_receptions'),
     path('api/reset-quantity-delivered/<int:fichier_id>/', reception_api.reset_quantity_delivered, name='reset_quantity_delivered'),
@@ -46,6 +57,11 @@ urlpatterns = [
     path('msrn/<int:msrn_id>/export-po-lines/', views_export.export_msrn_po_lines, name='export_msrn_po_lines'),
     path('api/generate-msrn/<int:bon_id>/', msrn_api.generate_msrn_report_api, name='generate_msrn_report_api'),
     path('api/msrn/<int:msrn_id>/update-retention/', msrn_api.update_msrn_retention, name='update_msrn_retention'),
+    path('api/generate-penalty/<int:bon_id>/', penalty_api.generate_penalty_report_api, name='generate_penalty_report_api'),
+    path('api/generate-penalty-amendment/<int:bon_id>/', penalty_amendment_api.generate_penalty_amendment_report_api, name='generate_penalty_amendment_report_api'),
+    path('api/get-penalty-amount/<int:bon_id>/', penalty_amount_api.get_penalty_amount_api, name='get_penalty_amount_api'),
+    path('api/generate-delay-evaluation/<int:bon_id>/', delay_evaluation_api.generate_delay_evaluation_report_api, name='generate_delay_evaluation_report_api'),
+    path('api/generate-compensation-letter/<int:bon_id>/', compensation_letter_api.generate_compensation_letter_api, name='generate_compensation_letter_api'),
     
     # Analytics API
     path('api/analytics/', include('orders.urls_analytics')),

@@ -18,130 +18,374 @@ function getCookie(name) {
 document.addEventListener('DOMContentLoaded', function() {
     'use strict';
     
-    // Gérer le bouton de génération de rapport MSRN
-    const generateMsrnBtn = document.getElementById('generate-msrn-btn');
-    if (generateMsrnBtn) {
-        generateMsrnBtn.addEventListener('click', function() {
+    // Bouton pour télécharger/générer un document (Penalité, Évaluation, MSRN)
+    const downloadDocumentBtn = document.getElementById('download-document');
+    if (downloadDocumentBtn) {
+        downloadDocumentBtn.addEventListener('click', async function() {
             const bonId = this.getAttribute('data-bon-id');
+            const bonNumber = this.getAttribute('data-bon-number') || 'PO';
+
             const retentionBtn = document.getElementById('set-retention-btn');
-            
-            // Récupérer directement les valeurs de rétention déjà définies
             const retentionRate = retentionBtn ? retentionBtn.getAttribute('data-retention-rate') || 0 : 0;
             const retentionCause = retentionBtn ? retentionBtn.getAttribute('data-retention-cause') || '' : '';
-            
-            // Récupérer les valeurs actuelles depuis l'en-tête de la page (mises à jour après chaque réception)
+
             const montantTotalRecuElement = document.querySelector('.montant-total-recue');
             const tauxAvancementElement = document.querySelector('.taux-avancement');
-            
-            // Extraire le texte et le nettoyer
             const currentAmountDelivered = montantTotalRecuElement ? montantTotalRecuElement.textContent.trim() : amountDelivered;
             const currentDeliveryRate = tauxAvancementElement ? tauxAvancementElement.textContent.trim().replace('%', '') : deliveryRate;
-            
-            // Afficher une alerte de confirmation avec les informations du PO
-            Swal.fire({
-                title: 'Generate MSRN Report?',
-                html: `
-                    <div style="text-align: left; padding: 10px;">
-                        <p style="margin-bottom: 15px;"><strong>Please confirm the following information:</strong></p>
-                        <table style="width: 100%; border-collapse: collapse;">
-                            <tr style="border-bottom: 1px solid #ddd;">
-                                <td style="padding: 8px; font-weight: bold;">Purchase Order:</td>
-                                <td style="padding: 8px;">${bonNumber}</td>
-                            </tr>
-                            <tr style="border-bottom: 1px solid #ddd;">
-                                <td style="padding: 8px; font-weight: bold;">Supplier:</td>
-                                <td style="padding: 8px;">${supplier}</td>
-                            </tr>
-                            <tr style="border-bottom: 1px solid #ddd;">
-                                <td style="padding: 8px; font-weight: bold;">PO Amount:</td>
-                                <td style="padding: 8px;">${parseFloat(poAmount).toLocaleString()} ${currency}</td>
-                            </tr>
-                            <tr style="border-bottom: 1px solid #ddd;">
-                                <td style="padding: 8px; font-weight: bold;">Amount Delivered:</td>
-                                <td style="padding: 8px;">${currentAmountDelivered} ${currency}</td>
-                            </tr>
-                            <tr style="border-bottom: 1px solid #ddd;">
-                                <td style="padding: 8px; font-weight: bold;">Delivery Rate:</td>
-                                <td style="padding: 8px;"><strong style="color: #28a745;">${currentDeliveryRate}%</strong></td>
-                            </tr>
-                            <tr style="border-bottom: 1px solid #ddd;">
-                                <td style="padding: 8px; font-weight: bold;">Payment Retention Rate:</td>
-                                <td style="padding: 8px;"><strong style="color: ${parseFloat(retentionRate) > 0 ? '#dc3545' : '#6c757d'};">${retentionRate}%</strong></td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px; font-weight: bold;">Retention Cause:</td>
-                                <td style="padding: 8px; font-style: italic;">${retentionCause}</td>
-                            </tr>
-                        </table>
+
+            const { value: formValues, isConfirmed } = await Swal.fire({
+                title: 'Quel document souhaitez-vous générer ?'
+                , html: `
+                    <div class="text-start">
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="radio" name="document-type" id="doc-delay" value="delay">
+                            <label class="form-check-label" for="doc-delay">
+                                Évaluation des Délais de Livraison
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio" name="document-type" id="doc-penalty" value="penalty" checked>
+                            <label class="form-check-label" for="doc-penalty">
+                                Fiche de Pénalité
+                            </label>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="radio" name="document-type" id="doc-compensation-letter" value="compensation-letter">
+                            <label class="form-check-label" for="doc-compensation-letter">
+                                Lettre de Demande de Compensation
+                            </label>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="radio" name="document-type" id="doc-penalty-amendment" value="penalty-amendment">
+                            <label class="form-check-label" for="doc-penalty-amendment">
+                                Fiche d'amendement de pénalité
+                            </label>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="radio" name="document-type" id="doc-msrn" value="msrn">
+                            <label class="form-check-label" for="doc-msrn">
+                                Rapport MSRN
+                            </label>
+                        </div>
                     </div>
-                `,
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonColor: '#28a745',
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: 'OK, Generate MSRN',
-                cancelButtonText: 'Cancel',
-                width: '650px'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    // L'utilisateur a confirmé, procéder à la génération
-                    // Afficher un indicateur de chargement
-                    Swal.fire({
-                        title: 'Generating MSRN report',
-                        text: 'Please wait...',
-                        allowOutsideClick: false,
-                        didOpen: () => {
-                            Swal.showLoading();
-                        }
+                `
+                , showCancelButton: true
+                , confirmButtonText: 'Télécharger'
+                , cancelButtonText: 'Annuler'
+                , focusConfirm: false
+                , preConfirm: () => {
+                    const selected = document.querySelector('input[name="document-type"]:checked');
+                    if (!selected) {
+                        Swal.showValidationMessage('Veuillez choisir un document.');
+                        return false;
+                    }
+                    return {
+                        type: selected.value
+                    };
+                }
+            });
+
+            if (!isConfirmed || !formValues) {
+                return;
+            }
+
+            const showGeneratingPopup = () => {
+                Swal.fire({
+                    title: 'Génération en cours...',
+                    html: 'Merci de patienter pendant la création du PDF.',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+            };
+
+            const triggerDownload = async (url, filename, payload = {}, reportType = 'Document') => {
+                try {
+                    showGeneratingPopup();
+
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': getCookie('csrftoken')
+                        },
+                        body: JSON.stringify(payload)
                     });
-                    
-                    // Appeler l'API pour générer le rapport MSRN
-                    fetch(`/orders/api/generate-msrn/${bonId}/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken')
-                },
-                body: JSON.stringify({
-                    retention_rate: retentionRate,
-                    retention_cause: retentionCause
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Fermer l'indicateur de chargement
-                    Swal.close();
-                    
-                    // Ne pas télécharger automatiquement. Informer l'utilisateur et proposer des actions.
+
+                    if (!response.ok) {
+                        throw new Error(`Erreur serveur (${response.status})`);
+                    }
+
+                    const blob = await response.blob();
+                    const downloadUrl = window.URL.createObjectURL(blob);
+
                     Swal.fire({
                         icon: 'success',
-                        title: 'MSRN généré',
-                        html: `Le rapport MSRN <strong>MSRN-${data.report_number}</strong> a été généré.<br>
+                        title: reportType + ' généré',
+                        html: `Le rapport <strong>${reportType}</strong> a été généré avec succès.<br>
                                Un email de notification a été envoyé aux destinataires et vous avez été mis en copie.<br><br>
-                               <a href="${data.download_url}" class="btn btn-outline-primary">Ouvrir le rapport</a>`,
-                        showConfirmButton: true,
-                        confirmButtonText: 'Fermer'
+                               <a href="${downloadUrl}" class="btn btn-outline-primary" download="${filename}">Télécharger le rapport</a>`,
+                        didClose: () => {
+                            window.URL.revokeObjectURL(downloadUrl);
+                        }
                     });
-                } else {
-                    // Afficher un message d'erreur
+                } catch (error) {
+                    console.error('Erreur lors du téléchargement :', error);
                     Swal.fire({
                         icon: 'error',
                         title: 'Erreur',
-                        text: data.error || 'An error occurred while generating the MSRN report.'
+                        text: error.message || 'Impossible de générer le document.'
                     });
                 }
-            })
-            .catch(error => {
-                console.error('Error generating MSRN report:', error);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Erreur',
-                    text: 'An error occurred while generating the MSRN report.'
-                });
-            });
+            };
+
+            if (formValues.type === 'penalty') {
+                try {
+                    await triggerDownload(
+                        `/orders/api/generate-penalty/${bonId}/`,
+                        `PenaltySheet-${bonNumber}.pdf`,
+                        {},
+                        'Fiche de Pénalité'
+                    );
+                } catch (error) {
+                    // Gestion d'erreur déjà faite dans triggerDownload
                 }
-            });
+            } else if (formValues.type === 'delay') {
+                try {
+                    await triggerDownload(
+                        `/orders/api/generate-delay-evaluation/${bonId}/`,
+                        `DelayEvaluation-${bonNumber}.pdf`,
+                        {},
+                        'Évaluation des Délais de Livraison'
+                    );
+                } catch (error) {
+                    // Gestion d'erreur déjà faite dans triggerDownload
+                }
+            } else if (formValues.type === 'penalty-amendment') {
+                try {
+                    // Fetch penalty amount with loading message
+                    let defaultPenalty = '0';
+                    try {
+                        // Show loading message while calculating penalty
+                        Swal.fire({
+                            title: 'Veuillez Patienter',
+                            text: 'Affichage du formulaire en cours...',
+                            icon: 'info',
+                            showConfirmButton: false,
+                            allowOutsideClick: false
+                        });
+                        
+                        const penaltyResponse = await fetch(`/orders/api/get-penalty-amount/${bonId}/`, {
+                            method: 'GET',
+                            headers: {
+                                'X-CSRFToken': getCookie('csrftoken')
+                            }
+                        });
+                        
+                        if (penaltyResponse.ok) {
+                            const penaltyData = await penaltyResponse.json();
+                            if (penaltyData.success && penaltyData.penalty_due) {
+                                defaultPenalty = penaltyData.penalty_due;
+                            }
+                        }
+                        
+                        Swal.close(); // Close loading message
+                    } catch (error) {
+                        console.warn('Could not fetch penalty amount:', error);
+                        Swal.close(); // Close loading message even on error
+                    }
+
+                    const { value: amendmentValues, isConfirmed: amendmentConfirmed } = await Swal.fire({
+                        title: 'Compléter la fiche',
+                        html: `
+                            <div class="text-start">
+                                <div class="mb-3">
+                                    <label for="amendment-supplier-plea" class="form-label fw-bold">Doléance du fournisseur</label>
+                                    <textarea id="amendment-supplier-plea" class="form-control" rows="3" placeholder="Saisir la doléance..."></textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="amendment-pm-proposal" class="form-label fw-bold">Proposition du PM</label>
+                                    <textarea id="amendment-pm-proposal" class="form-control" rows="3" placeholder="Saisir la proposition..."></textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Statut de la pénalité</label>
+                                    <div class="d-flex gap-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="amendment-status" id="amendment-status-annulee" value="annulee">
+                                            <label class="form-check-label" for="amendment-status-annulee">Annulée</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="amendment-status" id="amendment-status-reduite" value="reduite">
+                                            <label class="form-check-label" for="amendment-status-reduite">Réduite</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="amendment-status" id="amendment-status-reconduite" value="reconduite" checked>
+                                            <label class="form-check-label" for="amendment-status-reconduite">Reconduite</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="amendment-new-penalty" class="form-label fw-bold">Nouvelle pénalité due</label>
+                                    <input type="text" id="amendment-new-penalty" class="form-control" placeholder="Ex: 125000" value="${defaultPenalty}">
+                                </div>
+                            </div>
+                        `,
+                        showCancelButton: true,
+                        confirmButtonText: 'Générer',
+                        cancelButtonText: 'Annuler',
+                        focusConfirm: false,
+                        preConfirm: () => {
+                            const supplierPlea = document.getElementById('amendment-supplier-plea').value.trim();
+                            const pmProposal = document.getElementById('amendment-pm-proposal').value.trim();
+                            const statusInput = document.querySelector('input[name="amendment-status"]:checked');
+                            const newPenalty = document.getElementById('amendment-new-penalty').value.trim();
+
+                            return {
+                                supplierPlea,
+                                pmProposal,
+                                status: statusInput ? statusInput.value : '',
+                                newPenalty,
+                            };
+                        },
+                    });
+
+                    if (!amendmentConfirmed || !amendmentValues) {
+                        return;
+                    }
+
+                    await triggerDownload(
+                        `/orders/api/generate-penalty-amendment/${bonId}/`,
+                        `PenaltyAmendment-${bonNumber}.pdf`,
+                        {
+                            supplier_plea: amendmentValues.supplierPlea,
+                            pm_proposal: amendmentValues.pmProposal,
+                            penalty_status: amendmentValues.status,
+                            new_penalty_due: amendmentValues.newPenalty,
+                        },
+                        'Fiche d\'Amendement de Pénalité'
+                    );
+                } catch (error) {
+                    console.error('Erreur lors de la génération de la fiche amendement :', error);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erreur',
+                        text: error.message || 'Impossible de générer la fiche d\'amendement.'
+                    });
+                }
+            } else if (formValues.type === 'msrn') {
+                try {
+                    Swal.fire({
+                        title: 'Veuillez confirmer',
+                        html: `
+                            <div style="text-align: left; padding: 10px;">
+                                <p style="margin-bottom: 15px;"><strong>Confirmer les informations MSRN :</strong></p>
+                                <table style="width: 100%; border-collapse: collapse;">
+                                    <tr style="border-bottom: 1px solid #ddd;">
+                                        <td style="padding: 8px; font-weight: bold;">Purchase Order:</td>
+                                        <td style="padding: 8px;">${bonNumber}</td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #ddd;">
+                                        <td style="padding: 8px; font-weight: bold;">Supplier:</td>
+                                        <td style="padding: 8px;">${supplier}</td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #ddd;">
+                                        <td style="padding: 8px; font-weight: bold;">PO Amount:</td>
+                                        <td style="padding: 8px;">${parseFloat(poAmount).toLocaleString()} ${currency}</td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #ddd;">
+                                        <td style="padding: 8px; font-weight: bold;">Amount Delivered:</td>
+                                        <td style="padding: 8px;">${currentAmountDelivered} ${currency}</td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #ddd;">
+                                        <td style="padding: 8px; font-weight: bold;">Delivery Rate:</td>
+                                        <td style="padding: 8px;"><strong style="color: #28a745;">${currentDeliveryRate}%</strong></td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #ddd;">
+                                        <td style="padding: 8px; font-weight: bold;">Payment Retention Rate:</td>
+                                        <td style="padding: 8px;"><strong style="color: ${parseFloat(retentionRate) > 0 ? '#dc3545' : '#6c757d'};">${retentionRate}%</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 8px; font-weight: bold;">Retention Cause:</td>
+                                        <td style="padding: 8px; font-style: italic;">${retentionCause}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        `,
+                        icon: 'question',
+                        showCancelButton: true,
+                        confirmButtonColor: '#28a745',
+                        cancelButtonColor: '#6c757d',
+                        confirmButtonText: 'OK, Générer MSRN',
+                        cancelButtonText: 'Annuler',
+                        width: '650px'
+                    }).then(async (result) => {
+                        if (!result.isConfirmed) {
+                            return;
+                        }
+
+                        showGeneratingPopup();
+
+                        try {
+                            const response = await fetch(`/orders/api/generate-msrn/${bonId}/`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRFToken': getCookie('csrftoken')
+                                },
+                                body: JSON.stringify({
+                                    retention_rate: retentionRate,
+                                    retention_cause: retentionCause
+                                })
+                            });
+
+                            if (!response.ok) {
+                                throw new Error(`Erreur serveur (${response.status})`);
+                            }
+
+                            const data = await response.json();
+
+                            if (data.success) {
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'MSRN généré',
+                                    html: `Le rapport MSRN <strong>MSRN-${data.report_number}</strong> a été généré.<br>
+                                           Un email de notification a été envoyé aux destinataires et vous avez été mis en copie.<br><br>
+                                           <a href="${data.download_url}" class="btn btn-outline-primary">Ouvrir le rapport</a>`,
+                                });
+                            } else {
+                                throw new Error(data.error || 'Une erreur est survenue lors de la génération du rapport MSRN.');
+                            }
+                        } catch (error) {
+                            console.error('Erreur lors de la génération MSRN :', error);
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Erreur',
+                                text: error.message || 'Impossible de générer le rapport MSRN.'
+                            });
+                        }
+                    });
+                } catch (error) {
+                    console.error('Erreur lors de la génération MSRN :', error);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erreur',
+                        text: error.message || 'Impossible de générer le rapport MSRN.'
+                    });
+                }
+            } else if (formValues.type === 'compensation-letter') {
+                try {
+                    await triggerDownload(
+                        `/orders/api/generate-compensation-letter/${bonId}/`,
+                        `Lettre_Compensation_${bonNumber}.pdf`,
+                        {},
+                        'Lettre de Demande de Compensation'
+                    );
+                } catch (error) {
+                    // Gestion d'erreur déjà faite dans triggerDownload
+                }
+            }
         });
     }
     // Initialiser les tooltips Bootstrap si disponibles

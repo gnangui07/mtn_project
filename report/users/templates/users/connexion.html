@@ -1,4 +1,23 @@
 {% extends 'users/base_auth.html' %}
+<!--
+  A quoi sert cette page ?
+  - Cette page permet de se connecter à l'application.
+  - Vous tapez votre email et votre mot de passe, puis vous cliquez sur "Se connecter".
+  - Si les informations sont bonnes, vous entrez dans l'application.
+
+  Ce que vous voyez ici:
+  - Un endroit pour écrire votre email.
+  - Un endroit pour écrire votre mot de passe (vous pouvez montrer/cacher les caractères avec l'icône œil).
+  - Un bouton pour se connecter.
+
+  Ce que fait le petit programme (en bas de page):
+  - Il empêche le navigateur de revenir sur cette page après la connexion (pour éviter d'afficher une page sensible).
+  - Il permet d'afficher ou cacher le mot de passe quand vous cliquez sur l'icône œil.
+
+  Détails techniques (pour information):
+  - Quand vous cliquez sur "Se connecter", le navigateur envoie votre email et mot de passe au serveur en POST.
+  - Un jeton de sécurité (CSRF) est ajouté automatiquement pour protéger le formulaire.
+-->
 
 {% block title %}Connexion - MTN CI{% endblock %}
 
@@ -6,10 +25,12 @@
 {% block header_subtitle %}Accédez à votre espace CAPEX Works Valuation{% endblock %}
 
 {% block content %}
+<!-- Formulaire de connexion: remplissez les deux champs, puis cliquez sur le bouton -->
 <form method="post" id="loginForm">
     {% csrf_token %}
     
     <div class="mb-3">
+        <!-- Ecrivez votre adresse email professionnelle ici -->
         <label for="email" class="form-label">
             <i class="fas fa-envelope"></i> Adresse email
         </label>
@@ -30,6 +51,7 @@
     </div>
     
     <div class="mb-4">
+        <!-- Ecrivez votre mot de passe ici. Vous pouvez cliquer sur l'œil pour voir/masquer -->
         <label for="password" class="form-label">
             <i class="fas fa-lock"></i> Mot de passe
         </label>
@@ -52,12 +74,14 @@
     </div>
     
     <div class="mb-3 form-check">
+        <!-- Option facultative: si coché, votre navigateur peut se souvenir de vous -->
         <input type="checkbox" class="form-check-input" id="rememberMe">
         <label class="form-check-label" for="rememberMe">
             Se souvenir de moi
         </label>
     </div>
     
+    <!-- Cliquez ici pour envoyer vos informations au serveur -->
     <button type="submit" class="btn btn-primary">
         <i class="fas fa-sign-in-alt"></i> Se connecter
     </button>
@@ -66,8 +90,8 @@
 <div class="text-center mt-4">
     <p class="text-muted">
         <small>
-            <i class="fas fa-info-circle"></i> 
-            Vous n'avez pas encore activé votre compte ? Vérifiez votre email.
+            <i class="fas fa-info-circle"></i>
+            Si vous n'avez pas encore activé votre compte, regardez votre boîte mail.
         </small>
     </p>
 </div>
@@ -75,7 +99,9 @@
 
 {% block extra_js %}
 <script>
-    // Empêche le retour en arrière après connexion
+    // Empêcher le retour en arrière après la connexion
+    // Explication simple: après s'être connecté, si on appuie sur "Retour",
+    // on n'affiche pas cette page pour éviter de voir des infos sensibles.
     if (window.history && window.history.pushState) {
         window.history.pushState('forward', null, window.location.href);
         window.onpopstate = function() {
@@ -83,7 +109,8 @@
         };
     }
     
-    // Toggle password visibility
+    // Montrer / cacher le mot de passe
+    // Explication simple: cliquez sur l'icône œil pour voir ce que vous tapez.
     document.getElementById('togglePassword').addEventListener('click', function() {
         const passwordInput = document.getElementById('password');
         const icon = this.querySelector('i');

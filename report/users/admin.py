@@ -22,7 +22,16 @@ from .models import User
 
 
 class UserAdminForm(forms.ModelForm):
-    """Formulaire personnalisé pour l'admin avec sélection multiple des services"""
+    """Formulaire admin pour créer/éditer un utilisateur avec choix de services.
+
+    Objectif:
+    - L'admin montre une case à cocher par service (MultipleChoiceField) plutôt
+      que d'éditer directement la chaîne `service` du modèle.
+    - À l'enregistrement, on reconstruit la chaîne `service` ("NWG, ITS, ...").
+
+    Remarque: le champ `service` du modèle est exclu du formulaire et remplacé
+    par le champ virtuel `services` (liste), plus simple à utiliser.
+    """
     
     services = forms.MultipleChoiceField(
         choices=User.SERVICE_CHOICES,
@@ -38,7 +47,7 @@ class UserAdminForm(forms.ModelForm):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
+        # Préparer le formulaire à l'édition d'un utilisateur existant
         # Pré-remplir les services sélectionnés si l'utilisateur existe
         if self.instance and self.instance.pk and self.instance.service:
             # Convertir la chaîne "NWG, ITS" en liste ['NWG', 'ITS']
@@ -46,7 +55,12 @@ class UserAdminForm(forms.ModelForm):
             self.fields['services'].initial = selected_services
     
     def clean(self):
-        """Validation : services obligatoires pour les utilisateurs non-superusers"""
+        """Validation simple des services.
+
+        Règle:
+        - Pour un utilisateur standard (non superuser), au moins un service
+          doit être coché. Les superusers peuvent laisser vide.
+        """
         cleaned_data = super().clean()
         is_superuser = cleaned_data.get('is_superuser', False)
         services = cleaned_data.get('services', [])
@@ -59,6 +73,14 @@ class UserAdminForm(forms.ModelForm):
         return cleaned_data
     
     def save(self, commit=True):
+        """Enregistre l'utilisateur en mappant les services cochés vers `service`.
+
+        Détails:
+        - Le champ `service` du modèle est une chaîne. On convertit la liste
+          `services` du formulaire en une chaîne jointe par virgules.
+        - On sauvegarde ensuite l'utilisateur; `save_m2m()` gère les relations
+          ManyToMany (ex: permissions, groupes) si présentes.
+        """
         # Ne pas appeler super().save() tout de suite car le champ service est exclu
         user = super().save(commit=False)
         
@@ -80,15 +102,25 @@ class UserAdminForm(forms.ModelForm):
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
-    """Administration personnalisée pour le modèle User"""
+    """Configuration de l'administration pour le modèle `User`.
+
+    Ce panneau permet de lister, filtrer, rechercher et éditer les utilisateurs.
+    Les sections ci-dessous décrivent ce qui est affiché et comment l'activation
+    est gérée lors de la création d'un compte.
+    """
     
     form = UserAdminForm
     
+    # Colonnes visibles dans la liste des utilisateurs
     list_display = ['email', 'first_name', 'last_name', 'service', 'is_active', 'activation_status', 'date_joined']
+    # Filtres latéraux pour affiner l'affichage
     list_filter = ['is_active', 'is_staff', 'service', 'date_joined']
+    # Champs indexés pour la recherche
     search_fields = ['email', 'first_name', 'last_name', 'service']
+    # Tri par défaut: plus récents d'abord
     ordering = ['-date_joined']
     
+    # Organisation du formulaire d'édition (onglets/sections)
     fieldsets = (
         ('Informations de base', {
             'fields': ('email', 'first_name', 'last_name', 'phone', 'services')
@@ -97,7 +129,7 @@ class UserAdmin(admin.ModelAdmin):
             'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions'),
             'classes': ('collapse',)
         }),
-        ('Informations d\'activation', {
+        ("Informations d'activation", {
             'fields': ('activation_token', 'token_created_at', 'temporary_password'),
             'classes': ('collapse',)
         }),
@@ -107,20 +139,34 @@ class UserAdmin(admin.ModelAdmin):
         }),
     )
     
+    # Champs non modifiables dans l'admin (lecture seule)
     readonly_fields = ['date_joined', 'last_login', 'activation_token', 'token_created_at', 'temporary_password']
     
     def activation_status(self, obj):
-        """Affiche le statut d'activation avec icône"""
+        """Affiche le statut d'activation sous forme d'icône colorée.
+
+        - Vert: compte activé (`is_active=True`).
+        - Orange: en attente (token généré mais pas encore activé).
+        - Rouge: non activé (pas de token).
+        """
         if obj.is_active:
-            return format_html('<span style="color: green;">✓ Activé</span>')
+            return mark_safe('<span style="color: green;">✓ Activé</span>')
         elif obj.activation_token:
-            return format_html('<span style="color: orange;">⏳ En attente</span>')
+            return mark_safe('<span style="color: orange;">⏳ En attente</span>')
         else:
-            return format_html('<span style="color: red;">✗ Non activé</span>')
+            return mark_safe('<span style="color: red;">✗ Non activé</span>')
     activation_status.short_description = 'Statut'
     
     def save_model(self, request, obj, form, change):
-        """Surcharge pour envoyer l'email d'activation lors de la création"""
+        """À la création d'un utilisateur, préparer l'activation et envoyer l'email.
+
+        Création (obj.pk is None):
+        - Génère un mot de passe temporaire (haché en base, le clair est envoyé par email).
+        - Génère un token d'activation + horodatage.
+        - Sauvegarde l'utilisateur puis envoie un email d'activation.
+
+        Modification: sauvegarde simple, sans réémettre d'email.
+        """
         is_new = obj.pk is None
         
         if is_new:
@@ -145,7 +191,15 @@ class UserAdmin(admin.ModelAdmin):
             obj.save()
     
     def send_activation_email(self, user, temp_password, request):
-        """Envoie l'email d'activation à l'utilisateur"""
+        """Construit et envoie l'email d'activation au nouvel utilisateur.
+
+        Contenu:
+        - Lien d'activation absolu (basé sur `SITE_URL` + reverse URL `users:activate`).
+        - Sujet + version HTML (stylée) et texte brut (fallback).
+
+        Résilience:
+        - En cas d'erreur d'envoi, on log/print sans bloquer la création.
+        """
         try:
             # Construction du lien d'activation avec SITE_URL
             activation_path = reverse('users:activate', kwargs={'token': user.activation_token})

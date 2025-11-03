@@ -1,9 +1,20 @@
 """
 Vues de l'application `users`.
 
-Contient les vues de gestion d'authentification/activation, préférences vocales
-et utilitaires anti-cache, exposées via des FBV/CBV. Aucune logique
-métiers critique n'est implémentée ici.
+Ce module regroupe des vues très simples et orientées "interface" pour:
+ - l'authentification (connexion/déconnexion),
+ - l'activation de compte via un token,
+ - la gestion des préférences de synthèse vocale,
+ - l'ajout d'en-têtes anti-cache (pour éviter que le navigateur garde des pages
+   sensibles en mémoire après déconnexion).
+
+ Chaque vue précise:
+ - Qui peut y accéder (anonyme / connecté).
+ - La méthode HTTP attendue.
+ - Les données d'entrée (form/JSON/URL).
+ - La réponse renvoyée (HTML/JSON/redirect) et les effets de bord (session,
+   cookies, base de données).
+Aucune logique métier critique n'est implémentée ici.
 """
  
 from django.shortcuts import render, redirect, get_object_or_404
@@ -19,7 +30,18 @@ from django.views.decorators.csrf import csrf_protect
 
 # Mixin pour ajouter des en-têtes anti-cache aux CBV (Class-Based Views)
 class NoCacheMixin:
-    """Mixin qui ajoute des en-têtes anti-cache à la réponse"""
+    """Mixin qui ajoute des en-têtes anti-cache à la réponse.
+
+    Utilisation: Hériter ce mixin dans une Class-Based View (CBV) pour forcer
+    le navigateur à ne pas mettre la page en cache. C'est utile pour les pages
+    sensibles (connexion, pages post-authentification) afin d'éviter qu'elles
+    restent visibles via le bouton "Précédent" après déconnexion.
+
+    Sortie: la même réponse HTTP que la CBV d'origine, mais avec les en-têtes:
+    - Cache-Control: no-cache, no-store, must-revalidate
+    - Pragma: no-cache
+    - Expires: 0
+    """
     def dispatch(self, *args, **kwargs):
         response = super().dispatch(*args, **kwargs)
         # Ajouter des en-têtes pour éviter la mise en cache
@@ -30,7 +52,12 @@ class NoCacheMixin:
 
 # Décorateur pour ajouter des en-têtes anti-cache aux FBV (Function-Based Views)
 def never_cache_view(view_func):
-    """Décorateur qui ajoute des en-têtes anti-cache à la réponse"""
+    """Décorateur qui ajoute des en-têtes anti-cache aux vues fonctionnelles.
+
+    Utilisation: placer au-dessus d'une Function-Based View (FBV).
+    Effet: modifie la réponse HTTP pour empêcher le cache navigateur, exactement
+    comme le `NoCacheMixin`, mais pour les FBV.
+    """
     @wraps(view_func)
     def wrapped_view(request, *args, **kwargs):
         response = view_func(request, *args, **kwargs)
@@ -45,6 +72,19 @@ def never_cache_view(view_func):
 @csrf_protect
 @never_cache_view
 def deconnexion_view(request):
+    """Déconnexion sécurisée de l'utilisateur.
+
+    Accès: uniquement utilisateur connecté.
+    Méthode: POST attendue. En GET, on redirige vers la page de connexion.
+    Entrées: aucune donnée nécessaire.
+    Effets de bord:
+    - Met à jour des attributs utilisateur si disponibles (`is_online`,
+      `date_derniere_connexion`).
+    - Vide complètement la session côté serveur (`session.flush()`).
+    - Déconnecte l'utilisateur (`logout`).
+    - Supprime les cookies de session (custom `msrn_sessionid` et `sessionid`).
+    Réponse: redirection HTTP vers `/connexion/` avec en-têtes anti-cache.
+    """
     if request.method == 'POST':
         # Récupérer l'utilisateur avant la déconnexion
         if request.user.is_authenticated:
@@ -76,25 +116,19 @@ def deconnexion_view(request):
         return response
     return redirect('/connexion/')
 
-@csrf_protect
-@never_cache_view
-def play_welcome_sound(request):
-    if request.method == 'POST' and request.user.is_authenticated:
-        # Préparer le texte à prononcer
-        username = request.user.get_full_name() or request.user.email
-        welcome_text = f"Bienvenue {username}"
-        
-        return JsonResponse({
-            'status': 'success',
-            'welcome_text': welcome_text,
-            'username': username
-        })
-    return JsonResponse({'status': 'error'}, status=400)
-
 @login_required
 @csrf_protect
 @never_cache_view
 def get_voice_prefs(request):
+    """Récupère les préférences de voix de l'utilisateur.
+
+    Accès: utilisateur connecté.
+    Méthode: GET uniquement; sinon -> 405.
+    Entrées: aucune.
+    Effets de bord: crée un enregistrement `UserVoicePreference` par défaut si
+    inexistant pour cet utilisateur (get_or_create).
+    Sortie: JSON {enabled, lang, voiceName}.
+    """
     if request.method != 'GET':
         return JsonResponse({'detail': 'Method not allowed'}, status=405)
     prefs, _ = UserVoicePreference.objects.get_or_create(user=request.user)
@@ -108,6 +142,18 @@ def get_voice_prefs(request):
 @csrf_protect
 @never_cache_view
 def set_voice_prefs(request):
+    """Met à jour les préférences de voix de l'utilisateur.
+
+    Accès: utilisateur connecté.
+    Méthode: POST uniquement; sinon -> 405.
+    Entrées acceptées:
+    - Form POST classique (request.POST) ou JSON (`Content-Type: application/json`).
+    - Champs: `enabled` (bool), `lang` (str, ex: 'fr-FR'), `voiceName` (str).
+    Sécurité/Validation simple:
+    - `lang` tronqué à 16 caractères; `voiceName` à 128 caractères.
+    Effets de bord: persiste/maj le modèle `UserVoicePreference` lié à l'user.
+    Sortie: JSON {'status': 'ok'} ou JSON d'erreur 400.
+    """
     if request.method != 'POST':
         return JsonResponse({'detail': 'Method not allowed'}, status=405)
     try:
@@ -130,7 +176,21 @@ def set_voice_prefs(request):
 
 
 def activate_account(request, token):
-    """Page d'activation du compte avec le token"""
+    """Page d'activation du compte via un token unique.
+
+    Accès: anonyme (avant connexion).
+    Méthodes:
+    - GET: affiche le formulaire demandant email + mot de passe temporaire.
+    - POST: vérifie que l'email et le mot de passe temporaire correspondent à
+      l'utilisateur associé au `token`, puis redirige vers la création du
+      mot de passe définitif (`confirm_password`).
+    Entrées: `token` (paramètre d'URL), et en POST: `email`, `temp_password`.
+    Contrôles: validité du token et statut d'activation du compte.
+    Sorties:
+    - HTML: `users/activation.html` avec le contexte utilisateur.
+    - Redirect: vers `users:login` si expiré/déjà actif, ou `users:confirm_password`.
+    Effets de bord: aucun changement persistant ici (juste validations).
+    """
     user = get_object_or_404(User, activation_token=token)
     
     # Vérifie si le token est encore valide
@@ -163,7 +223,19 @@ def activate_account(request, token):
 
 
 def confirm_password(request, token):
-    """Page de confirmation et création du nouveau mot de passe"""
+    """Choix du nouveau mot de passe après validation du token.
+
+    Accès: anonyme (via lien d'activation).
+    Méthodes:
+    - GET: affiche le formulaire de saisie du nouveau mot de passe (x2).
+    - POST: valide, enregistre le mot de passe, et active définitivement le compte.
+    Entrées: `token` (URL), en POST: `new_password`, `confirm_password`.
+    Règles: mots de passe identiques et 8+ caractères.
+    Sorties:
+    - HTML: `users/confirmer_activation.html` avec messages d'erreur si besoin.
+    - Redirect: `users:login` si succès ou si token invalide/déjà actif.
+    Effets de bord: `set_password`, `activate_account()` sur le modèle User.
+    """
     user = get_object_or_404(User, activation_token=token)
     
     # Vérifie si le token est encore valide
@@ -205,7 +277,21 @@ def confirm_password(request, token):
 
 @never_cache_view
 def login_view(request):
-    """Page de connexion"""
+    """Page de connexion (authentification par email + mot de passe).
+
+    Accès: anonyme. Si déjà connecté, redirige vers `core:accueil`.
+    Méthodes:
+    - GET: affiche la page `users/connexion.html` (avec anti-cache renforcé).
+    - POST: tente d'authentifier via `authenticate(username=email, password=...)`.
+    Succès:
+    - Vide l'ancienne session, connecte l'utilisateur, régénère la clé de session
+      (sécurité), ajoute un message de bienvenue et redirige vers `next` ou
+      `core:accueil`.
+    Échec:
+    - Affiche des messages d'erreur (compte inactif, identifiants invalides).
+    Sorties: HTML (GET) ou Redirect (POST). En-têtes anti-cache ajoutés dans
+    tous les cas pour éviter l'historique de pages sensibles.
+    """
     if request.user.is_authenticated:
         return redirect('core:accueil')
     
