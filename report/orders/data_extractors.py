@@ -1,7 +1,19 @@
-"""
-Fonctions utilitaires pour extraire des données des lignes de fichier
+"""But:
+- Fournir des fonctions simples pour extraire des champs utiles d'une ligne importée.
+
+Étapes:
+- Lire le contenu de la ligne.
+- Rechercher la clé pertinente (tolérance sur variantes de libellés).
+- Retourner la valeur normalisée ou une valeur par défaut.
+
+Entrées:
+- `ligne`: objet avec attribut `contenu` (dict de colonnes->valeurs).
+
+Sorties:
+- Valeurs extraites (str/float/Decimal) ou "N/A"/0 selon la fonction.
 """
 import logging
+from decimal import Decimal, InvalidOperation
 
 # Configuration du logger
 logger = logging.getLogger(__name__)

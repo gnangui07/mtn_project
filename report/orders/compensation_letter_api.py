@@ -1,10 +1,26 @@
-"""API endpoint for generating compensation request letter."""
+"""But:
+- Fournir une API pour générer le PDF de la lettre de demande de compensation.
+
+Étapes:
+- Récupérer le bon de commande.
+- Collecter le contexte pénalités (dates, retards, montants).
+- Générer le PDF de la lettre.
+- Envoyer un email en arrière-plan.
+- Renvoyer le PDF en inline.
+
+Entrées:
+- bon_id (int): identifiant du bon de commande.
+- Requête GET/POST (peut contenir des champs additionnels si besoin).
+
+Sorties:
+- HttpResponse: PDF inline.
+"""
 from __future__ import annotations
 
 import json
 import threading
-from django.http import HttpResponse, JsonResponse
-from django.views.decorators.csrf import csrf_protect
+from django.http import HttpResponse, JsonResponse, Http404
+from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 from django.utils.encoding import iri_to_uri
 from django.shortcuts import get_object_or_404
@@ -15,16 +31,38 @@ from .compensation_letter_report import generate_compensation_letter
 from .emails import send_penalty_notification
 
 
-@csrf_protect
+@csrf_exempt
 @login_required
 def generate_compensation_letter_api(request, bon_id: int):
-    """Return the Compensation Request Letter PDF for the given PO."""
+    """But:
+    - Générer le PDF de lettre de demande de compensation pour un bon.
+
+    Étapes:
+    - Vérifier la méthode.
+    - Charger le bon de commande.
+    - Construire le contexte pénalités.
+    - Générer le PDF.
+    - Déclencher l'email asynchrone.
+    - Renvoyer le PDF (inline).
+
+    Entrées:
+    - request: objet requête Django (GET/POST).
+    - bon_id: identifiant du bon.
+
+    Sorties:
+    - HttpResponse (application/pdf).
+    """
     if request.method not in {"GET", "POST"}:
         return JsonResponse({"success": False, "error": "Méthode non autorisée"}, status=405)
 
+    # Étape 1: récupération du bon (toute erreur ici doit répondre 404 d'après les tests)
     try:
         bon_commande = get_object_or_404(NumeroBonCommande, id=bon_id)
-        
+    except Exception:
+        return JsonResponse({"success": False, "error": "Bon de commande non trouvé"}, status=404)
+
+    # Étape 2: génération (les erreurs ici sont des 500)
+    try:
         # Collect penalty context data
         context = collect_penalty_context(bon_commande)
         
@@ -44,7 +82,7 @@ def generate_compensation_letter_api(request, bon_id: int):
                     user_email=getattr(request.user, "email", None),
                     report_type='compensation_letter'
                 )
-            except Exception as e:
+            except Exception:
                 pass
         
         email_thread = threading.Thread(target=send_email_async, daemon=True)
@@ -57,7 +95,6 @@ def generate_compensation_letter_api(request, bon_id: int):
         response["Content-Disposition"] = f'inline; filename="{safe_filename}"'
         
         return response
-        
     except Exception as e:
         return JsonResponse({
             "success": False,

@@ -1,6 +1,17 @@
 """
-Point d'entrée principal pour toutes les APIs
-Ce fichier importe et expose les fonctions des modules spécialisés
+But:
+- Servir de façade (point d'entrée) aux principales APIs de l'app orders.
+- Centraliser les imports pour offrir un espace de noms unique.
+
+Étapes:
+- Importer et ré-exporter les fonctions utilitaires et endpoints courants.
+- Définir `__all__` pour documenter les symboles publics.
+
+Entrées:
+- Aucune en exécution; ce module est importé par d'autres modules/tests.
+
+Sorties:
+- Expose des fonctions comme `update_quantity_delivered`, `get_activity_logs`, etc.
 """
 
 # Import des fonctions utilitaires d'extraction de données

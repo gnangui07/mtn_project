@@ -1,4 +1,17 @@
-"""Utilities to gather penalty sheet data directly from imported PO lines."""
+"""But:
+- Rassembler les données nécessaires à la fiche de pénalité depuis les lignes importées.
+
+Étapes:
+- Chercher la première ligne correspondant au PO.
+- Extraire les champs utiles (montants, dates, fournisseur, etc.).
+- Calculer les pénalités (taux, plafonds, jours, quotités).
+
+Entrées:
+- Objet `NumeroBonCommande` avec accès à ses fichiers/lignes associés.
+
+Sorties:
+- Dictionnaire `context` prêt pour la génération du PDF de pénalité.
+"""
 from __future__ import annotations
 
 from datetime import datetime
@@ -16,11 +29,15 @@ from .models import LigneFichier, NumeroBonCommande, TimelineDelay
 
 def _normalize_header(header: str) -> str:
     """Normalize a column header for tolerant comparisons."""
+    # Idée simple: on met les titres en minuscules et on enlève les caractères
+    # spéciaux pour mieux les comparer entre fichiers différents.
     return " ".join(str(header).strip().lower().replace("_", " ").replace("-", " ").split())
 
 
 def _find_order_key(contenu: Dict[str, Any]) -> Optional[str]:
     """Locate the key that represents the PO number in a ligne."""
+    # On cherche la colonne qui contient le numéro de commande (PO).
+    # Les fichiers peuvent utiliser des noms différents (Order, Commande, BC, ...).
     if "Order" in contenu:
         return "Order"
     for key in contenu.keys():
@@ -38,6 +55,7 @@ def _get_value_tolerant(
     tokens: Optional[Tuple[str, ...]] = None,
 ) -> Optional[Any]:
     """Retrieve a value from contenu using tolerant header matching."""
+    # But simple: retrouver une valeur même si l'en-tête varie un peu d'un fichier à l'autre.
     if not contenu:
         return None
 
@@ -60,6 +78,7 @@ def _get_value_tolerant(
 
 def _parse_date(value: Any) -> Optional[datetime]:
     """Parse various date formats found in imported files."""
+    # On accepte plusieurs formats de date courants. Si rien ne marche, on renvoie None.
     if not value:
         return None
 
@@ -90,6 +109,8 @@ def _get_prefetched_list(instance: Any, attr: str):
 
 def _get_first_occurrence_contenu(bon: NumeroBonCommande) -> Dict[str, Any]:
     """Return the first ligne contenu associated with the PO number."""
+    # Idée simple: on parcourt les fichiers et leurs lignes jusqu'à trouver la première
+    # ligne qui correspond au bon de commande demandé. Cette ligne sert de référence.
     fichiers = _get_prefetched_list(bon, "fichiers")
     if fichiers is None:
         fichiers = list(
@@ -115,6 +136,7 @@ def _get_first_occurrence_contenu(bon: NumeroBonCommande) -> Dict[str, Any]:
                 continue
             order_value = str(contenu.get(order_key, "")).strip()
             if order_value and order_value == bon.numero:
+                # On s'arrête dès qu'on trouve une ligne du bon.
                 return contenu
     return {}
 
@@ -124,10 +146,24 @@ def _get_first_occurrence_contenu(bon: NumeroBonCommande) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def collect_penalty_context(bon: NumeroBonCommande) -> Dict[str, Any]:
-    """Assemble all data required to generate the penalty sheet for a PO."""
+    """But:
+    - Assembler toutes les données nécessaires à la fiche de pénalité d’un PO.
+
+    Étapes:
+    - Retrouver la première ligne du PO.
+    - Extraire supplier/currency/dates/description/montant.
+    - Calculer jours de retard, taux, plafonds et pénalité due.
+
+    Entrées:
+    - `bon` (NumeroBonCommande) avec M2M `fichiers` et leurs `lignes`.
+
+    Sorties:
+    - `context` (dict) complet pour le PDF et l’API.
+    """
+    # 1) Trouver la première ligne de données correspondant au bon
     contenu = _get_first_occurrence_contenu(bon)
 
-    # Base values from content
+    # 2) Lire les infos de base (fournisseur, devise, dates, description...)
     supplier = _get_value_tolerant(contenu, exact_candidates=("Supplier",), tokens=("supplier",))
     currency = _get_value_tolerant(contenu, exact_candidates=("Currency",))
     creation_date_raw = _get_value_tolerant(contenu, exact_candidates=("Creation Date",))
@@ -143,7 +179,7 @@ def collect_penalty_context(bon: NumeroBonCommande) -> Dict[str, Any]:
         tokens=("order", "description"),
     )
 
-    # Monetary data
+    # 3) Montant du PO (avec tolérance sur le nom de colonne)
     po_amount_raw = _get_value_tolerant(
         contenu,
         exact_candidates=("Total", "PO Amount", "PO AMOUNT/MONTANT BC"),
@@ -155,7 +191,7 @@ def collect_penalty_context(bon: NumeroBonCommande) -> Dict[str, Any]:
         po_amount = bon.montant_total() if hasattr(bon, "montant_total") else Decimal("0.00")
     po_amount = po_amount.quantize(Decimal("0.01")) if isinstance(po_amount, Decimal) else Decimal("0.00")
 
-    # Dates and diff
+    # 4) Convertir les dates et calculer le nombre de jours de retard
     creation_date = _parse_date(creation_date_raw)
     pip_end_date = _parse_date(pip_end_raw)
     actual_end_date = _parse_date(actual_end_raw)
@@ -165,7 +201,7 @@ def collect_penalty_context(bon: NumeroBonCommande) -> Dict[str, Any]:
         delta = (actual_end_date - pip_end_date).days
         total_penalty_days = max(delta, 0)
 
-    # Timeline delay breakdown
+    # 5) Prendre en compte la répartition des retards (MTN / Force majeure / Prestataire)
     timeline: Optional[TimelineDelay] = getattr(bon, "timeline_delay", None)
     delay_mtn = timeline.delay_part_mtn if timeline else 0
     delay_force_majeure = timeline.delay_part_force_majeure if timeline else 0
@@ -175,12 +211,14 @@ def collect_penalty_context(bon: NumeroBonCommande) -> Dict[str, Any]:
     if quotite_non_realisee < Decimal("0"):
         quotite_non_realisee = Decimal("0")
 
+    # 6) Taux de pénalité (0,30% par jour imputable au prestataire)
     penalty_rate = Decimal("0.30")  # 0,30%
 
     quotite_factor = (Decimal("100.00") - quotite_realisee) / Decimal("100")
     if quotite_factor < Decimal("0"):
         quotite_factor = Decimal("0")
 
+    # 7) Calcul des pénalités, puis plafonnement à 10% du montant du PO
     penalties_calculated = (
         po_amount
         * (penalty_rate / Decimal("100"))
@@ -190,6 +228,7 @@ def collect_penalty_context(bon: NumeroBonCommande) -> Dict[str, Any]:
     penalty_cap = (po_amount * Decimal("0.10")).quantize(Decimal("0.01"))
     penalties_due = min(penalties_calculated, penalty_cap)
 
+    # 8) Préparer le dictionnaire final pour le PDF et l'API
     context = {
         "po_number": bon.numero,
         "supplier": supplier or "N/A",

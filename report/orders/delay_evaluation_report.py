@@ -1,9 +1,26 @@
-"""PDF generation for the Delivery Delay Evaluation document."""
+"""But:
+- Générer le PDF de la fiche d'évaluation des délais de livraison.
+
+Étapes:
+- Initialiser les styles ReportLab.
+- Construire l'en-tête avec logo et titre.
+- Ajouter les sections: PM, infos PO, objet contrat, évaluation retard, répartition, critères, signatures.
+- Retourner le buffer PDF.
+
+Entrées:
+- bon_commande: instance NumeroBonCommande.
+- context: dict avec toutes les données (dates, délais, notes).
+- user_email: email de l'utilisateur générateur.
+
+Sorties:
+- BytesIO: buffer mémoire contenant le PDF.
+"""
 from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
 from io import BytesIO
+from pathlib import Path
 from typing import Any, Dict, List
 
 from django.conf import settings
@@ -101,12 +118,12 @@ def _multiline_block(label: str, content: str) -> Table:
 
 
 STYLE_CACHE_INITIALISED = False
-SECTION_HEADER_STYLE: ParagraphStyle
-LABEL_STYLE: ParagraphStyle
-VALUE_STYLE: ParagraphStyle
-TITLE_STYLE: ParagraphStyle
-DOC_NUM_STYLE: ParagraphStyle
-SMALL_STYLE: ParagraphStyle
+SECTION_HEADER_STYLE = None
+LABEL_STYLE = None
+VALUE_STYLE = None
+TITLE_STYLE = None
+DOC_NUM_STYLE = None
+SMALL_STYLE = None
 
 
 def _ensure_styles():
@@ -178,9 +195,28 @@ def generate_delay_evaluation_report(
     context: Dict[str, Any],
     user_email: str | None = None,
 ) -> BytesIO:
-    """Generate the Delivery Delay Evaluation PDF."""
+    """But:
+    - Créer le PDF d'évaluation des délais.
+
+    Étapes:
+    - Initialiser les styles.
+    - Construire l'en-tête.
+    - Ajouter toutes les sections (PM, PO, délais, notes, signatures).
+    - Compiler le PDF.
+    - Retourner le buffer.
+
+    Entrées:
+    - bon_commande: PO concerné.
+    - context: données complètes.
+    - user_email: générateur.
+
+    Sorties:
+    - BytesIO avec PDF.
+    """
+    # Initialiser les styles de texte et tableaux
     _ensure_styles()
 
+    # Créer le buffer et le document PDF
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -193,14 +229,24 @@ def generate_delay_evaluation_report(
 
     elements: List[Any] = []
 
-    logo_path = settings.BASE_DIR / "static" / "logo_mtn.jpeg"
-    header_data = [
-        [
-            Image(str(logo_path), width=60, height=24),
-            Paragraph("EVALUATION DES DELAIS DE LIVRAISON", TITLE_STYLE),
-            Paragraph(f"N° ED/{datetime.now():%y/%m/%d}", DOC_NUM_STYLE),
+    # Charger le logo MTN
+    logo_path = Path(settings.BASE_DIR) / "static" / "logo_mtn.jpeg"
+    if Path.exists(logo_path):
+        header_data = [
+            [
+                Image(str(logo_path), width=60, height=24),
+                Paragraph("EVALUATION DES DELAIS DE LIVRAISON", TITLE_STYLE),
+                Paragraph(f"N° ED/{datetime.now():%y/%m/%d}", DOC_NUM_STYLE),
+            ]
         ]
-    ]
+    else:
+        header_data = [
+            [
+                Spacer(1, 24),
+                Paragraph("EVALUATION DES DELAIS DE LIVRAISON", TITLE_STYLE),
+                Paragraph(f"N° ED/{datetime.now():%y/%m/%d}", DOC_NUM_STYLE),
+            ]
+        ]
     header_table = Table(header_data, colWidths=[80, 350, 100])
     header_table.setStyle(
         TableStyle(
@@ -215,13 +261,13 @@ def generate_delay_evaluation_report(
     elements.append(header_table)
     elements.append(Spacer(1, 6))
 
-    # Project Manager section
+    # Section: Nom du Project Manager
     elements.append(_build_section_title("NOM DU PROJECT MANAGER"))
     elements.append(Spacer(1, 4))
     elements.append(_info_row("Project Manager", context.get("project_manager", "N/A")))
     elements.append(Spacer(1, 6))
 
-    # PO info section
+    # Section: Informations du bon de commande
     elements.append(_build_section_title("INFORMATION BON DE COMMANDE"))
     elements.append(Spacer(1, 4))
 
@@ -265,13 +311,13 @@ def generate_delay_evaluation_report(
     elements.append(info_table)
     elements.append(Spacer(1, 6))
 
-    # Contract object
+    # Section: Objet du contrat
     elements.append(_build_section_title("OBJET DU CONTRAT"))
     elements.append(Spacer(1, 4))
     elements.append(_multiline_block("Description", context.get("order_description", "N/A")))
     elements.append(Spacer(1, 6))
 
-    # Evaluation de retard section
+    # Section: Évaluation de retard
     elements.append(_build_section_title("EVALUATION DE RETARD"))
     elements.append(Spacer(1, 4))
 
@@ -340,7 +386,7 @@ def generate_delay_evaluation_report(
     elements.append(repartition_table)
     elements.append(Spacer(1, 6))
 
-    # Criteria details table (if available)
+    # Tableau des critères d'évaluation (si disponible)
     criteria_details: List[Dict[str, Any]] = context.get("criteria_details", [])
     if criteria_details:
         criteria_table_data = [
@@ -373,7 +419,7 @@ def generate_delay_evaluation_report(
         elements.append(criteria_table)
         elements.append(Spacer(1, 6))
 
-    # Signatures
+    # Section: Signatures
     elements.append(_build_section_title("SIGNATURES"))
     elements.append(Spacer(1, 4))
 
@@ -400,7 +446,7 @@ def generate_delay_evaluation_report(
     elements.append(signatures_table)
     elements.append(Spacer(1, 8))
 
-    # Extrait des conditions générales
+    # Section: Extrait des conditions générales
     elements.append(_build_section_title("EXTRAIT DES CONDITIONS GÉNÉRALES - RETARD DE LIVRAISON"))
     elements.append(Spacer(1, 4))
     retard_condition = (

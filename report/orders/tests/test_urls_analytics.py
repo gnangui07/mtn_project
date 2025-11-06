@@ -1,12 +1,12 @@
-"""
-Tests pour urls_analytics:
-- Le nom 'orders:get_analytics_data' se résout.
-"""
-import pytest
-from django.urls import reverse
+# tests/test_urls_analytics.py
+from django.test import TestCase
+from django.urls import reverse, resolve
+from orders import analytics_api
 
 
-@pytest.mark.django_db
-def test_get_analytics_data_url_resolves():
-    url = reverse('orders:get_analytics_data')
-    assert isinstance(url, str) and len(url) > 0
+class TestAnalyticsURLs(TestCase):
+    def test_get_analytics_data_url(self):
+        """Test l'URL des données analytiques"""
+        url = reverse('orders:get_analytics_data')
+        self.assertEqual(url, '/orders/api/analytics/')
+        self.assertEqual(resolve(url).func, analytics_api.get_analytics_data)

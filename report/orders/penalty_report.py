@@ -47,7 +47,21 @@ def generate_penalty_report(
     context: Dict[str, Any],
     user_email: str | None = None,
 ) -> BytesIO:
-    """Generate the Penalty Sheet PDF and return an in-memory buffer."""
+    """But:
+    - Générer le PDF de la fiche de pénalité et le retourner en mémoire.
+
+    Étapes:
+    - Construire les sections (infos PO, pénalité, observation, signatures).
+    - Formater les montants et dates.
+    - Construire le document avec ReportLab et retourner le buffer.
+
+    Entrées:
+    - `bon_commande` (NumeroBonCommande), `context` (dict), `user_email` (str|None).
+
+    Sorties:
+    - `BytesIO` prêt à être servi en HTTP ou envoyé par email.
+    """
+    # On crée un "tampon" mémoire qui va contenir le PDF fini (pas de fichier sur disque)
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -57,8 +71,10 @@ def generate_penalty_report(
         topMargin=20,
         bottomMargin=20,
     )
+    # "elements" = la liste des blocs (titres, tableaux, textes) à mettre dans le PDF
     elements: list[Any] = []
 
+    # Styles de base pour formater les textes
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(
         "Title",
@@ -105,7 +121,7 @@ def generate_penalty_report(
         fontSize=7,
     )
 
-    # Header with title and logo
+    # Entête avec logo, titre du document et numéro généré
     logo_path = settings.BASE_DIR / "static" / "logo_mtn.jpeg"
     header_data = [
         [
@@ -128,7 +144,7 @@ def generate_penalty_report(
     elements.append(header_table)
     elements.append(Spacer(1, 6))
 
-    # Helper to build section headers
+    # Petit outil: crée un en-tête de section coloré (pour séparer visuellement les parties)
     def section_header(label: str):
         table = Table(
             [[Paragraph(label, section_header_style)]],
@@ -148,7 +164,7 @@ def generate_penalty_report(
         elements.append(table)
         elements.append(Spacer(1, 4))
 
-    # Helper for label/value rows
+    # Petit outil: crée une ligne d'information "Étiquette : Valeur"
     def info_row(label: str, value: str):
         table = Table(
             [
@@ -173,11 +189,11 @@ def generate_penalty_report(
         elements.append(table)
         elements.append(Spacer(1, 4))
 
-    # DEMANDEUR section
+    # SECTION: Demandeur (qui est responsable côté projet)
     section_header("DEMANDEUR")
     info_row("Nom du Demandeur", context.get("project_coordinator", "N/A"))
 
-    # INFORMATION BON DE COMMANDE
+    # SECTION: Informations principales du Bon de Commande (numéro, fournisseur, montants, dates)
     section_header("INFORMATION BON DE COMMANDE")
     info_table_data = [
         [
@@ -227,11 +243,11 @@ def generate_penalty_report(
     elements.append(info_table)
     elements.append(Spacer(1, 6))
 
-    # OBJET DU CONTRAT
+    # SECTION: Objet de la commande (description générale)
     section_header("OBJET COMMANDE")
     info_row("Description", context.get("order_description", "N/A"))
 
-    # PENALITE section with multiple blocks
+    # SECTION: Mode de calcul des pénalités (jours de retard, taux, répartition, montants)
     section_header("MODE DE CALCUL PENALITES")
     penalty_data = [
         [
@@ -302,7 +318,7 @@ def generate_penalty_report(
     elements.append(penalty_table)
     elements.append(Spacer(1, 6))
 
-    # Observation block
+    # SECTION: Zone d'observation (texte libre pour commentaires)
     section_header("OBSERVATION")
     observation_text = context.get("observation", "") or " " * 5
     observation_table = Table(
@@ -324,7 +340,7 @@ def generate_penalty_report(
     elements.append(observation_table)
     elements.append(Spacer(1, 12))
 
-    # Signatures block
+    # SECTION: Signatures (emplacements pour validation interne)
     section_header("SIGNATURES")
     signature_labels = [
         " Project Coordinator",
@@ -356,6 +372,7 @@ def generate_penalty_report(
     )
     elements.append(signatures_table)
 
+    # Option: afficher qui a généré le document et quand
     if user_email:
         elements.append(Spacer(1, 8))
         elements.append(
@@ -365,6 +382,8 @@ def generate_penalty_report(
             )
         )
 
+    # Construction finale du PDF à partir de la liste d'éléments
     doc.build(elements)
+    # Remettre le curseur au début pour permettre la lecture du PDF
     buffer.seek(0)
     return buffer

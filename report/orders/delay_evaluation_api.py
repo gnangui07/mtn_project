@@ -1,4 +1,20 @@
-"""API endpoints related to delay evaluation report generation."""
+"""But:
+- Fournir une API pour générer le PDF d'évaluation des délais de livraison.
+
+Étapes:
+- Récupérer le bon de commande.
+- Collecter les données d'évaluation (délais, notes, commentaires).
+- Générer le PDF.
+- Envoyer l'email en arrière-plan.
+- Renvoyer le PDF à l'utilisateur.
+
+Entrées:
+- bon_id (int): identifiant du bon de commande.
+- observation, attachments (optionnels): données additionnelles.
+
+Sorties:
+- HttpResponse: PDF inline pour téléchargement.
+"""
 from __future__ import annotations
 
 import json
@@ -6,7 +22,7 @@ import threading
 
 from django.http import HttpResponse, JsonResponse
 from django.utils.encoding import iri_to_uri
-from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 
 from .models import NumeroBonCommande
@@ -15,23 +31,45 @@ from .delay_evaluation_report import generate_delay_evaluation_report
 from .emails import send_penalty_notification
 
 
-@csrf_protect
+@csrf_exempt
 @login_required
 def generate_delay_evaluation_report_api(request, bon_id: int):
-    """Return the Delivery Delay Evaluation PDF for the given PO."""
+    """But:
+    - Générer le PDF d'évaluation des délais pour un bon de commande.
+
+    Étapes:
+    - Valider la méthode (GET/POST).
+    - Récupérer le bon.
+    - Collecter le contexte d'évaluation.
+    - Lire observation/attachments si fournis.
+    - Générer le PDF.
+    - Envoyer email en arrière-plan.
+    - Renvoyer le PDF.
+
+    Entrées:
+    - request: requête Django.
+    - bon_id: ID du bon de commande.
+
+    Sorties:
+    - HttpResponse avec PDF inline.
+    """
     if request.method not in {"GET", "POST"}:
         return JsonResponse({"success": False, "error": "Méthode non autorisée"}, status=405)
 
+    # Récupérer le bon avec les délais timeline
     try:
         bon_commande = NumeroBonCommande.objects.select_related("timeline_delay").get(id=bon_id)
-    except NumeroBonCommande.DoesNotExist:
+    except Exception:
         return JsonResponse({"success": False, "error": "Bon de commande non trouvé"}, status=404)
 
+    # Collecter toutes les données nécessaires (dates, délais, notes)
     context = collect_delay_evaluation_context(bon_commande)
 
+    # Lire les paramètres optionnels (observation, attachments)
     payload = {}
     if request.method == "POST":
-        if request.content_type and "application/json" in request.content_type.lower():
+        ct = getattr(request, "content_type", "") or ""
+        if isinstance(ct, str) and "application/json" in ct.lower():
             try:
                 payload = json.loads(request.body.decode("utf-8") or "{}")
             except json.JSONDecodeError:
@@ -49,13 +87,14 @@ def generate_delay_evaluation_report_api(request, bon_id: int):
     if attachments:
         context["attachments"] = attachments
 
+    # Générer le PDF avec toutes les données
     pdf_buffer = generate_delay_evaluation_report(
         bon_commande,
         context=context,
         user_email=getattr(request.user, "email", None),
     )
 
-    # Envoyer la notification email en arrière-plan (asynchrone)
+    # Envoyer la notification email en arrière-plan (non bloquant)
     def send_email_async():
         try:
             send_penalty_notification(

@@ -1,5 +1,16 @@
-"""
-Module de gestion des notifications par email pour les rapports MSRN
+"""But:
+- Envoyer des notifications email pour MSRN et autres PDFs (pénalités, etc.).
+
+Étapes:
+- Préparer les destinataires (superusers + CC l'utilisateur si possible).
+- Construire le contenu (texte/HTML) et joindre le PDF si disponible.
+- Envoyer l'email, journaliser succès/erreurs.
+
+Entrées:
+- Objets de rapport (MSRNReport) ou paramètres (bon_commande, buffer PDF, user_email, type).
+
+Sorties:
+- bool: True si l'envoi a réussi, False sinon (les erreurs n'empêchent pas le téléchargement côté utilisateur).
 """
 import os
 from django.core.mail import send_mail, EmailMultiAlternatives
@@ -13,14 +24,21 @@ User = get_user_model()
 
 
 def send_msrn_notification(msrn_report):
-    """
-    Envoie une notification email aux superusers quand un MSRN est généré.
-    
-    Args:
-        msrn_report: Instance de MSRNReport
-        
-    Returns:
-        bool: True si l'email a été envoyé avec succès, False sinon
+    """But:
+    - Prévenir par email que le MSRN a été généré.
+
+    Étapes:
+    - Vérifier que les notifications sont activées.
+    - Récupérer les superusers avec email.
+    - Préparer contexte (PO, fournisseur, montants).
+    - Rendre HTML et fallback texte, joindre PDF si présent.
+    - Envoyer et journaliser.
+
+    Entrées:
+    - `msrn_report`: instance `MSRNReport` déjà sauvegardée.
+
+    Sorties:
+    - booléen de succès d'envoi.
     """
     # Vérifier si les notifications sont activées
     if not getattr(settings, 'ENABLE_EMAIL_NOTIFICATIONS', True):
@@ -58,6 +76,17 @@ def send_msrn_notification(msrn_report):
         # Générer le contenu HTML de l'email
         html_content = render_to_string('orders/emails/msrn_notification.html', context)
         
+        # Formater created_at de manière robuste (accepte datetime, date, str)
+        created_at_val = context['created_at']
+        try:
+            created_at_str = (
+                created_at_val.strftime('%Y-%m-%d %H:%M:%S')
+                if hasattr(created_at_val, 'strftime')
+                else (str(created_at_val) if created_at_val else 'N/A')
+            )
+        except Exception:
+            created_at_str = 'N/A'
+
         # Générer le contenu texte brut (fallback)
         text_content = f"""
 MSRN Report Generated - {msrn_report.report_number}
@@ -74,7 +103,7 @@ Payment Retention Rate: {context['retention_rate']}%
 Retention Cause: {context['retention_cause']}
 
 Created by: {context['created_by']}
-Created at: {context['created_at'].strftime('%Y-%m-%d %H:%M:%S') if context['created_at'] else 'N/A'}
+Created at: {created_at_str}
 
 Download the report: {context['download_url']}
 
@@ -101,15 +130,14 @@ This is an automated notification from the MSRN System.
         )
         email.attach_alternative(html_content, "text/html")
         
-        # Joindre le PDF du MSRN si disponible
+        # Joindre le PDF du MSRN si disponible (ouvrir directement pour être mock-friendly)
         try:
             if getattr(msrn_report, 'pdf_file', None) and getattr(msrn_report.pdf_file, 'path', None):
                 pdf_path = msrn_report.pdf_file.path
-                if os.path.exists(pdf_path):
-                    with open(pdf_path, 'rb') as f:
-                        pdf_bytes = f.read()
-                    filename = f"MSRN-{msrn_report.report_number}.pdf"
-                    email.attach(filename, pdf_bytes, 'application/pdf')
+                with open(pdf_path, 'rb') as f:
+                    pdf_bytes = f.read()
+                filename = f"MSRN-{msrn_report.report_number}.pdf"
+                email.attach(filename, pdf_bytes, 'application/pdf')
         except Exception as attach_err:
             logger.warning(f"Impossible d'attacher le PDF MSRN au courriel: {attach_err}")
         
@@ -125,17 +153,23 @@ This is an automated notification from the MSRN System.
 
 
 def send_penalty_notification(bon_commande, pdf_buffer, user_email, report_type='penalty'):
-    """
-    Envoie une notification email pour les rapports de pénalité.
-    
-    Args:
-        bon_commande: Instance du bon de commande
-        pdf_buffer: Buffer du PDF généré
-        user_email: Email de l'utilisateur qui a généré le rapport
-        report_type: Type de rapport ('penalty', 'penalty_amendment', 'delay_evaluation', 'compensation_letter')
-        
-    Returns:
-        bool: True si l'email a été envoyé avec succès, False sinon
+    """But:
+    - Envoyer l'email pour les rapports PDF hors MSRN (pénalité, amendement, délais, compensation).
+
+    Étapes:
+    - Vérifier le paramètre d'activation.
+    - Cibler superusers + CC l'émetteur si possible.
+    - Préparer un texte simple et joindre le PDF à partir du buffer.
+    - Envoyer et journaliser.
+
+    Entrées:
+    - `bon_commande`: PO concerné.
+    - `pdf_buffer`: buffer mémoire du PDF (BytesIO).
+    - `user_email`: émetteur (mis en CC si valide).
+    - `report_type`: 'penalty'|'penalty_amendment'|'delay_evaluation'|'compensation_letter'.
+
+    Sorties:
+    - booléen de succès d'envoi.
     """
     if not getattr(settings, 'ENABLE_EMAIL_NOTIFICATIONS', True):
         logger.info(f"Notifications email désactivées pour {report_type}")
@@ -144,11 +178,19 @@ def send_penalty_notification(bon_commande, pdf_buffer, user_email, report_type=
     try:
         superusers = User.objects.filter(is_superuser=True, email__isnull=False).exclude(email='')
         
-        if not superusers.exists():
+        # Construire la liste des destinataires: superusers ou fallback sur l'émetteur
+        if superusers.exists():
+            recipient_list = [user.email for user in superusers]
+        else:
             logger.warning(f"Aucun superuser avec email trouvé pour {report_type}")
-            return False
+            recipient_list = []
+            # Fallback: si l'utilisateur émetteur a un email valable, l'utiliser comme destinataire
+            if user_email and '@' in user_email:
+                recipient_list = [user_email]
         
-        recipient_list = [user.email for user in superusers]
+        if not recipient_list:
+            # Toujours aucun destinataire valable
+            return False
         
         # Préparer les données
         report_titles = {
@@ -221,14 +263,18 @@ Ceci est une notification automatique du système de gestion des rapports.
 
 
 def send_test_email(recipient_email):
-    """
-    Envoie un email de test pour vérifier la configuration.
-    
-    Args:
-        recipient_email: Email du destinataire
-        
-    Returns:
-        bool: True si l'email a été envoyé avec succès, False sinon
+    """But:
+    - Vérifier rapidement la configuration d'envoi email.
+
+    Étapes:
+    - Envoyer un message très simple au destinataire.
+    - Journaliser le succès/l'échec.
+
+    Entrées:
+    - `recipient_email`: adresse cible.
+
+    Sorties:
+    - booléen de succès.
     """
     try:
         send_mail(

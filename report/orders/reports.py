@@ -32,13 +32,22 @@ LIGHT_BLUE = colors.HexColor('#E6F0FA')   # Bleu très clair pour fonds
 
 def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, user_email=None):
     """
-    Génère un rapport MSRN (Material Service Receipt Note) au format PDF.
-    Optimisé pour tenir sur une seule page avec toutes les informations.
-    
-    Args:
-        bon_commande: Instance du bon de commande
-        report_number: Numéro de rapport à utiliser pour le PDF
-        request: Objet HttpRequest optionnel pour récupérer les paramètres de rétention
+    But:
+    - Générer un PDF MSRN (1 page) pour un bon de commande, lisible et compact.
+
+    Étapes:
+    1) Préparer styles et tableaux (entête, acceptation, financier, paiement, signatures).
+    2) Utiliser en priorité les snapshots du MSRNReport si fournis, sinon les valeurs du bon.
+    3) Composer le document avec ReportLab et retourner le flux PDF.
+
+    Entrées:
+    - bon_commande (NumeroBonCommande): PO ciblé.
+    - report_number (str|None): numéro du certificat (si None, géré en amont).
+    - msrn_report (MSRNReport|None): snapshots (montants/taux/terms) optionnels.
+    - user_email (str|None): trace éventuelle (non obligatoire).
+
+    Sorties:
+    - bytes: contenu binaire du PDF prêt à être sauvegardé/retourné.
     """
     buffer = BytesIO()
     # Marges réduites pour maximiser l'espace disponible
@@ -428,7 +437,7 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
     # Utiliser les snapshots du rapport MSRN pour les montants
     if msrn_report and msrn_report.montant_total_snapshot is not None:
         montant_total = msrn_report.montant_total_snapshot
-        montant_recu_actuel = msrn_report.montant_recu_snapshot or Decimal('0')
+        montant_recu_actuel = msrn_report.montant_recu_snapshot or _D('0')
     else:
         # Fallback sur les valeurs actuelles si pas de snapshot
         montant_total = bon_commande.montant_total() or _D('0')
@@ -872,9 +881,8 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
                 quantity_delivered = reception['quantity_delivered']
                 # Calcul de la nouvelle colonne: Net Qty to receive in boost = Qty payable - Received
                 try:
-                    from decimal import Decimal
                     quantity_payable = reception['quantity_payable']
-                    net_qty_to_receipt_in_boost = Decimal(str(quantity_payable)) - Decimal(str(received_quantity))
+                    net_qty_to_receipt_in_boost = _D(str(quantity_payable)) - _D(str(received_quantity))
                 except Exception:
                     net_qty_to_receipt_in_boost = 0
                 quantity_payable = reception['quantity_payable']
@@ -946,8 +954,7 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
                 
                 # Calcul de la nouvelle colonne: Net Qty to Receive in boost = Qty payable - Received
                 try:
-                    from decimal import Decimal
-                    net_qty_to_receipt_in_boost = Decimal(str(quantity_payable)) - Decimal(str(received_quantity))
+                    net_qty_to_receipt_in_boost = _D(str(quantity_payable)) - _D(str(received_quantity))
                 except Exception:
                     net_qty_to_receipt_in_boost = 0
             

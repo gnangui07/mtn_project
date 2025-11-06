@@ -1,3 +1,17 @@
+"""
+But:
+- Enregistrer les modèles de l'app orders dans l'admin et offrir des vues/colonnes utiles (aperçu des données, export, liens).
+
+Étapes:
+- Définir des ModelAdmin personnalisés pour FichierImporte et MSRNReport.
+- Afficher un tableau HTML des données importées et des actions d'export.
+
+Entrées:
+- Actions de l'admin Django (HTTP), objets modèles.
+
+Sorties:
+- Pages d'administration enrichies avec aperçus, liens et boutons d'export.
+"""
 import os
 from django.contrib import admin
 from django.utils.html import format_html
@@ -18,7 +32,7 @@ class FichierImporteAdmin(admin.ModelAdmin):
             obj.utilisateur = request.user
         super().save_model(request, obj, form, change)
 
-    list_display = ('file_link', 'extension', 'date_importation', 'nombre_lignes', 'user_display', 'export_excel_button')
+    list_display = ['file_link', 'extension', 'date_importation', 'nombre_lignes', 'user_display', 'export_excel_button']
     readonly_fields = ('extension', 'date_importation', 'nombre_lignes', 'data_table_view', 'user_display')
 
     fieldsets = (

@@ -241,6 +241,8 @@ def update_quantity_delivered(request, fichier_id):
                 
                 return JsonResponse(response_data)
                 
+            except json.JSONDecodeError:
+                return JsonResponse({'status': 'error', 'message': 'Format JSON invalide'}, status=400)
             except NumeroBonCommande.DoesNotExist:
                 return JsonResponse({'status': 'error', 'message': 'Bon de commande non trouvé'}, status=404)
             except InvalidOperation:
@@ -266,11 +268,20 @@ def update_quantity_delivered(request, fichier_id):
 @require_http_methods(["POST"])
 def bulk_update_receptions(request, fichier_id):
     """
-    API pour mettre à jour plusieurs réceptions en une seule requête (quantity delivered collectif).
-    
-    Paramètres attendus dans le corps de la requête:
-    - bon_number: Numéro du bon de commande
-    - updates: Liste des mises à jour [{"business_id": str, "quantity_delivered": float, "ordered_quantity": float}]
+    But:
+    - Mettre à jour en bloc plusieurs réceptions d'un même fichier importé.
+
+    Étapes:
+    1) Lire JSON {bon_number, updates[]}.
+    2) Pour chaque update: retrouver prix, cumuler quantité, valider bornes.
+    3) update_or_create Reception, journaliser ActivityLog, recalculer taux global.
+
+    Entrées:
+    - request (POST JSON)
+    - fichier_id (int)
+
+    Sorties:
+    - JsonResponse: statut, lignes mises à jour, taux et montant reçus.
     """
     logger = logging.getLogger(__name__)
     
@@ -406,11 +417,20 @@ def bulk_update_receptions(request, fichier_id):
 @require_http_methods(["POST"])
 def reset_quantity_delivered(request, fichier_id):
     """
-    API pour réinitialiser toutes les quantités reçues (Quantity Delivered) pour un bon de commande.
-    Supprime toutes les entrées Reception pour le bon de commande spécifié.
-    
-    Paramètres attendus dans le corps de la requête:
-    - bon_number: Numéro du bon de commande à réinitialiser
+    But:
+    - Réinitialiser toutes les réceptions (Quantity Delivered) d'un bon pour un fichier donné.
+
+    Étapes:
+    1) Lire JSON {bon_number}.
+    2) Supprimer toutes les Reception correspondantes.
+    3) Journaliser l'action dans ActivityLog.
+
+    Entrées:
+    - request (POST JSON)
+    - fichier_id (int)
+
+    Sorties:
+    - JsonResponse: succès + message, ou erreur (400/404/500).
     """
     try:
         # Récupérer le fichier importé
@@ -481,11 +501,21 @@ def reset_quantity_delivered(request, fichier_id):
 @csrf_protect
 @require_http_methods(["POST"])
 def update_retention(request, bon_id):
-    """API pour mettre à jour le taux de rétention (global au bon)
-    - Valide le taux (0-10%) et la cause (requise si taux > 0)
-    - Persiste sur NumeroBonCommande (retention_rate, retention_cause)
-    - Met à jour le dernier MSRNReport du bon (retention_rate, retention_cause, retention_amount, payable_amount)
-    - Déclenche le recalcul global des quantity_payable via le save() de NumeroBonCommande
+    """
+    But:
+    - Mettre à jour le taux de rétention d'un bon et recalculer les payable.
+
+    Étapes:
+    1) Lire JSON {retention_rate, retention_cause} et valider (0-10%).
+    2) Mettre à jour NumeroBonCommande + recalcul receptions (quantity/amount payable).
+    3) Calculer montants (sans modifier les MSRN historiques).
+
+    Entrées:
+    - request (POST JSON)
+    - bon_id (int)
+
+    Sorties:
+    - JsonResponse: statut + valeurs de rétention.
     """
     try:
         data = json.loads(request.body)
@@ -570,7 +600,19 @@ def update_retention(request, bon_id):
 @require_http_methods(["GET"])
 def get_receptions(request, bon_id):
     """
-    Récupère toutes les réceptions d'un bon de commande avec leurs valeurs quantity_payable et amount_payable
+    But:
+    - Lister les réceptions d'un bon avec les champs clés (delivered, payable, unit price).
+
+    Étapes:
+    1) Charger le bon.
+    2) Itérer les Reception et formatter une liste JSON.
+
+    Entrées:
+    - request (GET)
+    - bon_id (int)
+
+    Sorties:
+    - JsonResponse: {status, receptions[]}.
     """
     try:
         # Récupérer le bon de commande

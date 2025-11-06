@@ -1,4 +1,17 @@
-"""PDF generation for the Penalty Amendment Sheet."""
+"""But:
+- Générer le PDF de la Fiche d'Amendement de Pénalité.
+
+Étapes:
+- Construire les sections: entête, infos BC, objet, pénalité, répartition, doléances/proposition, statut, nouvelle pénalité, signatures.
+- Mettre en forme des montants et des dates.
+- Retourner un buffer mémoire prêt à être envoyé.
+
+Entrées:
+- `bon_commande` (NumeroBonCommande), `context` (dict) avec valeurs calculées + saisies, `user_email` (str|None).
+
+Sorties:
+- `BytesIO` contenant le PDF.
+"""
 from __future__ import annotations
 
 from datetime import datetime
@@ -91,6 +104,7 @@ def generate_penalty_amendment_report(
     user_email: str | None = None,
 ) -> BytesIO:
     """Build the Penalty Amendment Sheet PDF."""
+    # Créer un tampon mémoire pour stocker le PDF (aucun fichier écrit sur disque)
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -100,7 +114,7 @@ def generate_penalty_amendment_report(
         topMargin=20,
         bottomMargin=20,
     )
-
+    # Styles de base pour uniformiser les polices et tailles
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(
         "Title",
@@ -160,9 +174,11 @@ def generate_penalty_amendment_report(
         textColor=colors.grey,
     )
 
+    # La liste des "éléments" (titres, tableaux, textes) qui composent le PDF
     elements: list[Any] = []
 
     logo_path = settings.BASE_DIR / "static" / "logo_mtn.jpeg"
+    # Entête avec logo, titre et numéro de document
     header_table = Table(
         [
             [
@@ -187,14 +203,15 @@ def generate_penalty_amendment_report(
     elements.append(header_table)
     elements.append(Spacer(1, 6))
 
-    # Section: Demandeur
+    # Section: Demandeur (qui initie la demande)
     elements.append(_section_bar("DEMANDEUR", style=section_header_style))
     elements.append(Spacer(1, 2))
+    # Ligne simple "Étiquette : Valeur"
     requester_table = _key_value_rows([( "Nom du demandeur", context.get("requester", "N/A"))], label_style, value_style)
     elements.append(requester_table)
     elements.append(Spacer(1, 6))
 
-    # Section: Information Bon de Commande
+    # Section: Information Bon de Commande (PO principal)
     elements.append(_section_bar("INFORMATION BON DE COMMANDE", style=section_header_style))
     elements.append(Spacer(1, 2))
     info_rows = [
@@ -211,9 +228,10 @@ def generate_penalty_amendment_report(
     elements.append(info_table)
     elements.append(Spacer(1, 6))
 
-    # Section: Objet du contrat
+    # Section: Objet du contrat (texte libre)
     elements.append(_section_bar("OBJET DU CONTRAT", style=section_header_style))
     elements.append(Spacer(1, 2))
+    # Bloc de texte sous forme de tableau pour encadrer la zone
     contract_table = Table(
         [[Paragraph(context.get("order_description", "N/A"), long_text_style)]],
         colWidths=[552],
@@ -233,7 +251,7 @@ def generate_penalty_amendment_report(
     elements.append(contract_table)
     elements.append(Spacer(1, 6))
 
-    # Section: Pénalité
+    # Section: Pénalité (rappel des dates et calcul initial)
     elements.append(_section_bar("PENALITE", style=section_header_style))
     elements.append(Spacer(1, 3))
 
@@ -247,6 +265,7 @@ def generate_penalty_amendment_report(
         [Paragraph("NOMBRE DE JOURS TOTAL DE PENALITE", label_style), Paragraph(str(context.get("total_penalty_days", 0)), value_style)],
     ]
     
+    # Tableau des dates avec un entête sur toute la largeur
     dates_table = Table([dates_data[0]] + dates_rows_data, colWidths=[180, 372])
     dates_table.setStyle(
         TableStyle(
@@ -266,7 +285,7 @@ def generate_penalty_amendment_report(
     elements.append(dates_table)
     elements.append(Spacer(1, 4))
 
-    # Répartition des jours - intégré dans le tableau
+    # Répartition des jours - intégré dans le tableau (MTN / Prestataire / Force majeure)
     repartition_data = [
         [Paragraph("Répartition des jours", subsection_style)],
         [Paragraph("MTN", label_style), Paragraph("Prestataire", label_style), Paragraph("Forces majeures", label_style)],
@@ -296,7 +315,7 @@ def generate_penalty_amendment_report(
     elements.append(repartition_table)
     elements.append(Spacer(1, 6))
 
-    # Section: Pénalité due
+    # Section: Pénalité due (montant initial avant amendement)
     elements.append(_section_bar("PENALITE DUE", style=section_header_style))
     elements.append(Spacer(1, 2))
     penalty_due_table = Table(
@@ -322,9 +341,10 @@ def generate_penalty_amendment_report(
     elements.append(penalty_due_table)
     elements.append(Spacer(1, 6))
 
-    # Section: Doléances / Proposition
+    # Section: Doléances / Proposition (champs libres)
     elements.append(_section_bar("DOLEANCE DU FOURNISSEUR / PROPOSITION DU PM", style=section_header_style))
     elements.append(Spacer(1, 2))
+    # Deux colonnes pour juxtaposer les textes
     pleas_table = Table(
         [
             [
@@ -355,7 +375,7 @@ def generate_penalty_amendment_report(
     elements.append(pleas_table)
     elements.append(Spacer(1, 6))
 
-    # Section: Statut de la pénalité
+    # Section: Statut de la pénalité (case cochée visuelle)
     elements.append(_section_bar("STATUT DE LA PENALITE", style=section_header_style))
     elements.append(Spacer(1, 2))
     status_labels = [
@@ -371,7 +391,7 @@ def generate_penalty_amendment_report(
     for label, key in status_labels:
         label_cells.append(Paragraph(label, value_style))
     
-    # Second row: indicator only under checked option
+    # Deuxième ligne: case cochée uniquement sous l'option choisie
     indicator_cells = []
     for label, key in status_labels:
         checked = current_status == key
@@ -398,7 +418,7 @@ def generate_penalty_amendment_report(
     elements.append(status_table)
     elements.append(Spacer(1, 6))
 
-    # Section: Nouvelle pénalité due
+    # Section: Nouvelle pénalité due (montant modifié après amendement)
     elements.append(_section_bar("NOUVELLE PENALITE DUE", style=section_header_style))
     elements.append(Spacer(1, 2))
     new_penalty_table = Table(
@@ -424,7 +444,7 @@ def generate_penalty_amendment_report(
     elements.append(new_penalty_table)
     elements.append(Spacer(1, 6))
 
-    # Section: Validation du management
+    # Section: Validation du management (emplacements de signature)
     elements.append(_section_bar("VALIDATION DU MANAGEMENT", style=section_header_style))
     elements.append(Spacer(1, 2))
 
@@ -456,6 +476,7 @@ def generate_penalty_amendment_report(
     )
     elements.append(signatures_table)
 
+    # Optionnel: afficher qui a généré le document et quand
     if user_email:
         elements.append(Spacer(1, 10))
         elements.append(
@@ -465,6 +486,7 @@ def generate_penalty_amendment_report(
             )
         )
 
+    # Générer le PDF final et réinitialiser le tampon
     doc.build(elements)
     buffer.seek(0)
     return buffer

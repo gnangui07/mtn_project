@@ -1,3 +1,17 @@
+"""
+But:
+- Fournir des endpoints analytiques simplifiés pour le tableau de bord.
+
+Étapes:
+- Calculer le nombre de bons avec réception et le total des bons.
+- Déduire le nombre sans réception et renvoyer une structure JSON prête pour les graphiques.
+
+Entrées:
+- Requête HTTP GET.
+
+Sorties:
+- JsonResponse avec les clés: status, bons_avec_reception, total_bons, pie_chart.
+"""
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
@@ -13,11 +27,19 @@ logger = logging.getLogger(__name__)
 
 @require_http_methods(["GET"])
 def get_analytics_data(request):
-    """
-    Récupère les données analytiques simplifiées pour le tableau de bord:
-    1. Nombre de bons avec réception
-    2. Total des bons
-    3. Graphique circulaire: bons avec réception vs sans réception
+    """But:
+    - Récupérer des métriques synthétiques pour alimenter le dashboard.
+
+    Étapes:
+    - Compter les bons ayant au moins une réception.
+    - Compter le total des bons.
+    - Calculer les bons sans réception et structurer la réponse.
+
+    Entrées:
+    - HttpRequest GET.
+
+    Sorties:
+    - JsonResponse(status='success', ...), ou 'error' en cas d'exception.
     """
     try:
         # 1. Nombre de bons avec réception (au moins une réception)

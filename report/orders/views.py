@@ -362,7 +362,24 @@ def details_bon(request, bon_id):
             selected_order_number = fichier.bons_commande.first().numero
         
     # Vérifier si le fichier physique existe
-    if fichier.fichier and not os.path.exists(fichier.fichier.path):
+    file_exists = False
+    file_size = None
+    try:
+        if getattr(fichier, 'fichier', None) and getattr(fichier.fichier, 'path', None):
+            file_exists = os.path.exists(fichier.fichier.path)
+            if file_exists:
+                try:
+                    # L'accès à .size peut lever une erreur si le backend ne trouve pas le fichier
+                    file_size = fichier.fichier.size
+                except Exception:
+                    file_size = None
+        else:
+            file_exists = False
+    except Exception:
+        file_exists = False
+        file_size = None
+
+    if getattr(fichier, 'fichier', None) and not file_exists:
         messages.warning(request, f"Le fichier original '{os.path.basename(fichier.fichier.name)}' est manquant. Les données en mémoire seront utilisées si disponibles.")
 
     bon_number = selected_order_number if selected_order_number else f'PO-{fichier.id}'
@@ -777,6 +794,8 @@ def details_bon(request, bon_id):
         'bon': fichier,  
         'bon_id': fichier.id,  
         'bon_number': bon_number,
+        'file_exists': file_exists,
+        'file_size': file_size,
         'selected_order_number': selected_order_number,
         'raw_data': raw_data,
         'headers': headers,

@@ -578,8 +578,11 @@ def export_msrn_po_lines(request, msrn_id):
         from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
         from openpyxl.utils import get_column_letter
         
-        # Récupérer le rapport MSRN
-        msrn_report = get_object_or_404(MSRNReport, id=msrn_id)
+        # Récupérer le rapport MSRN (retourner 404 JSON si inexistant)
+        try:
+            msrn_report = MSRNReport.objects.get(id=msrn_id)
+        except MSRNReport.DoesNotExist:
+            return HttpResponse("MSRN Report not found", status=404)
         bon_commande = msrn_report.bon_commande
         retention_rate = msrn_report.retention_rate or Decimal('0')
         
@@ -1036,9 +1039,11 @@ def export_vendor_evaluations(request):
     # Créer le DataFrame
     df = pd.DataFrame(data)
     
-    # Remplacer les valeurs vides par des chaînes vides pour éviter NaT
-    df['DATE DE FIN CONTRACTUELLE(PIP)'] = df['DATE DE FIN CONTRACTUELLE(PIP)'].fillna('')
-    df['DATE DE FIN REELLE'] = df['DATE DE FIN REELLE'].fillna('')
+    # Remplacer les valeurs vides par des chaînes vides pour éviter NaT (seulement si les colonnes existent)
+    if 'DATE DE FIN CONTRACTUELLE(PIP)' in df.columns:
+        df['DATE DE FIN CONTRACTUELLE(PIP)'] = df['DATE DE FIN CONTRACTUELLE(PIP)'].fillna('')
+    if 'DATE DE FIN REELLE' in df.columns:
+        df['DATE DE FIN REELLE'] = df['DATE DE FIN REELLE'].fillna('')
     
     # Créer le fichier Excel
     output = BytesIO()
@@ -1285,7 +1290,7 @@ def export_vendor_ranking(request):
                 po_amount_xof = po_amount_value * exchange_rate
             else:
                 order_status = 'N/A'
-                close_date = ''
+                closed_date = ''
                 project_manager = 'N/A'
                 buyer = 'N/A'
                 order_description = 'N/A'

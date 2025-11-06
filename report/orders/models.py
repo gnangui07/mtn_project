@@ -519,202 +519,22 @@ class NumeroBonCommande(models.Model):
 
         return "N/A"
     
-    def get_Année(self):
-        if not self.fichiers.exists():
-            return "N/A"
-
-        for fichier in self.fichiers.all():
-            for ligne in fichier.lignes.all():
-                contenu = ligne.contenu
-                
-                # Trouver la clé pour le numéro de commande
-                order_key = None
-                for key in contenu.keys():
-                    key_lower = key.lower() if key else ''
-                    if 'order' in key_lower or 'commande' in key_lower or 'bon' in key_lower or 'bc' in key_lower:
-                        order_key = key
-                        break
-                
-                if order_key and str(contenu.get(order_key, '')).strip() == str(self.numero):
-                    # Chercher la colonne Manager Portfolio
-                    for key, value in contenu.items():
-                        key_lower = key.lower() if key else ''
-                        if 'annee' in key_lower and value:
-                            return str(value)
-
-        return "N/A"
     
-    def get_Project_Name(self):
-        if not self.fichiers.exists():
-            return "N/A"
-        for fichier in self.fichiers.all():
-            for ligne in fichier.lignes.all():
-                contenu = ligne.contenu
-                
-            order_key = None
-            for key in contenu.keys():
-                key_lower = key.lower() if key else ''
-                if 'order' in key_lower or 'commande' in key_lower or 'bon' in key_lower or 'bc' in key_lower:
-                    order_key = key
-                    break
-            
-            if order_key and str(contenu.get(order_key, '')).strip() == str(self.numero):
-                for key, value in contenu.items():
-                    key_lower = key.lower() if key else ''
-                    if 'project name' in key_lower and value:
-                        return str(value)
-        return "N/A"
-    
-    def get_Po_type(self):
-        if not self.fichiers.exists():
-            return "N/A"
-        for fichier in self.fichiers.all():
-            for ligne in fichier.lignes.all():
-                contenu = ligne.contenu
-                
-            order_key = None
-            for key in contenu.keys():
-                key_lower = key.lower() if key else ''
-                if 'order' in key_lower or 'commande' in key_lower or 'bon' in key_lower or 'bc' in key_lower:
-                    order_key = key
-                    break
-            
-            if order_key and str(contenu.get(order_key, '')).strip() == str(self.numero):
-                for key, value in contenu.items():
-                    key_lower = key.lower() if key else ''
-                    if 'po type' in key_lower and value:
-                        return str(value)
-        return "N/A"
-
-    def get_Replaced_Order(self):
-        if not self.fichiers.exists():
-            return "N/A"
-        for fichier in self.fichiers.all():
-            for ligne in fichier.lignes.all():
-                contenu = ligne.contenu
-                
-            order_key = None
-            for key in contenu.keys():
-                key_lower = key.lower() if key else ''
-                if 'order' in key_lower or 'commande' in key_lower or 'bon' in key_lower or 'bc' in key_lower:
-                    order_key = key
-                    break
-            
-            if order_key and str(contenu.get(order_key, '')).strip() == str(self.numero):
-                for key, value in contenu.items():
-                    key_lower = key.lower() if key else ''
-                    if 'replaced order' in key_lower and value:
-                        return str(value)
-        return "N/A"
-    
-    def get_ASSET_TYPE(self):
-        if not self.fichiers.exists():
-            return "N/A"
-        for fichier in self.fichiers.all():
-            for ligne in fichier.lignes.all():
-                contenu = ligne.contenu
-                
-            order_key = None
-            for key in contenu.keys():
-                key_lower = key.lower() if key else ''
-                if 'order' in key_lower or 'commande' in key_lower or 'bon' in key_lower or 'bc' in key_lower:
-                    order_key = key
-                    break
-            
-            if order_key and str(contenu.get(order_key, '')).strip() == str(self.numero):
-                for key, value in contenu.items():
-                    key_lower = key.lower() if key else ''
-                    if 'asset type' in key_lower and value:
-                        return str(value)
-        return "N/A"
-    
-    def get_PIP_END_DATE(self):
-        if not self.fichiers.exists():
-            return "N/A"
-        for fichier in self.fichiers.all():
-            for ligne in fichier.lignes.all():
-                contenu = ligne.contenu
-                
-            order_key = None
-            for key in contenu.keys():
-                key_lower = key.lower() if key else ''
-                if 'order' in key_lower or 'commande' in key_lower or 'bon' in key_lower or 'bc' in key_lower:
-                    order_key = key
-                    break
-            
-            if order_key and str(contenu.get(order_key, '')).strip() == str(self.numero):
-                for key, value in contenu.items():
-                    key_lower = key.lower() if key else ''
-                    if 'pip end date' in key_lower and value:
-                        return str(value)
-        return "N/A"
-    
-    def get_REVISED_END_DATE(self):
-        if not self.fichiers.exists():
-            return "N/A"
-        for fichier in self.fichiers.all():
-            for ligne in fichier.lignes.all():
-                contenu = ligne.contenu
-                
-            order_key = None
-            for key in contenu.keys():
-                key_lower = key.lower() if key else ''
-                if 'order' in key_lower or 'commande' in key_lower or 'bon' in key_lower or 'bc' in key_lower:
-                    order_key = key
-                    break
-            
-            if order_key and str(contenu.get(order_key, '')).strip() == str(self.numero):
-                for key, value in contenu.items():
-                    key_lower = key.lower() if key else ''
-                    if 'revised end date' in key_lower and value:
-                        return str(value)
-        return "N/A"
-    
-    def get_ACTUAL_END_DATE(self):
-        if not self.fichiers.exists():
-            return "N/A"
-        for fichier in self.fichiers.all():
-            for ligne in fichier.lignes.all():
-                contenu = ligne.contenu
-                
-            order_key = None
-            for key in contenu.keys():
-                key_lower = key.lower() if key else ''
-                if 'order' in key_lower or 'commande' in key_lower or 'bon' in key_lower or 'bc' in key_lower:
-                    order_key = key
-                    break
-            
-            if order_key and str(contenu.get(order_key, '')).strip() == str(self.numero):
-                for key, value in contenu.items():
-                    key_lower = key.lower() if key else ''
-                    if 'actual end date' in key_lower and value:
-                        return str(value)
-        return "N/A"
-
-    def get_Line_Type(self):
-        if not self.fichiers.exists():
-            return "N/A"
-        for fichier in self.fichiers.all():
-            for ligne in fichier.lignes.all():
-                contenu = ligne.contenu
-                
-            order_key = None
-            for key in contenu.keys():
-                key_lower = key.lower() if key else ''
-                if 'order' in key_lower or 'commande' in key_lower or 'bon' in key_lower or 'bc' in key_lower:
-                    order_key = key
-                    break
-            
-            if order_key and str(contenu.get(order_key, '')).strip() == str(self.numero):
-                for key, value in contenu.items():
-                    key_lower = key.lower() if key else ''
-                    if 'line type' in key_lower and value:
-                        return str(value)
-        return "N/A"
- 
-
     def get_gm_epmo(self):
-        """Récupère le nom du GM EPMO depuis les lignes correspondant au bon de commande"""
+        """But:
+        - Récupérer le nom du GM EPMO correspondant à ce bon de commande.
+
+        Étapes:
+        - Parcourir les fichiers associés et leurs lignes.
+        - Repérer la ligne dont le numéro d'ordre correspond à `self.numero`.
+        - Chercher la clé contenant "gm epmo" et retourner sa valeur.
+
+        Entrées:
+        - Aucune (utilise `self` et relations `fichiers`/`lignes`).
+
+        Sorties:
+        - str: le nom trouvé ou "N/A" si absent.
+        """
         if not self.fichiers.exists():
             return "N/A"
 
@@ -740,7 +560,20 @@ class NumeroBonCommande(models.Model):
         return "N/A"
     
     def get_senior_pm(self):
-        """Récupère le nom du Senior PM depuis les lignes correspondant au bon de commande"""
+        """But:
+        - Récupérer le nom du Senior PM correspondant à ce bon de commande.
+
+        Étapes:
+        - Parcourir les fichiers associés et leurs lignes.
+        - Repérer la ligne dont le numéro d'ordre correspond à `self.numero`.
+        - Chercher la clé contenant "senior pm" et retourner sa valeur.
+
+        Entrées:
+        - Aucune (utilise `self` et relations `fichiers`/`lignes`).
+
+        Sorties:
+        - str: le nom trouvé ou "N/A" si absent.
+        """
         if not self.fichiers.exists():
             return "N/A"
 

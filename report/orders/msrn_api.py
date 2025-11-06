@@ -1,3 +1,17 @@
+"""But:
+- Offrir des APIs pour générer le rapport MSRN et mettre à jour la rétention.
+
+Étapes:
+- generate_msrn_report_api: valider, récupérer le bon, créer le rapport, générer le PDF, envoyer l'email, renvoyer un JSON.
+- update_msrn_retention: valider, charger le rapport, mettre à jour rétention, recalcule, régénérer PDF, renvoyer un JSON.
+
+Entrées:
+- generate: POST JSON (retention_rate, retention_cause), bon_id en URL.
+- update: POST JSON (retention_rate, retention_cause), msrn_id en URL.
+
+Sorties:
+- JsonResponse: succès/erreur, identifiants et URL de téléchargement.
+"""
 from django.http import JsonResponse, HttpResponseBadRequest
 from django.views.decorators.csrf import csrf_protect
 from django.core.files import File
@@ -32,10 +46,11 @@ def generate_msrn_report_api(request, bon_id):
     - report_number: Numéro du rapport
     - download_url: URL pour télécharger le rapport
     """
+    # Autoriser uniquement POST
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'Méthode non autorisée'}, status=405)
     
-    # Optimisation: Récupérer le bon de commande avec prefetch
+    # Récupérer le bon de commande avec prefetch pour réduire les requêtes
     try:
         bon_commande = NumeroBonCommande.objects.prefetch_related(
             'fichiers__lignes',
@@ -44,7 +59,7 @@ def generate_msrn_report_api(request, bon_id):
     except NumeroBonCommande.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Bon de commande non trouvé'}, status=404)
     
-    # Récupérer les paramètres de rétention
+    # Récupérer les paramètres de rétention (JSON)
     try:
         data = json.loads(request.body) if request.body else {}
     except json.JSONDecodeError:
@@ -57,14 +72,14 @@ def generate_msrn_report_api(request, bon_id):
     
     retention_cause = data.get('retention_cause', bon_commande.retention_cause or '')
     
-    # Valider le taux de rétention
+    # Valider le taux de rétention (0 à 10%)
     if retention_rate < 0 or retention_rate > 10:
         return JsonResponse({'success': False, 'error': 'Le taux de rétention doit être compris entre 0 et 10%'}, status=400)
             
     if retention_rate > 0 and not retention_cause:
         return JsonResponse({'success': False, 'error': 'La cause de la rétention est requise pour un taux supérieur à 0%'}, status=400)
     
-    # Créer et sauvegarder le rapport
+    # Créer et sauvegarder le rapport, générer le PDF et notifier
     try:
         # Mesurer le temps de génération
         start_time = time.time()
@@ -86,7 +101,7 @@ def generate_msrn_report_api(request, bon_id):
         
         logger.info(f"PDF generated in {time.time() - pdf_start:.2f}s")
         
-        # Mettre à jour le fichier PDF avec le bon numéro
+        # Enregistrer le PDF dans le champ fichier du rapport
         report.pdf_file.save(
             f"MSRN-{report.report_number}.pdf",
             File(pdf_buffer)
@@ -96,7 +111,7 @@ def generate_msrn_report_api(request, bon_id):
         total_time = time.time() - start_time
         logger.info(f"Rapport MSRN généré avec succès: MSRN-{report.report_number} (Total: {total_time:.2f}s)")
         
-        # Envoyer la notification email aux superusers
+        # Envoyer la notification email aux superusers (non bloquant pour la réponse)
         try:
             email_sent = send_msrn_notification(report)
             if email_sent:
@@ -137,13 +152,13 @@ def update_msrn_retention(request, msrn_id):
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'Méthode non autorisée'}, status=405)
     
-    # Récupérer le rapport MSRN
+    # Récupérer le rapport MSRN (retourner un JSON 404 plutôt qu'une page HTML)
     try:
-        msrn_report = get_object_or_404(MSRNReport, id=msrn_id)
+        msrn_report = MSRNReport.objects.get(id=msrn_id)
     except MSRNReport.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Rapport MSRN non trouvé'}, status=404)
     
-    # Récupérer les paramètres de rétention
+    # Récupérer les paramètres de rétention (JSON)
     try:
         data = json.loads(request.body) if request.body else {}
     except json.JSONDecodeError:
@@ -163,7 +178,7 @@ def update_msrn_retention(request, msrn_id):
     if retention_rate > 0 and not retention_cause:
         return JsonResponse({'success': False, 'error': 'La cause de la rétention est requise pour un taux supérieur à 0%'}, status=400)
     
-    # Mettre à jour le rapport MSRN
+    # Mettre à jour le rapport MSRN et recalculer les montants
     try:
         # Sauvegarder les anciennes valeurs pour le log
         old_retention_rate = msrn_report.retention_rate

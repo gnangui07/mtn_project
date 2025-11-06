@@ -1,4 +1,16 @@
-"""Data collector for the Penalty Amendment Sheet."""
+"""But:
+- Construire les données pour la fiche d'amendement de pénalité.
+
+Étapes:
+- Partir du contexte de pénalité standard (montants, dates, jours, etc.).
+- Ajouter les champs propres à l'amendement (doléance, proposition, nouveau montant, statut).
+
+Entrées:
+- Objet `NumeroBonCommande`.
+
+Sorties:
+- Dictionnaire `context` prêt pour le PDF d'amendement.
+"""
 from __future__ import annotations
 
 from decimal import Decimal
@@ -19,11 +31,25 @@ def _as_decimal(value: Any) -> Decimal:
 
 
 def collect_penalty_amendment_context(bon) -> Dict[str, Any]:
-    """Assemble the context required to render the penalty amendment sheet."""
+    """But:
+    - Préparer le contexte nécessaire à la fiche d'amendement.
+
+    Étapes:
+    - Récupérer le contexte de pénalité de base.
+    - Normaliser les montants et compléter avec les champs d'amendement.
+
+    Entrées:
+    - `bon` (NumeroBonCommande).
+
+    Sorties:
+    - `context` (dict) avec valeurs par défaut simples.
+    """
+    # 1) Contexte de base (calculé depuis les fichiers)
     base = collect_penalty_context(bon)
 
     penalty_due = _as_decimal(base.get("penalties_due"))
 
+    # 2) Contexte d'amendement avec valeurs par défaut prêtes à afficher
     context: Dict[str, Any] = {
         "po_number": base.get("po_number", "N/A"),
         "supplier": base.get("supplier", "N/A"),

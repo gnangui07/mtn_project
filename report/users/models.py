@@ -1,17 +1,18 @@
-"""
-Modèles de l'application `users`.
+"""But:
+- Définir les modèles utilisateurs avec authentification par email et préférences vocales.
 
-Ce module définit:
-- Un modèle `User` personnalisé (authentification par email) avec un flux
-  d'activation: génération/vérification d'un mot de passe temporaire et d'un
-  token d'activation avec durée de validité.
-- Un modèle `UserVoicePreference` pour stocker côté serveur les préférences de
-  synthèse vocale (langue, voix, activation), utilisées par l'UX d'accueil.
+Étapes:
+- Créer un User personnalisé avec email comme identifiant unique.
+- Gérer l'activation de compte (mot de passe temporaire + token).
+- Stocker les préférences de synthèse vocale par utilisateur.
 
-Pour chaque méthode importante, les docstrings précisent:
-- Le but, les paramètres, la valeur de retour.
-- Les effets de bord (persistance, sécurité, expiration des tokens, etc.).
-"""
+Entrées:
+- Email, mot de passe, prénom, nom, services autorisés.
+- Token d'activation, mot de passe temporaire.
+
+Sorties:
+- Instances User et UserVoicePreference persistées.
+- Validation de tokens et mots de passe temporaires."""
 
 from django.db import models
 from django.contrib.auth.models import AbstractUser

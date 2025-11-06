@@ -1,7 +1,24 @@
-"""PDF generation for the Compensation Request Letter."""
+"""But:
+- Générer le PDF de la lettre de demande de compensation.
+
+Étapes:
+- Préparer styles et gabarit (logo, en-tête, adresse, références, objet).
+- Composer les paragraphes (faits, dates, jours de retard, pénalité calculée).
+- Ajouter les pièces jointes et signatures.
+- Construire et retourner le buffer PDF.
+
+Entrées:
+- `bon_commande`: PO concerné.
+- `context`: dictionnaire avec po_number, supplier, dates, pénalités, devise, etc.
+- `user_email` (optionnel): pour traçabilité.
+
+Sorties:
+- `BytesIO`: buffer mémoire positionné au début, prêt à être renvoyé.
+"""
 from __future__ import annotations
 
 from datetime import datetime
+import os
 from decimal import Decimal
 from io import BytesIO
 from typing import Any, Dict
@@ -46,7 +63,23 @@ def generate_compensation_letter(
     context: Dict[str, Any],
     user_email: str | None = None,
 ) -> BytesIO:
-    """Build the Compensation Request Letter PDF."""
+    """But:
+    - Construire le PDF de la lettre de compensation.
+
+    Étapes:
+    - Initialiser le document et les styles.
+    - Injecter les données du contexte (PO, fournisseur, montants, dates).
+    - Générer les sections (adresse, objet, corps, PJ, signatures).
+    - `doc.build()` puis `seek(0)` et retourner le buffer.
+
+    Entrées:
+    - bon_commande: objet du bon de commande.
+    - context: données nécessaires à la lettre.
+    - user_email: email de l'émetteur (optionnel).
+
+    Sorties:
+    - BytesIO: PDF en mémoire.
+    """
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -143,8 +176,8 @@ def generate_compensation_letter(
     elements = []
 
     # Logo MTN (si disponible)
-    logo_path = settings.BASE_DIR / "static" / "logo_mtn.jpeg"
-    if logo_path.exists():
+    logo_path = os.path.join(settings.BASE_DIR, "static", "logo_mtn.jpeg")
+    if os.path.exists(logo_path):
         logo = Image(str(logo_path), width=80, height=40)
         logo.hAlign = 'LEFT'
         elements.append(logo)
