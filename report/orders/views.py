@@ -17,6 +17,7 @@ from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 from openpyxl.utils import get_column_letter
 import os
 from decimal import Decimal
+from datetime import datetime
 from .models import NumeroBonCommande, Reception, FichierImporte, LigneFichier, MSRNReport
 
 from .models import (
@@ -789,6 +790,37 @@ def details_bon(request, bon_id):
         except Exception:
             actual_end_date = None        
 
+        # Extraire la date de création du PO à partir du contenu du fichier s'il existe
+        po_creation_date = None
+        try:
+            po_creation_date_raw = get_value_tolerant(
+                first_item,
+                exact_candidates=['Creation Date', 'Order Creation Date', 'PO Creation Date'],
+                tokens=['creation', 'date']
+            )
+            if po_creation_date_raw:
+                # Essayer de parser différents formats courants
+                date_str = str(po_creation_date_raw).strip()
+                date_formats = [
+                    '%Y-%m-%d %H:%M:%S',
+                    '%Y-%m-%d',
+                    '%d/%m/%Y',
+                    '%d/%m/%Y %H:%M:%S',
+                    '%m/%d/%Y',
+                    '%m/%d/%Y %H:%M:%S',
+                ]
+                parsed = None
+                for fmt in date_formats:
+                    try:
+                        parsed = datetime.strptime(date_str, fmt)
+                        break
+                    except ValueError:
+                        continue
+                # Si échec du parsing, conserver la chaîne telle quelle (le template affichera la valeur brute)
+                po_creation_date = parsed if parsed else po_creation_date_raw
+        except Exception:
+            po_creation_date = None
+
     context = {
         'fichier': fichier,
         'bon': fichier,  
@@ -808,7 +840,8 @@ def details_bon(request, bon_id):
         'montant_total_recu': montant_total_recu,
         'devise': devise,
         'nb_lignes': len(raw_data) if selected_order_number and colonne_order else (fichier.nombre_lignes if hasattr(fichier, 'nombre_lignes') else len(raw_data)),
-        'date_creation': fichier.date_importation if hasattr(fichier, 'date_importation') else None,
+        # Date de création provenant uniquement du contenu du fichier (pas de fallback)
+        'date_creation': (po_creation_date if 'po_creation_date' in locals() and po_creation_date else None),
         'status_value': status_value,
         'order_status': order_status_extracted if order_status_extracted not in (None, '') else status_value,
         'receptions': receptions,

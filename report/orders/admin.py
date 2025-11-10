@@ -34,6 +34,9 @@ class FichierImporteAdmin(admin.ModelAdmin):
 
     list_display = ['file_link', 'extension', 'date_importation', 'nombre_lignes', 'user_display', 'export_excel_button']
     readonly_fields = ('extension', 'date_importation', 'nombre_lignes', 'data_table_view', 'user_display')
+    list_per_page = 20
+    list_filter = ['extension', 'date_importation', 'utilisateur']
+    search_fields = ['fichier', 'utilisateur__email', 'utilisateur__first_name', 'utilisateur__last_name']
 
     fieldsets = (
         (None, {
