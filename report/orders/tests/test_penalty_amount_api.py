@@ -49,3 +49,39 @@ class TestPenaltyAmountAPI(TestCase):
         """Test avec une méthode HTTP invalide"""
         response = self.client.post(reverse('orders:get_penalty_amount_api', args=[self.bon_commande.id]))
         self.assertEqual(response.status_code, 405)
+
+    def test_get_penalty_amount_formats_none_to_zero(self):
+        """penalties_due None doit être formaté en '0'"""
+        from unittest.mock import patch
+        url = reverse('orders:get_penalty_amount_api', args=[self.bon_commande.id])
+        with patch('orders.penalty_amount_api.collect_penalty_context') as mock_collect:
+            mock_collect.return_value = {"penalties_due": None, "currency": "XOF"}
+            resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        self.assertTrue(data.get('success'))
+        self.assertEqual(data.get('penalty_due'), '0')
+        self.assertEqual(data.get('currency'), 'XOF')
+
+    def test_get_penalty_amount_invalid_penalty_value(self):
+        """penalties_due non numérique doit retourner '0' (gestion d'exception)"""
+        from unittest.mock import patch
+        url = reverse('orders:get_penalty_amount_api', args=[self.bon_commande.id])
+        with patch('orders.penalty_amount_api.collect_penalty_context') as mock_collect:
+            mock_collect.return_value = {"penalties_due": "abc", "currency": "XOF"}
+            resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        self.assertTrue(data.get('success'))
+        self.assertEqual(data.get('penalty_due'), '0')
+
+    def test_get_penalty_amount_internal_error(self):
+        """Erreur interne lors du calcul doit renvoyer 500 et success False"""
+        from unittest.mock import patch
+        url = reverse('orders:get_penalty_amount_api', args=[self.bon_commande.id])
+        with patch('orders.penalty_amount_api.collect_penalty_context') as mock_collect:
+            mock_collect.side_effect = Exception('boom')
+            resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 500)
+        data = json.loads(resp.content)
+        self.assertFalse(data.get('success'))

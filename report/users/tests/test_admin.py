@@ -44,3 +44,5 @@ def test_admin_save_model_sends_activation_email():
         assert obj.temporary_password  # hash stocké (non vide)
         # send_mail doit être appelé une fois
         assert mocked_send.call_count == 1
+
+        

@@ -2,12 +2,11 @@
 import pytest
 from django.contrib.auth import get_user_model
 
-User = get_user_model()
-
 
 @pytest.fixture
 def user_active(db):
     """Fixture créant un utilisateur actif avec mot de passe utilisable."""
+    User = get_user_model()
     user = User.objects.create_user(
         email='orders-active@example.com',
         password='Secret123!',
@@ -36,6 +35,7 @@ class TestConftestFixtures:
 
     def test_user_active_is_saved(self, user_active):
         """Test que l'utilisateur est bien sauvegardé en base"""
+        User = get_user_model()
         assert user_active.id is not None
         assert User.objects.filter(email='orders-active@example.com').exists() is True
 

@@ -9,7 +9,7 @@ from django.test import TestCase
 from django.utils import timezone
 from datetime import timedelta
 
-from users.models import User
+from users.models import User, UserVoicePreference
 
 
 class UserModelTests(TestCase):
@@ -61,3 +61,28 @@ class UserModelTests(TestCase):
         self.user.service = "NWG, ITS ,  FAC"
         self.user.save()
         self.assertEqual(self.user.get_services_list(), ["NWG", "ITS", "FAC"]) 
+
+
+class UserVoicePreferenceTests(TestCase):
+    def test_voice_preference_str(self):
+        """Test de la représentation en chaîne de UserVoicePreference"""
+        user = User.objects.create_user(
+            email='test@example.com',
+            password='testpass',
+            first_name='Test',
+            last_name='User'
+        )
+        # Test avec un nom de voix spécifié
+        prefs = UserVoicePreference.objects.create(
+            user=user,
+            lang='fr-FR',
+            voice_name='fr-FR-Standard-A',
+            enabled=True
+        )
+        # Le modèle utilise self.user_id, donc on compare avec l'ID utilisateur
+        self.assertEqual(str(prefs), f"VoicePrefs({user.id}, fr-FR, fr-FR-Standard-A)")
+        
+        # Test avec voice_name vide (doit utiliser 'auto')
+        prefs.voice_name = ''
+        prefs.save()
+        self.assertEqual(str(prefs), f"VoicePrefs({user.id}, fr-FR, auto)")

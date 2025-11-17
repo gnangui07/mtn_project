@@ -200,3 +200,89 @@ class TestEmails:
         result = send_test_email('test@example.com')
 
         assert result is False
+
+    @patch('orders.emails.settings')
+    @patch('orders.emails.User.objects.filter')
+    @patch('orders.emails.render_to_string')
+    @patch('orders.emails.EmailMultiAlternatives')
+    def test_send_msrn_notification_created_at_fallback_and_cc(self, mock_email_class, mock_render, mock_user_filter, mock_settings, msrn_report):
+        """Couvre le fallback created_at et l'ajout en CC de l'émetteur"""
+        mock_settings.ENABLE_EMAIL_NOTIFICATIONS = True
+        mock_settings.DEFAULT_FROM_EMAIL = 'noreply@example.com'
+        mock_settings.SITE_URL = 'http://localhost:8000'
+
+        user = Mock()
+        user.email = 'admin@example.com'
+        mock_queryset = Mock()
+        mock_queryset.exists.return_value = True
+        mock_queryset.__iter__ = Mock(return_value=iter([user]))
+        mock_user_filter.return_value.exclude.return_value = mock_queryset
+
+        mock_render.return_value = '<html>Email content</html>'
+
+        # Forcer created_at à un objet qui ne supporte pas strftime -> fallback
+        class WeirdDate:
+            pass
+        msrn_report.created_at = WeirdDate()
+
+        mock_email = Mock()
+        mock_email_class.return_value = mock_email
+
+        result = send_msrn_notification(msrn_report)
+        assert result is True
+        # Vérifier que CC a été fourni (l'émetteur est distinct du superuser)
+        args, kwargs = mock_email_class.call_args
+        assert 'cc' in kwargs and kwargs['cc'] is not None
+
+    @patch('orders.emails.settings')
+    @patch('orders.emails.User.objects.filter')
+    @patch('orders.emails.render_to_string')
+    @patch('orders.emails.EmailMultiAlternatives')
+    def test_send_msrn_notification_send_raises_returns_false(self, mock_email_class, mock_render, mock_user_filter, mock_settings, msrn_report):
+        """Si l'envoi lève une exception, la fonction retourne False (branche except)"""
+        mock_settings.ENABLE_EMAIL_NOTIFICATIONS = True
+        mock_settings.DEFAULT_FROM_EMAIL = 'noreply@example.com'
+        mock_settings.SITE_URL = 'http://localhost:8000'
+
+        user = Mock()
+        user.email = 'admin@example.com'
+        mock_queryset = Mock()
+        mock_queryset.exists.return_value = True
+        mock_queryset.__iter__ = Mock(return_value=iter([user]))
+        mock_user_filter.return_value.exclude.return_value = mock_queryset
+
+        mock_render.return_value = '<html>Email content</html>'
+
+        mock_email = Mock()
+        mock_email.send.side_effect = Exception('smtp down')
+        mock_email_class.return_value = mock_email
+
+        result = send_msrn_notification(msrn_report)
+        assert result is False
+
+    @patch('orders.emails.settings')
+    @patch('orders.emails.User.objects.filter')
+    @patch('orders.emails.EmailMultiAlternatives')
+    def test_send_penalty_notification_attach_warning(self, mock_email_class, mock_user_filter, mock_settings):
+        """L'échec de lecture de la pièce jointe déclenche un warning mais n'empêche pas l'envoi"""
+        mock_settings.ENABLE_EMAIL_NOTIFICATIONS = True
+        mock_settings.DEFAULT_FROM_EMAIL = 'noreply@example.com'
+
+        user = Mock()
+        user.email = 'admin@example.com'
+        mock_queryset = Mock()
+        mock_queryset.exists.return_value = True
+        mock_queryset.__iter__ = Mock(return_value=iter([user]))
+        mock_user_filter.return_value.exclude.return_value = mock_queryset
+
+        bon_commande = Mock()
+        bon_commande.numero = 'TEST123'
+        bon_commande.get_supplier.return_value = 'Test Supplier'
+
+        pdf_buffer = Mock()
+        pdf_buffer.seek.return_value = None
+        pdf_buffer.read.side_effect = Exception('read fail')
+
+        result = send_penalty_notification(bon_commande, pdf_buffer, 'user@example.com', 'penalty')
+        assert result is True
+        mock_email_class.return_value.send.assert_called_once_with(fail_silently=False)

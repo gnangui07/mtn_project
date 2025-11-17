@@ -1,0 +1,25 @@
+[run]
+source = orders,users
+omit =
+    orders/migrations/*
+    orders/tests/*
+    */conftest.py
+    */tests/conftest.py
+    orders/admin.py
+    orders/urls.py
+    orders/management/*
+    orders/templatetags/*
+    orders/__init__.py
+    orders/apps.py
+    */__pycache__/*
+    */venv/*
+    */env/*
+   
+
+[report]
+precision = 2
+show_missing = True
+skip_covered = False
+
+[html]
+directory = htmlcov

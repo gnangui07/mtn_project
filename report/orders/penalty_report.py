@@ -82,7 +82,7 @@ def generate_penalty_report(
         fontName="Times-Bold",
         fontSize=16,
         alignment=TA_CENTER,
-        textColor=colors.white,
+        textColor=colors.black,
         spaceAfter=6,
     )
     doc_number_style = ParagraphStyle(

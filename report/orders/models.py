@@ -745,7 +745,9 @@ class LigneFichier(models.Model):
     
     def generate_business_id(self):
         """Génère un ID métier basé sur Order+Line+Item+Schedule avec normalisation des valeurs numériques"""
-        if not self.contenu:
+        # Si le contenu est vide ou n'est pas un dictionnaire (ex: chaîne brute),
+        # on ne peut pas construire d'ID métier structuré.
+        if not self.contenu or not isinstance(self.contenu, dict):
             return None
             
         components = []
@@ -1274,7 +1276,8 @@ class FichierImporte(models.Model):
             # Créer une entrée d'erreur dans la table des lignes
             LigneFichier.objects.create(
                 fichier=self,
-                numero_ligne=1,
+                # Utiliser 0 pour éviter les collisions avec les lignes métier (>=1)
+                numero_ligne=0,
                 contenu={"error": f"Erreur d'extraction: {str(e)}"}
             )
 

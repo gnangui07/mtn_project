@@ -237,7 +237,7 @@
             </div>
             <div class="info-item">
               <div class="info-label">Imported By:</div>
-              <div class="info-value">{{ bon.utilisateur.get_full_name|default:bon.utilisateur.email|default:'System' }}</div>
+              <div class="info-value">{{ imported_by|default:'System' }}</div>
             </div>
             <div class="info-item">
               <div class="info-label">File Size:</div>

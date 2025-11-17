@@ -25,7 +25,9 @@ def _as_decimal(value: Any) -> Decimal:
             return value
         if value is None:
             return Decimal("0.00")
-        return Decimal(str(value).replace(" ", ""))
+        # Gérer les séparateurs de milliers avec virgules
+        value_str = str(value).replace(" ", "").replace(",", "")
+        return Decimal(value_str)
     except Exception:
         return Decimal("0.00")
 
