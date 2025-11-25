@@ -207,7 +207,7 @@ def generate_penalty_amendment_report(
     elements.append(_section_bar("DEMANDEUR", style=section_header_style))
     elements.append(Spacer(1, 2))
     # Ligne simple "Étiquette : Valeur"
-    requester_table = _key_value_rows([( "Nom du demandeur", context.get("requester", "N/A"))], label_style, value_style)
+    requester_table = _key_value_rows([( "demandeur", context.get("requester", "N/A"))], label_style, value_style)
     elements.append(requester_table)
     elements.append(Spacer(1, 6))
 

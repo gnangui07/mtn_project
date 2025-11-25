@@ -405,9 +405,58 @@ def details_bon(request, bon_id):
     
     # Récupérer les données depuis le modèle LigneFichier
     try:
-        # Récupérer toutes les lignes du fichier avec leur ID
-        lignes_fichier = LigneFichier.objects.filter(fichier=fichier).order_by('numero_ligne')
-        
+        # Initialiser les structures de données
+        contenu_data = []
+        receptions = {}
+
+        # Préparer le queryset de lignes en limitant au maximum le volume chargé
+        lignes_fichier_qs = None
+
+        if selected_order_number:
+            try:
+                # Récupérer le bon de commande
+                bon_commande = NumeroBonCommande.objects.get(numero=selected_order_number)
+
+                # Récupérer les réceptions pour ce bon de commande et ce fichier
+                receptions_queryset = Reception.objects.filter(
+                    bon_commande=bon_commande,
+                    fichier=fichier
+                ).select_related('fichier', 'bon_commande').order_by('business_id')
+
+                business_ids = []
+                # Convertir les réceptions en dictionnaire indexé par business_id
+                for reception in receptions_queryset:
+                    if reception.business_id:
+                        bid_str = str(reception.business_id)
+                        receptions[bid_str] = {
+                            'quantity_delivered': reception.quantity_delivered,
+                            'ordered_quantity': reception.ordered_quantity,
+                            'quantity_not_delivered': reception.quantity_not_delivered,
+                            'amount_delivered': reception.amount_delivered,
+                            'amount_not_delivered': reception.amount_not_delivered,
+                            'quantity_payable': reception.quantity_payable,
+                            'unit_price': reception.unit_price,
+                            'amount_payable': reception.amount_payable,  # Use the desired header
+                        }
+                        business_ids.append(reception.business_id)
+
+                # Limiter les lignes aux seules lignes du bon courant si des business_id sont disponibles
+                if business_ids:
+                    lignes_fichier_qs = LigneFichier.objects.filter(
+                        fichier=fichier,
+                        business_id__in=business_ids,
+                    ).order_by('numero_ligne')
+                else:
+                    # Fallback: aucune réception trouvée, on charge toutes les lignes du fichier
+                    lignes_fichier_qs = LigneFichier.objects.filter(fichier=fichier).order_by('numero_ligne')
+
+            except NumeroBonCommande.DoesNotExist:
+                # Fallback si le bon n'existe pas: charger toutes les lignes comme avant
+                lignes_fichier_qs = LigneFichier.objects.filter(fichier=fichier).order_by('numero_ligne')
+        else:
+            # Aucun numéro de bon sélectionné: comportement historique
+            lignes_fichier_qs = LigneFichier.objects.filter(fichier=fichier).order_by('numero_ligne')
+
         # Ajouter une fonction utilitaire pour extraire les valeurs numériques
         def extract_numeric_values(data):
             numeric_fields = ['Ordered Quantity', 'Quantity Delivered', 'Quantity Not Delivered', 'Price']
@@ -426,47 +475,14 @@ def details_bon(request, bon_id):
                     except (TypeError, ValueError):
                         data[field] = 0
             return data
-        
+
         # Créer une liste des données avec l'ID de la ligne
-        contenu_data = []
-        for ligne in lignes_fichier:
+        for ligne in lignes_fichier_qs:
             data = ligne.contenu.copy()
             data['_business_id'] = ligne.business_id  # Store business ID instead of row index
             data = extract_numeric_values(data)  # Extraire les valeurs numériques
             contenu_data.append(data)
-        
-        # Initialiser le dictionnaire des réceptions indexé par business_id
-        receptions = {}
-        
-        # Si un numéro de bon de commande est sélectionné, charger les réceptions existantes
-        if selected_order_number:
-            try:
-                # Récupérer le bon de commande
-                bon_commande = NumeroBonCommande.objects.get(numero=selected_order_number)
-                
-                # Récupérer les réceptions pour ce bon de commande et ce fichier
-                receptions_queryset = Reception.objects.filter(
-                    bon_commande=bon_commande,
-                    fichier=fichier
-                ).select_related('fichier', 'bon_commande').order_by('business_id')
-                
-                # Convertir les réceptions en dictionnaire indexé par business_id
-                for reception in receptions_queryset:
-                    receptions[str(reception.business_id)] = {
-                        'quantity_delivered': reception.quantity_delivered,
-                        'ordered_quantity': reception.ordered_quantity,
-                        'quantity_not_delivered': reception.quantity_not_delivered,
-                        'amount_delivered': reception.amount_delivered,
-                        'amount_not_delivered': reception.amount_not_delivered,
-                        'quantity_payable': reception.quantity_payable,
-                        'unit_price': reception.unit_price,
-                        'amount_payable': reception.amount_payable  # Use the desired header
-                    }
-                    
-            except NumeroBonCommande.DoesNotExist:
-                # Si le bon de commande n'existe pas encore, on continue avec un dictionnaire vide
-                pass
-                
+
     except Exception as e:
         messages.error(request, f"Erreur lors de la récupération des données : {str(e)}")
         contenu_data = []

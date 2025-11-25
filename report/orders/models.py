@@ -709,7 +709,9 @@ class LigneFichier(models.Model):
     """
     fichier = models.ForeignKey(
         'FichierImporte',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='lignes',
         verbose_name="Fichier d'origine"
     )
@@ -1139,6 +1141,7 @@ class FichierImporte(models.Model):
                                     reception.unit_price = unit_price
                                     reception.received_quantity = received_qty_dec
                                     reception.quantity_not_delivered = max(Decimal('0'), ordered_qty_dec - reception.quantity_delivered)
+                                    reception.fichier = self
                                     reception.date_modification = timezone.now()
                                     reception.save()
                                     created = False
@@ -1232,7 +1235,10 @@ class FichierImporte(models.Model):
                         # Ligne métier identique trouvée - mise à jour avec les nouvelles données
                         print(f"Ligne métier identique trouvée (ID: {business_id}) - mise à jour")
                         existing_business_line.contenu = ligne
-                        existing_business_line.save()
+                        # Rattacher systématiquement la ligne au fichier courant (réimport)
+                        existing_business_line.fichier = self
+                        existing_business_line.business_id = business_id
+                        existing_business_line.save(update_fields=['contenu', 'fichier', 'business_id'])
                         
                         # Associer cette ligne au fichier actuel pour traçabilité
                         # (mais ne pas créer de doublon)
@@ -1394,7 +1400,9 @@ class Reception(models.Model):
     )
     fichier = models.ForeignKey(
         'FichierImporte',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='receptions',
         verbose_name="Fichier importé"
     )
@@ -1981,7 +1989,7 @@ class InitialReceptionBusiness(models.Model):
     )
     source_file = models.ForeignKey(
         'FichierImporte',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name='initial_reception_lines',

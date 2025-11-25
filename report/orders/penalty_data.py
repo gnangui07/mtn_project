@@ -20,7 +20,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from django.db.models import Prefetch
 
-from .models import LigneFichier, NumeroBonCommande, TimelineDelay
+from .models import LigneFichier, NumeroBonCommande, TimelineDelay, Reception
 
 
 # ---------------------------------------------------------------------------
@@ -107,10 +107,35 @@ def _get_prefetched_list(instance: Any, attr: str):
     return None
 
 
+def _get_first_occurrence_contenu_from_receptions(bon: NumeroBonCommande) -> Optional[Dict[str, Any]]:
+    receptions = (
+        Reception.objects.filter(bon_commande=bon, fichier__isnull=False)
+        .select_related("fichier")
+        .order_by("fichier__date_importation", "id")
+    )
+    for reception in receptions:
+        ligne = (
+            LigneFichier.objects.filter(
+                fichier=reception.fichier,
+                business_id=reception.business_id,
+            )
+            .only("numero_ligne", "contenu")
+            .order_by("numero_ligne")
+            .first()
+        )
+        if ligne and ligne.contenu:
+            return ligne.contenu
+    return None
+
+
 def _get_first_occurrence_contenu(bon: NumeroBonCommande) -> Dict[str, Any]:
     """Return the first ligne contenu associated with the PO number."""
     # Idée simple: on parcourt les fichiers et leurs lignes jusqu'à trouver la première
     # ligne qui correspond au bon de commande demandé. Cette ligne sert de référence.
+    fast_contenu = _get_first_occurrence_contenu_from_receptions(bon)
+    if fast_contenu is not None:
+        return fast_contenu
+
     fichiers = _get_prefetched_list(bon, "fichiers")
     if fichiers is None:
         fichiers = list(
@@ -169,10 +194,8 @@ def collect_penalty_context(bon: NumeroBonCommande) -> Dict[str, Any]:
     creation_date_raw = _get_value_tolerant(contenu, exact_candidates=("Creation Date",))
     pip_end_raw = _get_value_tolerant(contenu, exact_candidates=("PIP END DATE",))
     actual_end_raw = _get_value_tolerant(contenu, exact_candidates=("ACTUAL END DATE",))
-    project_coordinator = _get_value_tolerant(
-        contenu,
-        tokens=("project", "coordinator"),
-    )
+    # Le demandeur est désormais toujours EPMO (on ne lit plus le Project Coordinator du fichier)
+    project_coordinator = "EPMO"
     order_description = _get_value_tolerant(
         contenu,
         exact_candidates=("Order Description",),
@@ -180,16 +203,13 @@ def collect_penalty_context(bon: NumeroBonCommande) -> Dict[str, Any]:
     )
 
     # 3) Montant du PO (avec tolérance sur le nom de colonne)
-    po_amount_raw = _get_value_tolerant(
-        contenu,
-        exact_candidates=("Total", "PO Amount", "PO AMOUNT/MONTANT BC"),
-        tokens=("po", "amount"),
-    )
-    try:
-        po_amount = Decimal(str(po_amount_raw).replace(" ", ""))
-    except Exception:
-        po_amount = bon.montant_total() if hasattr(bon, "montant_total") else Decimal("0.00")
-    po_amount = po_amount.quantize(Decimal("0.01")) if isinstance(po_amount, Decimal) else Decimal("0.00")
+    po_amount = bon.montant_total() if hasattr(bon, "montant_total") else Decimal("0.00")
+    if not isinstance(po_amount, Decimal):
+        try:
+            po_amount = Decimal(str(po_amount))
+        except Exception:
+            po_amount = Decimal("0.00")
+    po_amount = po_amount.quantize(Decimal("0.01"))
 
     # 4) Convertir les dates et calculer le nombre de jours de retard
     creation_date = _parse_date(creation_date_raw)
@@ -214,9 +234,12 @@ def collect_penalty_context(bon: NumeroBonCommande) -> Dict[str, Any]:
     # 6) Taux de pénalité (0,30% par jour imputable au prestataire)
     penalty_rate = Decimal("0.30")  # 0,30%
 
-    quotite_factor = (Decimal("100.00") - quotite_realisee) / Decimal("100")
+    # Appliquer la pénalité sur la quotité RÉALISÉE et non sur la quotité non réalisée
+    quotite_factor = quotite_realisee / Decimal("100")
     if quotite_factor < Decimal("0"):
         quotite_factor = Decimal("0")
+    elif quotite_factor > Decimal("1"):
+        quotite_factor = Decimal("1")
 
     # 7) Calcul des pénalités, puis plafonnement à 10% du montant du PO
     penalties_calculated = (

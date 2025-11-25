@@ -140,7 +140,7 @@ def _ensure_styles():
         fontName="Times-Bold",
         fontSize=16,
         alignment=TA_CENTER,
-        textColor=colors.white,
+        textColor=colors.black,
         spaceAfter=6,
     )
     DOC_NUM_STYLE = ParagraphStyle(

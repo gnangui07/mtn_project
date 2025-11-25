@@ -227,8 +227,27 @@ def generate_compensation_letter(
     elements.append(Paragraph(paragraph2, body_style))
 
     # Corps de la lettre - Paragraphe 3
-    pourcentage_penalite = context.get("penalty_rate", Decimal("0.30"))
-    montant_penalite = _fmt_amount(context.get("penalties_calculated"), context.get("currency"))
+    # Taux effectif global appliqué au bon : (pénalités dues / montant BC) * 100
+    penalties_due = context.get("penalties_due")
+    po_amount = context.get("po_amount")
+    penalty_rate_contractuel = context.get("penalty_rate", Decimal("0.30"))
+
+    taux_effectif = penalty_rate_contractuel
+    try:
+        if penalties_due is not None and po_amount not in (None, 0, "0", "0.00"):
+            po_amount_dec = Decimal(str(po_amount))
+            if po_amount_dec != 0:
+                taux_effectif = (Decimal(str(penalties_due)) / po_amount_dec * Decimal("100")).quantize(Decimal("0.01"))
+    except Exception:
+        # En cas de problème de données, on retombe sur le taux contractuel
+        taux_effectif = penalty_rate_contractuel
+
+    # Formater le taux pour l'affichage : 8, 8.5 ou 8.49 (pas de zéros inutiles)
+    taux_str = format(taux_effectif, "f")
+    if "." in taux_str:
+        taux_str = taux_str.rstrip("0").rstrip(".")
+    pourcentage_penalite = taux_str
+    montant_penalite = _fmt_amount(penalties_due, context.get("currency"))
     
     paragraph3 = f"""Au regard de ce qui précède et en application des clauses pertinentes de nos 
     conditions générales d'achat, régulièrement portées à votre connaissance, nous vous appliquons 

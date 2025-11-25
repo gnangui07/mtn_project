@@ -191,7 +191,7 @@ def generate_penalty_report(
 
     # SECTION: Demandeur (qui est responsable côté projet)
     section_header("DEMANDEUR")
-    info_row("Nom du Demandeur", context.get("project_coordinator", "N/A"))
+    info_row("Demandeur", context.get("project_coordinator", "N/A"))
 
     # SECTION: Informations principales du Bon de Commande (numéro, fournisseur, montants, dates)
     section_header("INFORMATION BON DE COMMANDE")

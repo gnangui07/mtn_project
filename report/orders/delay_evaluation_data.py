@@ -125,13 +125,14 @@ def collect_delay_evaluation_context(bon: NumeroBonCommande) -> Dict[str, Any]:
     pip_end_date = _parse_date(pip_end_raw)
     actual_end_date = _parse_date(actual_end_raw)
 
-    # Extraire le montant du bon de commande
-    po_amount_raw = _get_value_tolerant(
-        contenu,
-        exact_candidates=("Total", "PO Amount", "PO AMOUNT/MONTANT BC"),
-        tokens=("po", "amount"),
-    )
-    po_amount = _format_decimal(po_amount_raw)
+    # Extraire le montant du bon de commande depuis le modèle (montant_total)
+    po_amount = bon.montant_total() if hasattr(bon, "montant_total") else Decimal("0.00")
+    if not isinstance(po_amount, Decimal):
+        try:
+            po_amount = Decimal(str(po_amount))
+        except Exception:
+            po_amount = Decimal("0.00")
+    po_amount = po_amount.quantize(Decimal("0.01"))
 
     # Calculer le nombre total de jours de retard
     total_delay_days = 0

@@ -8,10 +8,6 @@ __pycache__/
 
 # Virtual Environment
 .aime/
-venv/
-env/
-ENV/
-.venv
 
 # Django
 *.log
@@ -23,8 +19,6 @@ db.sqlite3-journal
 
 # Environment variables
 .env
-.env.local
-.env.*.local
 
 # IDE
 .vscode/
