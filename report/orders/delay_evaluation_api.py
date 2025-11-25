@@ -24,8 +24,9 @@ from django.http import HttpResponse, JsonResponse
 from django.utils.encoding import iri_to_uri
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
+from django.core.files.base import ContentFile
 
-from .models import NumeroBonCommande
+from .models import NumeroBonCommande, DelayEvaluationReportLog
 from .delay_evaluation_data import collect_delay_evaluation_context
 from .delay_evaluation_report import generate_delay_evaluation_report
 from .emails import send_penalty_notification
@@ -93,6 +94,16 @@ def generate_delay_evaluation_report_api(request, bon_id: int):
         context=context,
         user_email=getattr(request.user, "email", None),
     )
+
+    # Sauvegarder le PDF dans le log
+    try:
+        pdf_bytes = pdf_buffer.getvalue()
+        log_entry = DelayEvaluationReportLog.objects.create(bon_commande=bon_commande)
+        filename = f"DelayEvaluation-{bon_commande.numero}-{log_entry.id}.pdf"
+        log_entry.file.save(filename, ContentFile(pdf_bytes), save=True)
+    except Exception:
+        # On continue même si la persistance du log échoue
+        pass
 
     # Envoyer la notification email en arrière-plan (non bloquant)
     def send_email_async():

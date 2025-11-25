@@ -23,8 +23,9 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
 from django.utils.encoding import iri_to_uri
 from django.views.decorators.csrf import csrf_protect
+from django.core.files.base import ContentFile
 
-from .models import NumeroBonCommande
+from .models import NumeroBonCommande, PenaltyAmendmentReportLog
 from .penalty_amendment_data import collect_penalty_amendment_context
 from .penalty_amendment_report import generate_penalty_amendment_report
 from .emails import send_penalty_notification
@@ -103,6 +104,16 @@ def generate_penalty_amendment_report_api(request, bon_id: int):
         context=context,
         user_email=getattr(request.user, "email", None),
     )
+
+    # Sauvegarder le PDF dans le log
+    try:
+        pdf_bytes = pdf_buffer.getvalue()
+        log_entry = PenaltyAmendmentReportLog.objects.create(bon_commande=bon_commande)
+        filename = f"PenaltyAmendment-{bon_commande.numero}-{log_entry.id}.pdf"
+        log_entry.file.save(filename, ContentFile(pdf_bytes), save=True)
+    except Exception:
+        # Ne pas perturber la génération en cas d'erreur de log
+        pass
 
     # 8) Envoyer la notification email en arrière-plan (asynchrone)
     def send_email_async():

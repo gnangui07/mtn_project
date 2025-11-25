@@ -22,9 +22,10 @@ from django.contrib.auth.decorators import login_required
 from django.utils.encoding import iri_to_uri
 from django.core.mail import send_mail
 from django.conf import settings
+from django.core.files.base import ContentFile
 import threading
 
-from .models import NumeroBonCommande
+from .models import NumeroBonCommande, PenaltyReportLog
 from .penalty_data import collect_penalty_context
 from .penalty_report import generate_penalty_report
 from .emails import send_penalty_notification
@@ -85,6 +86,16 @@ def generate_penalty_report_api(request, bon_id: int):
         context=context,
         user_email=getattr(request.user, "email", None),
     )
+
+    # Sauvegarder le PDF dans le log
+    try:
+        pdf_bytes = pdf_buffer.getvalue()
+        log_entry = PenaltyReportLog.objects.create(bon_commande=bon_commande)
+        filename = f"PenaltySheet-{bon_commande.numero}-{log_entry.id}.pdf"
+        log_entry.file.save(filename, ContentFile(pdf_bytes), save=True)
+    except Exception:
+        # On n'interrompt pas la génération en cas d'erreur de log
+        pass
 
     # Envoyer la notification email en arrière-plan (asynchrone)
     # (cela n'attend pas: l'utilisateur reçoit le PDF immédiatement)

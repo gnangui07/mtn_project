@@ -24,8 +24,10 @@ from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 from django.utils.encoding import iri_to_uri
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from django.core.files.base import ContentFile
 
-from .models import NumeroBonCommande
+from .models import NumeroBonCommande, CompensationLetterLog
 from .penalty_data import collect_penalty_context
 from .compensation_letter_report import generate_compensation_letter
 from .emails import send_penalty_notification
@@ -63,8 +65,17 @@ def generate_compensation_letter_api(request, bon_id: int):
 
     # Étape 2: génération (les erreurs ici sont des 500)
     try:
+        # Créer une entrée de log pour obtenir un identifiant séquentiel global
+        log_entry = CompensationLetterLog.objects.create(bon_commande=bon_commande)
+        sequence_number = log_entry.id
+
+        # Construire la référence de lettre au format EPMO/ED/LDC/MM-YYYY/NNN
+        now = timezone.now()
+        letter_reference = f"EPMO/ED/LDC/{now:%m-%Y}/{sequence_number:03d}"
+
         # Collect penalty context data
         context = collect_penalty_context(bon_commande)
+        context["letter_reference"] = letter_reference
         
         # Generate PDF
         pdf_buffer = generate_compensation_letter(
@@ -72,6 +83,15 @@ def generate_compensation_letter_api(request, bon_id: int):
             context=context,
             user_email=getattr(request.user, "email", None),
         )
+
+        # Sauvegarder le PDF dans le log
+        try:
+            pdf_bytes = pdf_buffer.getvalue()
+            filename = f"CompensationLetter-{bon_commande.numero}-{sequence_number}.pdf"
+            log_entry.file.save(filename, ContentFile(pdf_bytes), save=True)
+        except Exception:
+            # On évite de casser la génération de la lettre si l'enregistrement du fichier échoue
+            pass
         
         # Envoyer la notification email en arrière-plan (asynchrone)
         def send_email_async():

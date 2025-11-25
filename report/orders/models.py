@@ -64,6 +64,138 @@ def normalize_business_id(business_id):
 # Ce champ est disponible dans Django depuis la version 3.1
 
 
+class CompensationLetterLog(models.Model):
+    """Journalise chaque génération de lettre de compensation.
+
+    L'identifiant primaire (pk) sert de numéro séquentiel global pour
+    construire la référence de type EPMO/ED/LDC/MM-YYYY/NNN.
+    """
+
+    bon_commande = models.ForeignKey(
+        "NumeroBonCommande",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="compensation_letters",
+        verbose_name="Bon de commande",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Date de génération",
+    )
+    file = models.FileField(
+        upload_to="reports/compensation_letters/",
+        null=True,
+        blank=True,
+        verbose_name="Fichier PDF",
+    )
+
+    class Meta:
+        verbose_name = "Lettre de compensation"
+        verbose_name_plural = "Lettres de compensation"
+
+    def __str__(self):
+        if self.bon_commande:
+            return f"Lettre de compensation #{self.pk} pour {self.bon_commande.numero}"
+        return f"Lettre de compensation #{self.pk}"
+
+
+class PenaltyReportLog(models.Model):
+    """Journalise les fiches de pénalité générées (avec stockage du PDF)."""
+
+    bon_commande = models.ForeignKey(
+        "NumeroBonCommande",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="penalty_reports",
+        verbose_name="Bon de commande",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Date de génération",
+    )
+    file = models.FileField(
+        upload_to="reports/penalty/",
+        null=True,
+        blank=True,
+        verbose_name="Fichier PDF",
+    )
+
+    class Meta:
+        verbose_name = "Fiche de pénalité générée"
+        verbose_name_plural = "Fiches de pénalité générées"
+
+    def __str__(self):
+        if self.bon_commande:
+            return f"Fiche de pénalité #{self.pk} pour {self.bon_commande.numero}"
+        return f"Fiche de pénalité #{self.pk}"
+
+
+class PenaltyAmendmentReportLog(models.Model):
+    """Journalise les fiches d'amendement de pénalité générées (avec PDF)."""
+
+    bon_commande = models.ForeignKey(
+        "NumeroBonCommande",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="penalty_amendment_reports",
+        verbose_name="Bon de commande",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Date de génération",
+    )
+    file = models.FileField(
+        upload_to="reports/penalty_amendment/",
+        null=True,
+        blank=True,
+        verbose_name="Fichier PDF",
+    )
+
+    class Meta:
+        verbose_name = "Fiche d'amendement de pénalité générée"
+        verbose_name_plural = "Fiches d'amendement de pénalité générées"
+
+    def __str__(self):
+        if self.bon_commande:
+            return f"Fiche d'amendement #{self.pk} pour {self.bon_commande.numero}"
+        return f"Fiche d'amendement #{self.pk}"
+
+
+class DelayEvaluationReportLog(models.Model):
+    """Journalise les fiches d'évaluation des délais générées (avec PDF)."""
+
+    bon_commande = models.ForeignKey(
+        "NumeroBonCommande",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="delay_evaluation_reports",
+        verbose_name="Bon de commande",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Date de génération",
+    )
+    file = models.FileField(
+        upload_to="reports/delay_evaluation/",
+        null=True,
+        blank=True,
+        verbose_name="Fichier PDF",
+    )
+
+    class Meta:
+        verbose_name = "Fiche d'évaluation des délais générée"
+        verbose_name_plural = "Fiches d'évaluation des délais générées"
+
+    def __str__(self):
+        if self.bon_commande:
+            return f"Fiche d'évaluation des délais #{self.pk} pour {self.bon_commande.numero}"
+        return f"Fiche d'évaluation des délais #{self.pk}"
+
+
 class NumeroBonCommande(models.Model):
     """
     Modèle stockant de façon unique les numéros de bons de commande

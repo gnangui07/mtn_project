@@ -195,7 +195,10 @@ def generate_compensation_letter(
     elements.append(Paragraph("A Monsieur le Directeur Général", address_style))
 
     # Références
-    elements.append(Paragraph("Nos réf : CP/JC/TP/NA/08-2015/019", ref_style))
+    letter_ref = context.get("letter_reference")
+    if not letter_ref:
+        letter_ref = f"EPMO/ED/LDC/{datetime.now():%m-%Y}/000"
+    elements.append(Paragraph(f"Nos réf : {letter_ref}", ref_style))
 
     # Objet
     elements.append(Paragraph("<b>Objet : Demande de compensation</b>", object_style))
