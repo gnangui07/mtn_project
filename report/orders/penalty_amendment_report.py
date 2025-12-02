@@ -120,7 +120,7 @@ def generate_penalty_amendment_report(
         "Title",
         parent=styles["Title"],
         fontName="Times-Bold",
-        fontSize=12,
+        fontSize=11,
         alignment=TA_CENTER,
         textColor=colors.black,
     )
@@ -135,7 +135,7 @@ def generate_penalty_amendment_report(
         "SectionHeader",
         parent=styles["Normal"],
         fontName="Times-Bold",
-        fontSize=8,
+        fontSize=7,
         alignment=TA_LEFT,
         textColor=colors.white,
     )
@@ -150,20 +150,20 @@ def generate_penalty_amendment_report(
         "Label",
         parent=styles["Normal"],
         fontName="Times-Bold",
-        fontSize=7,
+        fontSize=6.5,
     )
     value_style = ParagraphStyle(
         "Value",
         parent=styles["Normal"],
         fontName="Times-Roman",
-        fontSize=7,
+        fontSize=6.5,
     )
     long_text_style = ParagraphStyle(
         "LongText",
         parent=styles["Normal"],
         fontName="Times-Roman",
-        fontSize=7,
-        leading=8,
+        fontSize=6.5,
+        leading=7.5,
     )
     small_style = ParagraphStyle(
         "Small",

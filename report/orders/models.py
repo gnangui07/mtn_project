@@ -1471,49 +1471,81 @@ def import_or_update_fichier(fichier_upload, utilisateur=None):
                 if numero and numero.lower() not in ('', 'false', 'true', 'none', 'null', 'nan', '0'):
                     numeros_bons.add(numero)
 
-    # Associer ou créer les bons et extraire le CPU
-    for numero in numeros_bons:
-        bon, created = NumeroBonCommande.objects.get_or_create(numero=numero)
-        bon.fichiers.add(fichier_importe)  # toujours lier le fichier au bon
-        
-        # Extraire et mettre à jour le CPU à chaque import (pour refléter les changements)
-        cpu_found = False
-        for ligne in fichier_importe.lignes.all():
-            if isinstance(ligne.contenu, dict):
-                contenu = ligne.contenu
-                
-                # Vérifier que cette ligne correspond à ce bon
-                order_key = None
-                for key in contenu.keys():
-                    key_lower = key.lower() if key else ''
-                    if 'order' in key_lower or 'commande' in key_lower or 'bon' in key_lower or 'bc' in key_lower:
-                        order_key = key
-                        break
-                
-                if order_key and str(contenu.get(order_key, '')).strip() == numero:
-                    # Chercher la colonne CPU (recherche insensible à la casse)
-                    for key, value in contenu.items():
-                        if key and value:
-                            key_normalized = key.strip().upper()
-                            if key_normalized == 'CPU':
-                                # Nettoyer la valeur CPU (ex: '02 - ITS' -> 'ITS')
-                                cpu_value = str(value).strip()
-                                if ' - ' in cpu_value:
-                                    # Prendre la partie après le dernier tiret et supprimer les espaces
-                                    cpu_value = cpu_value.split('-')[-1].strip()
-                                
-                                # Mettre à jour le CPU à chaque import (même s'il existe déjà)
-                                if cpu_value and cpu_value.upper() not in ('N/A', 'NA', 'NULL', 'NONE', ''):
-                                    bon.cpu = cpu_value
-                                    bon.save(update_fields=['cpu'])
-                                    cpu_found = True
-                                    print(f"CPU extrait pour {numero}: {cpu_value}")
-                                break
-                    if cpu_found:
-                        break
-        
-        if not cpu_found:
-            print(f"⚠ CPU non trouvé pour {numero}")
+    # Si aucun numéro de bon n'a été trouvé, on retourne simplement le fichier
+    if not numeros_bons:
+        return fichier_importe, True
+
+    # 1) Récupérer les bons déjà existants en une seule requête
+    existing_nums = set(
+        NumeroBonCommande.objects.filter(numero__in=numeros_bons).values_list('numero', flat=True)
+    )
+
+    # 2) Déterminer les numéros à créer
+    to_create = [n for n in numeros_bons if n not in existing_nums]
+
+    # 3) Créer les nouveaux bons en batch pour réduire le nombre de requêtes
+    if to_create:
+        NumeroBonCommande.objects.bulk_create(
+            [NumeroBonCommande(numero=n) for n in to_create],
+            ignore_conflicts=True,
+        )
+
+    # 4) Recharger tous les bons (existants + nouveaux) et les associer au fichier en une seule opération M2M
+    all_bons = list(NumeroBonCommande.objects.filter(numero__in=numeros_bons))
+    fichier_importe.bons_commande.add(*all_bons)
+
+    # 5) Mettre à jour le CPU pour chaque bon en se basant sur une seule ligne représentative
+    cpu_par_bon = {}
+
+    for ligne in fichier_importe.lignes.all():
+        contenu = ligne.contenu
+        if not isinstance(contenu, dict):
+            continue
+
+        # Trouver la clé pour le numéro de commande
+        order_key = None
+        for key in contenu.keys():
+            key_lower = key.lower() if key else ''
+            if 'order' in key_lower or 'commande' in key_lower or 'bon' in key_lower or 'bc' in key_lower:
+                order_key = key
+                break
+
+        if not order_key:
+            continue
+
+        numero = str(contenu.get(order_key, '')).strip()
+        if numero not in numeros_bons:
+            continue
+
+        # Si on a déjà un CPU pour ce bon, ne pas le recalculer
+        if numero in cpu_par_bon:
+            continue
+
+        # Chercher la colonne CPU
+        for key, value in contenu.items():
+            if not key or not value:
+                continue
+            key_lower = key.strip().lower()
+            if key_lower == 'cpu':
+                cpu_value = str(value).strip()
+                if ' - ' in cpu_value:
+                    # Prendre la partie après le dernier tiret et supprimer les espaces
+                    cpu_value = cpu_value.split('-')[-1].strip()
+                if cpu_value and cpu_value.upper() not in ('N/A', 'NA', 'NULL', 'NONE', ''):
+                    cpu_par_bon[numero] = cpu_value
+                break
+
+    # Appliquer ces CPU aux objets NumeroBonCommande en une seule fois
+    if cpu_par_bon:
+        bons_a_mettre_a_jour = []
+        for bon in all_bons:
+            cpu_value = cpu_par_bon.get(bon.numero)
+            if cpu_value and bon.cpu != cpu_value:
+                bon.cpu = cpu_value
+                bons_a_mettre_a_jour.append(bon)
+
+        if bons_a_mettre_a_jour:
+            NumeroBonCommande.objects.bulk_update(bons_a_mettre_a_jour, ['cpu'])
 
     return fichier_importe, True
 

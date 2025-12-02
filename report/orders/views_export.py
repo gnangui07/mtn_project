@@ -1702,17 +1702,14 @@ def export_bon_excel(request, bon_id):
             if idx is not None and str(idx) in receptions:
                 # Si on a une réception pour cette ligne, utiliser ses valeurs
                 rec = receptions[str(idx)]
-                # Renommer Quantity Delivered en Receipt
+                
                 item['Quantity Delivered'] = rec['quantity_delivered']
                 item['Ordered Quantity'] = rec['ordered_quantity']
                 item['Quantity Not Delivered'] = rec['quantity_not_delivered']
                 item['Amount Delivered'] = rec['amount_delivered']
                 item['Quantity Payable'] = rec['quantity_payable']
                 item['Amount Payable'] = rec['amount_payable']
-                
-                # Supprimer l'ancienne colonne Quantity Delivered si elle existe
-                # if 'Quantity Delivered' in item:
-                #     del item['Quantity Delivered']
+
             elif 'Ordered Quantity' in item:
                 # Initialiser avec des valeurs par défaut si pas de réception existante
                 try:
@@ -1724,18 +1721,13 @@ def export_bon_excel(request, bon_id):
                     item['Quantity Payable'] = 0
                     item['Amount Payable'] = 0
                     
-                    # Supprimer l'ancienne colonne Quantity Delivered si elle existe
-                    # if 'Quantity Delivered' in item:
-                    #     del item['Quantity Delivered']
+
                 except (ValueError, TypeError):
                     item['Quantity Delivered'] = 0
                     item['Quantity Not Delivered'] = 0
                     item['Amount Delivered'] = 0
                     item['Quantity Payable'] = 0
                     item['Amount Payable'] = 0                    
-                    # Supprimer l'ancienne colonne Quantity Delivered si elle existe
-                    # if 'Quantity Delivered' in item:
-                    #     del item['Quantity Delivered']
     
     # Nettoyer les données avant export: retirer lignes d'erreur et totalement vides
     filtered_raw = []

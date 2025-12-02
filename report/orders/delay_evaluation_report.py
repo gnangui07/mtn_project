@@ -138,7 +138,7 @@ def _ensure_styles():
         "DelayEvalTitle",
         parent=styles["Title"],
         fontName="Times-Bold",
-        fontSize=16,
+        fontSize=14,
         alignment=TA_CENTER,
         textColor=colors.black,
         spaceAfter=6,
@@ -154,23 +154,23 @@ def _ensure_styles():
         "SectionHeader",
         parent=styles["Normal"],
         fontName="Times-Bold",
-        fontSize=10,
+        fontSize=9,
         alignment=TA_LEFT,
         textColor=colors.white,
         spaceAfter=4,
-        leading=12,
+        leading=11,
     )
     LABEL_STYLE = ParagraphStyle(
         "Label",
         parent=styles["Normal"],
         fontName="Times-Bold",
-        fontSize=8,
+        fontSize=7,
     )
     VALUE_STYLE = ParagraphStyle(
         "Value",
         parent=styles["Normal"],
         fontName="Times-Roman",
-        fontSize=8,
+        fontSize=7,
     )
     SMALL_STYLE = ParagraphStyle(
         "Small",

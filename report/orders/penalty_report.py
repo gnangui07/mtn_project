@@ -80,7 +80,7 @@ def generate_penalty_report(
         "Title",
         parent=styles["Title"],
         fontName="Times-Bold",
-        fontSize=16,
+        fontSize=14,
         alignment=TA_CENTER,
         textColor=colors.black,
         spaceAfter=6,
@@ -96,23 +96,23 @@ def generate_penalty_report(
         "SectionHeader",
         parent=styles["Normal"],
         fontName="Times-Bold",
-        fontSize=10,
+        fontSize=9,
         alignment=TA_LEFT,
         textColor=colors.white,
         spaceAfter=4,
-        leading=12,
+        leading=11,
     )
     label_style = ParagraphStyle(
         "Label",
         parent=styles["Normal"],
         fontName="Times-Bold",
-        fontSize=8,
+        fontSize=7,
     )
     value_style = ParagraphStyle(
         "Value",
         parent=styles["Normal"],
         fontName="Times-Roman",
-        fontSize=8,
+        fontSize=7,
     )
     small_style = ParagraphStyle(
         "Small",
