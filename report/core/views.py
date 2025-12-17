@@ -52,4 +52,46 @@ class AccueilView(LoginRequiredMixin, NoCacheMixin, View):
         Aucun contexte spécifique n'est requis pour le moment, mais on peut
         enrichir le contexte plus tard (ex: statistiques rapides, raccourcis, etc.).
         """
-        return render(request, self.template_name)
+        from decimal import Decimal
+        from django.db.models import Q
+        from orders.models import NumeroBonCommande
+
+        services_list = request.user.get_services_list() if hasattr(request.user, 'get_services_list') else []
+
+        if request.user.is_superuser:
+            accessible_bons = NumeroBonCommande.objects.all()
+            display_services = ['NWG', 'FAC', 'ITS']
+        else:
+            if services_list:
+                query = Q()
+                for s in services_list:
+                    query |= Q(cpu__iexact=s)
+                accessible_bons = NumeroBonCommande.objects.filter(query)
+                display_services = services_list
+            else:
+                accessible_bons = NumeroBonCommande.objects.none()
+                display_services = []
+
+        po_counts_by_service = []
+        for s in display_services:
+            bons_for_service = accessible_bons.filter(cpu__iexact=s)
+            count = bons_for_service.count()
+            total_amount = Decimal('0')
+            delivered_amount = Decimal('0')
+            for bon in bons_for_service:
+                try:
+                    total_amount += bon.montant_total()
+                    delivered_amount += bon.montant_recu()
+                except Exception:
+                    continue
+            po_counts_by_service.append({
+                'service': s,
+                'count': count,
+                'total_amount': total_amount,
+                'delivered_amount': delivered_amount,
+            })
+
+        context = {
+            'po_counts_by_service': po_counts_by_service,
+        }
+        return render(request, self.template_name, context)

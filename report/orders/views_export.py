@@ -1,10 +1,14 @@
 """
 Vues d'export Excel pour les bons de commande
 Contient toutes les fonctions d'export volumineuses (> 200 lignes)
+
+Supporte deux modes:
+- Synchrone (par défaut): Export direct, réponse bloquante
+- Asynchrone (?async=1): Démarrage tâche Celery, polling via API
 """
 
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, get_object_or_404
 from django.contrib import messages
 from django.db.models import Sum, F, Value, DecimalField, ExpressionWrapper, Case, When, Subquery, OuterRef, FloatField
@@ -20,6 +24,14 @@ from .views import filter_bons_by_user_service
 
 logger = logging.getLogger(__name__)
 
+# Import Celery tasks avec fallback si non disponible
+try:
+    from .tasks import export_po_progress_task, export_vendor_evaluations_task, export_bon_excel_task
+    from .task_status_api import register_user_task
+    CELERY_AVAILABLE = True
+except ImportError:
+    CELERY_AVAILABLE = False
+
 
 # ============================================================================
 # EXPORTS EXCEL
@@ -31,18 +43,51 @@ def export_po_progress_monitoring(request):
     But:
     - Exporter en Excel un tableau récapitulatif des bons (1 ligne par PO) pour le suivi.
 
-    Étapes:
-    1) Charger les bons + fichiers liés (et filtrer par service si non‑superuser).
-    2) Chercher la “première occurrence” de chaque PO pour lire les infos.
-    3) Calculer les montants/taux utiles (retards, retenues, livraisons…).
-    4) Construire un DataFrame et formater un fichier Excel propre (titres, nombres, %).
+    Mode async:
+    - Si ?async=1 : Lance la tâche Celery et retourne un JSON avec task_id pour polling
+    - Sinon : Export synchrone classique
 
     Entrées:
     - request (HttpRequest): utilisateur connecté requis (login_required).
+    - GET param 'async' (optionnel): si '1', mode asynchrone
 
     Sorties:
-    - HttpResponse: fichier .xlsx en téléchargement (Content-Disposition: attachment).
+    - Si async=1: JsonResponse avec task_id
+    - Sinon: HttpResponse fichier .xlsx en téléchargement
     """
+    # ===== MODE ASYNC =====
+    if request.GET.get('async') == '1' and CELERY_AVAILABLE:
+        try:
+            # Récupérer le service de l'utilisateur pour filtrer
+            user_service = None
+            if hasattr(request.user, 'service') and request.user.service:
+                user_service = request.user.service
+            
+            # Lancer la tâche Celery
+            task = export_po_progress_task.delay(
+                user_id=request.user.id,
+                user_service=user_service
+            )
+            
+            # Enregistrer la tâche pour l'utilisateur
+            try:
+                register_user_task(request.user.id, task.id, 'export_po_progress')
+            except Exception:
+                pass
+            
+            return JsonResponse({
+                'success': True,
+                'async': True,
+                'task_id': task.id,
+                'message': 'Export démarré en arrière-plan',
+                'poll_url': f'/orders/api/task-status/{task.id}/'
+            })
+        except Exception as e:
+            logger.error(f"Erreur lors du démarrage de l'export async: {e}")
+            # Fallback vers le mode sync si erreur
+            pass
+    
+    # ===== MODE SYNC (par défaut) =====
     try:
         from .models import NumeroBonCommande, InitialReceptionBusiness, LigneFichier
 

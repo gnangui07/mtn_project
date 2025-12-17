@@ -229,13 +229,10 @@ def download_msrn_report(request, report_id):
 def accueil(request):
     """
     But:
-    - Page d’entrée: lister les POs accessibles selon le service de l’utilisateur.
-
-    Étapes:
-    1) Charger tous les numéros de POs.
-    2) Filtrer selon les services de l’utilisateur.
-    3) Afficher un message si rien n’est accessible.
-    4) Rendre la page ‘reception.html’.
+    - Page d'entrée: lister les POs accessibles selon le service de l'utilisateur.
+    
+    Performance:
+    - Cache Redis par utilisateur (5 min) pour éviter les requêtes répétées.
 
     Entrées:
     - request (HttpRequest)
@@ -244,13 +241,101 @@ def accueil(request):
     - Template HTML `orders/reception.html` avec la liste des POs.
     """
     from .models import NumeroBonCommande
+    from django.core.cache import cache
     
-    # Récupérer les numéros de bons de commande filtrés par service de l'utilisateur
-    numeros_bons = NumeroBonCommande.objects.all().order_by('numero')
-    numeros_bons = filter_bons_by_user_service(numeros_bons, request.user)
+    # Clé de cache spécifique à l'utilisateur
+    cache_key = f"accueil_bons_{request.user.id}"
+    
+    # Essayer de récupérer depuis le cache
+    cached_bons = cache.get(cache_key)
+    
+    if cached_bons is not None and isinstance(cached_bons, list) and cached_bons and all(
+        isinstance(item, dict) and 'numero' in item and 'fichier_id' in item for item in cached_bons
+    ):
+        numeros_bons = cached_bons
+    else:
+        # Récupérer les numéros de bons avec informations nécessaires pour le dropdown
+        qs = NumeroBonCommande.objects.all().order_by('numero')
+        if not request.user.is_superuser:
+            services_list = request.user.get_services_list() if hasattr(request.user, 'get_services_list') else []
+            if services_list:
+                services_upper = [s.upper() for s in services_list]
+                qs = qs.filter(cpu__in=services_upper)
+            else:
+                qs = qs.none()
+        numeros_bons = []
+        # Import local pour éviter dépendances globales
+        try:
+            from .models import VendorEvaluation
+        except Exception:
+            VendorEvaluation = None
+        for bon in qs:
+            # Fichier le plus récent pour redirection
+            fichier_id = None
+            latest_file = None
+            try:
+                latest_file = bon.fichiers.order_by('-date_importation').first()
+                if latest_file:
+                    fichier_id = latest_file.id
+            except Exception:
+                fichier_id = None
+            # Supplier: première occurrence rapide
+            supplier = None
+            try:
+                if VendorEvaluation is not None:
+                    ve = VendorEvaluation.objects.filter(bon_commande=bon).values('supplier').first()
+                    supplier = ve['supplier'] if ve and ve.get('supplier') else None
+            except Exception:
+                supplier = None
+            # Essai via business_id pour récupérer Supplier sans parcourir tout le fichier
+            if supplier is None:
+                try:
+                    from .models import Reception, LigneFichier
+                    rec = Reception.objects.filter(bon_commande=bon).values('business_id', 'fichier_id').first()
+                    if rec and rec.get('business_id') and rec.get('fichier_id'):
+                        lf = LigneFichier.objects.filter(
+                            fichier_id=rec['fichier_id'],
+                            business_id=rec['business_id']
+                        ).values('contenu').first()
+                        contenu = lf['contenu'] if lf and lf.get('contenu') else {}
+                        def _norm(s: str):
+                            return ' '.join(str(s).strip().lower().replace('_', ' ').replace('-', ' ').split())
+                        for k, v in (contenu.items() if isinstance(contenu, dict) else []):
+                            if not k:
+                                continue
+                            nk = _norm(k)
+                            if v and ('supplier' in nk or 'vendor' in nk or 'fournisseur' in nk or 'vendeur' in nk):
+                                supplier = str(v)
+                                break
+                except Exception:
+                    supplier = None
+            if supplier is None and latest_file:
+                try:
+                    first_line = latest_file.lignes.order_by('numero_ligne').first()
+                    contenu = getattr(first_line, 'contenu', {}) or {}
+                    def _norm(s: str):
+                        return ' '.join(str(s).strip().lower().replace('_', ' ').replace('-', ' ').split())
+                    for k, v in contenu.items():
+                        if not k:
+                            continue
+                        nk = _norm(k)
+                        if v and ('supplier' in nk or 'vendor' in nk or 'fournisseur' in nk or 'vendeur' in nk):
+                            supplier = str(v)
+                            break
+                except Exception:
+                    supplier = None
+            numeros_bons.append({
+                'id': bon.id,
+                'numero': bon.numero,
+                'cpu': bon.cpu,
+                'fichier_id': fichier_id,
+                'supplier': supplier or 'N/A',
+            })
+        # Mettre en cache pendant 5 minutes
+        cache.set(cache_key, numeros_bons, timeout=300)
     
     # Afficher un message informatif si aucun bon n'est accessible
-    if not numeros_bons.exists() and not request.user.is_superuser:
+    if not numeros_bons and not request.user.is_superuser:
         services_list = request.user.get_services_list() if hasattr(request.user, 'get_services_list') else []
         if not services_list:
             messages.info(request, "⚠️ Votre compte n'est pas associé à un service. Veuillez contacter l'administrateur.")
@@ -267,31 +352,92 @@ def import_fichier(request):
     """But:
     - Importer un fichier (Excel, CSV, etc.) et extraire automatiquement les données.
 
-    Étapes:
-    1) GET → afficher le formulaire d’upload.
-    2) POST → valider le formulaire, appeler import_or_update_fichier.
-    3) Après sauvegarde, afficher un message et rediriger vers les détails.
+    Mode async (recommandé pour les gros fichiers):
+    - Si ?async=1 : Sauvegarde le fichier temporairement, lance la tâche Celery
+    - Sinon : Import synchrone classique
 
     Entrées:
     - request (HttpRequest) GET/POST (fichier dans request.FILES en POST).
 
     Sorties:
     - GET → template `orders/reception.html` avec le formulaire.
-    - POST valide → redirection `orders:details_bon`.
-    - POST invalide → ré-afficher le formulaire avec erreurs.
+    - POST async → JsonResponse avec task_id pour polling.
+    - POST sync → redirection `orders:details_bon`.
     """
+    # Import Celery task avec fallback
+    try:
+        from .tasks import import_fichier_task
+        from .task_status_api import register_user_task
+        CELERY_IMPORT_AVAILABLE = True
+    except ImportError:
+        CELERY_IMPORT_AVAILABLE = False
+    
     if request.method == 'POST':
         form = UploadFichierForm(request.POST, request.FILES)
         fichier_upload = None
         if form.is_valid():
             fichier_upload = form.cleaned_data['fichier']
         else:
-            # Debug pour comprendre pourquoi le formulaire n'est pas valide dans certains tests
-            print("DEBUG import_fichier form errors:", form.errors)
             # Fallback: utiliser directement le fichier envoyé si présent
             fichier_upload = request.FILES.get('fichier')
 
         if fichier_upload:
+            # ===== MODE ASYNC =====
+            async_mode = request.GET.get('async') == '1' or request.POST.get('async') == '1'
+            
+            if async_mode and CELERY_IMPORT_AVAILABLE:
+                try:
+                    import tempfile
+                    import os
+                    from django.conf import settings
+                    
+                    # Sauvegarder le fichier temporairement
+                    temp_dir = os.path.join(settings.MEDIA_ROOT, 'imports', 'temp')
+                    os.makedirs(temp_dir, exist_ok=True)
+                    
+                    # Nom unique pour le fichier
+                    import time
+                    temp_filename = f"import_{request.user.id}_{int(time.time())}_{fichier_upload.name}"
+                    temp_path = os.path.join(temp_dir, temp_filename)
+                    
+                    # Sauvegarder le fichier
+                    with open(temp_path, 'wb+') as destination:
+                        for chunk in fichier_upload.chunks():
+                            destination.write(chunk)
+                    
+                    # Lancer la tâche Celery
+                    task = import_fichier_task.delay(
+                        file_path=temp_path,
+                        user_id=request.user.id,
+                        original_filename=fichier_upload.name
+                    )
+                    
+                    # Enregistrer la tâche pour l'utilisateur
+                    try:
+                        register_user_task(request.user.id, task.id, 'import_fichier')
+                    except Exception:
+                        pass
+                    
+                    # Si c'est une requête AJAX, retourner JSON
+                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                        return JsonResponse({
+                            'success': True,
+                            'async': True,
+                            'task_id': task.id,
+                            'message': 'Import démarré en arrière-plan. Vous serez notifié quand le fichier sera traité.',
+                            'poll_url': f'/orders/api/task-status/{task.id}/'
+                        })
+                    else:
+                        # Sinon, rediriger vers une page de statut
+                        messages.info(request, f'Import en cours en arrière-plan (ID: {task.id}). Vous pouvez continuer à naviguer.')
+                        return redirect('orders:accueil')
+                        
+                except Exception as e:
+                    logger.error(f"Erreur lors du démarrage de l'import async: {e}")
+                    # Fallback vers le mode sync
+                    messages.warning(request, "Mode async non disponible, import synchrone en cours...")
+            
+            # ===== MODE SYNC (par défaut ou fallback) =====
             fichier, _created = import_or_update_fichier(fichier_upload, utilisateur=request.user)
             messages.success(request, f'Fichier importé avec succès. {getattr(fichier, "nombre_lignes", 0)} lignes extraites.')
             return redirect('orders:details_bon', bon_id=fichier.id)
@@ -983,7 +1129,7 @@ def search_bon(request):
             limit = 20
         limit = max(1, min(limit, 50))
 
-        qs = NumeroBonCommande.objects.all()
+        qs = NumeroBonCommande.objects.all().prefetch_related('fichiers__lignes')
         if q:
             qs = qs.filter(numero__icontains=q)
         
@@ -1000,9 +1146,57 @@ def search_bon(request):
                     fichier_id = latest_file.id
             except Exception:
                 fichier_id = None
+            # Supplier: rapide, sans parcourir toutes les lignes
+            try:
+                from .models import VendorEvaluation
+                ve = VendorEvaluation.objects.filter(bon_commande=bon).values('supplier').first()
+                supplier = ve['supplier'] if ve and ve.get('supplier') else None
+            except Exception:
+                supplier = None
+            # Essai via business_id pour récupérer Supplier de manière ciblée
+            if supplier is None:
+                try:
+                    from .models import Reception, LigneFichier
+                    rec = Reception.objects.filter(bon_commande=bon).values('business_id', 'fichier_id').first()
+                    if rec and rec.get('business_id') and rec.get('fichier_id'):
+                        lf = LigneFichier.objects.filter(
+                            fichier_id=rec['fichier_id'],
+                            business_id=rec['business_id']
+                        ).values('contenu').first()
+                        contenu = lf['contenu'] if lf and lf.get('contenu') else {}
+                        def norm(s: str):
+                            return ' '.join(str(s).strip().lower().replace('_', ' ').replace('-', ' ').split())
+                        for k, v in (contenu.items() if isinstance(contenu, dict) else []):
+                            if not k:
+                                continue
+                            nk = norm(k)
+                            if v and ('supplier' in nk or 'vendor' in nk or 'fournisseur' in nk or 'vendeur' in nk):
+                                supplier = str(v)
+                                break
+                except Exception:
+                    supplier = None
+            if supplier is None and latest_file:
+                try:
+                    # Première ligne du dernier fichier importé
+                    first_line = latest_file.lignes.order_by('numero_ligne').first()
+                    contenu = getattr(first_line, 'contenu', {}) or {}
+                    # Recherche tolérante des clés Supplier/Vendor/Fournisseur
+                    def norm(s: str):
+                        return ' '.join(str(s).strip().lower().replace('_', ' ').replace('-', ' ').split())
+                    for k, v in contenu.items():
+                        if not k:
+                            continue
+                        nk = norm(k)
+                        if v and ('supplier' in nk or 'vendor' in nk or 'fournisseur' in nk or 'vendeur' in nk):
+                            supplier = str(v)
+                            break
+                except Exception:
+                    supplier = None
             bons.append({
                 'numero': bon.numero,
                 'fichier_id': fichier_id,
+                'cpu': bon.cpu,
+                'supplier': supplier,
             })
 
         return JsonResponse({'status': 'success', 'data': bons})
@@ -1835,5 +2029,3 @@ def vendor_ranking(request):
     }
     
     return render(request, 'orders/vendor_ranking.html', context)
-
-

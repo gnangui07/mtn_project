@@ -1,310 +1,810 @@
+<!-- Nouveau fichier : accueil.html -->
 {% extends 'base.html' %}
 {% load static %}
+{% load humanize %}
 
-{% block title %}Accueil{% endblock %}
+{% block title %}Accueil - CAPEX Valuation{% endblock %}
 
 {% block extra_css %}
-<!-- Styles spécifiques à la page d'accueil: variables, mise en page et cartes -->
+<!-- Variables et styles globaux -->
 <style>
+    /* ========================================
+       VARIABLES ET STYLES DE PAGE D'ACCUEIL
+       ======================================== */
+    
     :root {
-        --mtn-yellow: #FFCC00;
-        --mtn-black: #000000;
-        --mtn-gray: #666666;
-        --mtn-light: #f8f8f8;
+        --dashboard-bg: #f8f9fa;
+        --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        --card-hover-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+        --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+        --yellow-gradient: linear-gradient(135deg, #FFCC00 0%, #FFD633 100%);
+        --black-gradient: linear-gradient(135deg, #000000 0%, #222222 100%);
+        --success-gradient: linear-gradient(135deg, #10B981 0%, #34D399 100%);
+        --info-gradient: linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%);
     }
     
-    /* Conteneur principal de la page d'accueil */
-    .search-page {
-        background-color: var(--mtn-light);
-        min-height: calc(100vh - 56px);
-        display: flex;
-        align-items: center;
-        padding: 2rem 0;
+    /* Conteneur principal */
+    .dashboard-container {
+        min-height: calc(100vh - 2rem);
+        background: var(--dashboard-bg);
+        padding: 2rem;
+        animation: fadeIn 0.6s ease-out;
     }
     
-    /* Carte cliquable pour chaque option (Consultation / Réception) */
-    .option-card {
-        cursor: pointer;
-        transition: all 0.3s ease;
-        border: 2px solid transparent;
-        height: 100%;
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
     }
     
-    .option-card:hover, .option-card.active {
-        border-color: var(--mtn-yellow);
-        box-shadow: 0 4px 12px rgba(255, 204, 0, 0.2);
-        transform: translateY(-5px);
-    }
+    /* ========================================
+       HEADER DU DASHBOARD
+       ======================================== */
     
-    .option-icon {
-        color: var(--mtn-yellow);
-        margin-bottom: 1rem;
-    }
-    
-    .search-container {
-        max-width: 800px;
-        margin: 0 auto;
-        background-color: #fff;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        overflow: hidden;
-    }
-    
-    /* Bandeau jaune en tête du bloc central */
-    .search-header {
-        background: linear-gradient(135deg, var(--mtn-yellow) 0%, #e6b800 100%);
-        padding: 1.5rem;
-        color: var(--mtn-black);
-        position: relative;
-    }
-    
-    .search-title {
-        font-size: 1.5rem;
-        font-weight: 700;
-        margin-bottom: 0.5rem;
-    }
-    
-    .search-subtitle {
-        font-size: 0.9rem;
-        opacity: 0.8;
-    }
-    
-    /* Corps: messages flash + choix d'options */
-    .search-form-container {
-        padding: 1.5rem;
-        border-bottom: 1px solid #eee;
-    }
-    
-    .search-input-group {
-        position: relative;
-        margin-bottom: 1rem;
-    }
-    
-    .search-input {
-        width: 100%;
-        padding: 0.75rem 1rem 0.75rem 3rem;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        font-size: 1rem;
-        transition: all 0.2s;
-    }
-    
-    .search-input:focus {
-        outline: none;
-        border-color: var(--mtn-yellow);
-        box-shadow: 0 0 0 3px rgba(255, 204, 0, 0.15);
-    }
-    
-    .search-icon {
-        position: absolute;
-        left: 1rem;
-        top: 50%;
-        transform: translateY(-50%);
-        color: var(--mtn-yellow);
-    }
-    
-    .search-button {
-        width: 100%;
-        padding: 0.75rem 1rem;
-        background: linear-gradient(to right, var(--mtn-yellow), #e6b800);
-        border: none;
-        border-radius: 4px;
-        color: var(--mtn-black);
-        font-weight: 600;
-        font-size: 1rem;
-        cursor: pointer;
-        transition: all 0.2s;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    .search-button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        background: linear-gradient(to right, #e6b800, var(--mtn-yellow));
-    }
-    
-    .search-button i {
-        margin-right: 0.5rem;
-    }
-    
-    .results-container {
-        padding: 1.5rem;
-    }
-    
-    .results-title {
-        font-size: 0.9rem;
-        font-weight: 600;
-        color: var(--mtn-gray);
-        margin-bottom: 1rem;
-        display: flex;
-        align-items: center;
-    }
-    
-    .results-title i {
-        color: var(--mtn-yellow);
-        margin-right: 0.5rem;
-    }
-    
-    .results-list {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-    }
-    
-    .result-item {
-        padding: 0.75rem;
-        border-radius: 4px;
-        margin-bottom: 0.5rem;
-        transition: all 0.2s;
-        border-left: 3px solid transparent;
-    }
-    
-    .result-item:hover {
-        background-color: var(--mtn-light);
-        border-left-color: var(--mtn-yellow);
-    }
-    
-    .result-link {
+    .dashboard-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        text-decoration: none;
-        color: var(--mtn-black);
+        margin-bottom: 2.5rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
     }
     
-    .result-number {
-        font-weight: 500;
-        display: flex;
-        align-items: center;
-    }
-    
-    .result-number i {
-        color: var(--mtn-yellow);
-        margin-right: 0.5rem;
-        font-size: 0.9rem;
-    }
-    
-    .result-date {
-        font-size: 0.8rem;
-        color: var(--mtn-gray);
-        background-color: rgba(0, 0, 0, 0.05);
-        padding: 0.25rem 0.5rem;
-        border-radius: 20px;
-    }
-    
-    .similar-results {
-        border-top: 1px solid #eee;
-        padding-top: 1rem;
-        margin-top: 1rem;
-    }
-    
-    .alert {
-        padding: 0.75rem 1rem;
-        margin-bottom: 1rem;
-        border-radius: 4px;
-        font-size: 0.9rem;
-        display: flex;
-        align-items: center;
-    }
-    
-    .alert i {
-        margin-right: 0.5rem;
-    }
-    
-    .alert-danger {
-        background-color: #fef2f2;
-        color: #b91c1c;
-        border-left: 3px solid #ef4444;
-    }
-    
-    .alert-success {
-        background-color: #f0fdf4;
-        color: #166534;
-        border-left: 3px solid #22c55e;
-    }
-    
-    .empty-state {
-        text-align: center;
-        padding: 1.5rem;
-        color: var(--mtn-gray);
-    }
-    
-    .empty-state i {
+    .header-left h1 {
         font-size: 2rem;
-        color: #ddd;
-        margin-bottom: 1rem;
+        font-weight: 700;
+        color: #000;
+        margin: 0;
+        background: linear-gradient(135deg, #000 0%, #333 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    
+    .header-left .greeting {
+        font-size: 1.1rem;
+        color: #666;
+        margin-top: 0.5rem;
+    }
+    
+    .header-right {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+    }
+    
+    .datetime-display {
+        background: white;
+        padding: 0.75rem 1.5rem;
+        border-radius: 12px;
+        box-shadow: var(--card-shadow);
+        font-family: 'Inter', monospace;
+        font-weight: 500;
+        color: #333;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    
+    .datetime-display i {
+        color: #FFCC00;
+        font-size: 1.1rem;
+    }
+    
+    .user-badge {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        background: white;
+        padding: 0.75rem 1.5rem;
+        border-radius: 12px;
+        box-shadow: var(--card-shadow);
+        transition: var(--transition-base);
+        cursor: pointer;
+    }
+    
+    .user-badge:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--card-hover-shadow);
+    }
+    
+    .user-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--yellow-gradient);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        color: #000;
+        font-size: 1.1rem;
+    }
+    
+    .user-info {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .user-name {
+        font-weight: 600;
+        color: #000;
+        white-space: nowrap;
+    }
+    
+    .user-role {
+        font-size: 0.85rem;
+        color: #666;
+    }
+    
+    /* ========================================
+       SECTION BIENVENUE
+       ======================================== */
+    
+    .welcome-section {
+        margin-bottom: 2.5rem;
+    }
+    
+    .welcome-card {
+        position: relative;
+        overflow: hidden;
+        border-radius: 16px;
+        background-image: url("{% static 'welcome.jpg' %}");
+        background-size: cover;
+        background-position: center;
+        color: white;
+        padding: 2.5rem;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        min-height: 200px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    
+    .welcome-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 60%;
+        height: 100%;
+        background: radial-gradient(circle at top right, rgba(255, 204, 0, 0.2), transparent 70%);
+        pointer-events: none;
+    }
+    
+    .welcome-card::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.45);
+        z-index: 1;
+    }
+    
+    .welcome-content {
+        position: relative;
+        z-index: 2;
+        max-width: 600px;
+    }
+    
+    .welcome-title {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        color: white;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.9);
+    }
+    
+    .welcome-subtitle {
+        font-size: 1.1rem;
+        opacity: 0.9;
+        color: rgba(255, 255, 255, 0.95);
+        line-height: 1.6;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+    }
+    
+    /* ========================================
+       SECTION ACTIONS RAPIDES
+       ======================================== */
+    
+    .quick-actions-section {
+        margin-bottom: 3rem;
+    }
+    
+    .section-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #000;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    
+    .section-title i {
+        color: #FFCC00;
+    }
+    
+    .actions-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+    }
+    
+    .action-card {
+        background: white;
+        border-radius: 16px;
+        padding: 2rem;
+        box-shadow: var(--card-shadow);
+        transition: var(--transition-base);
+        cursor: pointer;
+        border: 2px solid transparent;
+        text-decoration: none;
+        color: inherit;
         display: block;
+        height: 100%;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .action-card:hover {
+        transform: translateY(-8px);
+        box-shadow: var(--card-hover-shadow);
+        border-color: #FFCC00;
+    }
+    
+    .action-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: var(--yellow-gradient);
+    }
+    
+    .card-content {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+    
+    .card-image {
+        width: 100%;
+        height: 140px;
+        border-radius: 12px;
+        background-size: cover;
+        background-position: center;
+        margin-bottom: 1rem;
+        box-shadow: var(--card-shadow);
+        position: relative;
+        overflow: hidden;
+    }
+    .card-image::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(to bottom, rgba(0,0,0,0.10), rgba(0,0,0,0.00) 60%);
+        pointer-events: none;
+    }
+    
+    .card-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1.5rem;
+        font-size: 1.8rem;
+        color: white;
+    }
+    
+    .card-1 .card-icon {
+        background: var(--success-gradient);
+    }
+    
+    .card-2 .card-icon {
+        background: var(--info-gradient);
+    }
+    
+    .card-title {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: #000;
+        margin-bottom: 0.75rem;
+    }
+    
+    .card-description {
+        color: #666;
+        line-height: 1.5;
+        flex-grow: 1;
+        margin-bottom: 1.5rem;
+    }
+    
+    .card-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: auto;
+    }
+    
+    .card-stats {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: #666;
+        font-size: 0.9rem;
+    }
+    
+    .card-stats i {
+        color: #FFCC00;
+    }
+    
+    .card-arrow {
+        color: #666;
+        transition: var(--transition-base);
+    }
+    
+    .action-card:hover .card-arrow {
+        color: #FFCC00;
+        transform: translateX(4px);
+    }
+    
+    /* ========================================
+       SECTION STATISTIQUES
+       ======================================== */
+    
+    .stats-section {
+        margin-top: 2rem;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+    }
+    
+    .stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: var(--card-shadow);
+        border-left: 4px solid #FFCC00;
+    }
+    
+    .stat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+    
+    .stat-title {
+        font-size: 0.9rem;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .stat-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.2rem;
+    }
+    
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #000;
+        margin-bottom: 0.5rem;
+    }
+    
+    .stat-change {
+        font-size: 0.85rem;
+        color: #10B981;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+    
+    .stat-change.negative {
+        color: #EF4444;
+    }
+    
+    /* ========================================
+       MESSAGES FLASH
+       ======================================== */
+    
+    .flash-messages {
+        margin-bottom: 2rem;
+    }
+    
+    .flash-message {
+        padding: 1rem 1.5rem;
+        border-radius: 12px;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        animation: slideInRight 0.3s ease-out;
+    }
+    
+    .flash-message.success {
+        background: linear-gradient(135deg, #D1FAE5 0%, #ECFDF5 100%);
+        border-left: 4px solid #10B981;
+        color: #065F46;
+    }
+    
+    .flash-message.error {
+        background: linear-gradient(135deg, #FEE2E2 0%, #FEF2F2 100%);
+        border-left: 4px solid #EF4444;
+        color: #7F1D1D;
+    }
+    
+    .flash-message.info {
+        background: linear-gradient(135deg, #DBEAFE 0%, #EFF6FF 100%);
+        border-left: 4px solid #3B82F6;
+        color: #1E40AF;
+    }
+    
+    .flash-icon {
+        font-size: 1.2rem;
+    }
+    
+    /* ========================================
+       RESPONSIVE DESIGN
+       ======================================== */
+    
+    @media (max-width: 992px) {
+        .dashboard-container {
+            padding: 1.5rem;
+        }
+        
+        .dashboard-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1.5rem;
+        }
+        
+        .header-right {
+            width: 100%;
+            justify-content: space-between;
+        }
+        
+        .actions-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .dashboard-container {
+            padding: 1rem;
+        }
+        
+        .header-left h1 {
+            font-size: 1.5rem;
+        }
+        
+        .welcome-card {
+            padding: 1.5rem;
+        }
+        
+        .welcome-title {
+            font-size: 1.5rem;
+        }
+        
+        .datetime-display,
+        .user-badge {
+            padding: 0.5rem 1rem;
+        }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="search-page">
-    <div class="container">
-        <div class="search-container">
-            <!-- En-tête de recherche (titre + sous-titre) -->
-            <div class="search-header">
-                <h1 class="search-title">CAPEX Works Valuation Tool</h1>
-                <p class="search-subtitle">Choose one of the following options</p>
+<div class="dashboard-container">
+    <!-- Messages Flash -->
+    <div class="flash-messages">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="flash-message {{ message.tags }}">
+                    <i class="flash-icon fas 
+                        {% if message.tags == 'error' %}fa-exclamation-circle
+                        {% elif message.tags == 'success' %}fa-check-circle
+                        {% else %}fa-info-circle{% endif %}">
+                    </i>
+                    <span>{{ message }}</span>
+                </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+    
+    <!-- Header -->
+    <header class="dashboard-header">
+        <div class="header-left">
+            <h1>CAPEX Works Valuation Dashboard</h1>
+            <div class="greeting" id="greetingText"></div>
+        </div>
+        
+        <div class="header-right">
+            <div class="datetime-display">
+                <i class="fas fa-clock"></i>
+                <span id="currentDateTime"></span>
             </div>
             
-            <!-- Corps principal: messages + options -->
-            <div class="search-form-container">
-                <!-- Messages flash (erreurs, infos) -->
-                {% if messages %}
-                    {% for message in messages %}
-                        <div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-info{% endif %}">
-                            <i class="fas {% if message.tags == 'error' %}fa-exclamation-circle{% else %}fa-info-circle{% endif %}"></i>
-                            {{ message }}
-                        </div>
-                    {% endfor %}
-                {% endif %}
-                
-                <div class="row">
-                    <!-- Option 1: Consultation des bons de commande -->
-                    <div class="col-md-6 mb-3">
-                        <a href="{% url 'orders:consultation' %}" class="text-decoration-none">
-                            <div class="card h-100 option-card">
-                                <div class="card-body text-center">
-                                    <i class="fas fa-clipboard-list fa-4x mb-3 option-icon"></i>
-                                    <h4>Delivery Overview </h4>
-                                    <p class="text-muted">View order forms</p>
-                                </div>
-                            </div>
-                        </a>
-                    </div>
-                    <!-- Option 2: Réception des bons de commande -->
-                    <div class="col-md-6 mb-3">
-                        <a href="{% url 'orders:reception' %}" class="text-decoration-none">
-                            <div class="card h-100 option-card">
-                                <div class="card-body text-center">
-                                    <i class="fas fa-search fa-4x mb-3 option-icon"></i>
-                                    <h4>Register Delivery</h4>
-                                    <p class="text-muted">perform acceptances</p>
-                                </div>
-                            </div>
-                        </a>
-                    </div>
+            <div class="user-badge">
+                <div class="user-avatar">
+                    {% if user.is_authenticated %}
+                        {{ user.first_name|default:'U'|slice:':1'|upper }}
+                    {% else %}
+                        <i class="fas fa-user"></i>
+                    {% endif %}
+                </div>
+                <div class="user-info">
+                    <span class="user-name">
+                        {% if user.is_authenticated %}
+                            {{ user.get_full_name|default:user.email }}
+                        {% else %}
+                            Guest User
+                        {% endif %}
+                    </span>
+                    <span class="user-role">
+                        {% if user.is_authenticated %}
+                            {% if user.is_superuser %}Administrator
+                            {% else %}Standard User{% endif %}
+                        {% else %}
+                            Not authenticated
+                        {% endif %}
+                    </span>
                 </div>
             </div>
-            
-
         </div>
-    </div>
+    </header>
+    
+    <!-- Section Bienvenue -->
+    <section class="welcome-section">
+        <div class="welcome-card">
+            <div class="welcome-content">
+                <h2 class="welcome-title" id="dynamicGreeting"></h2>
+                <p class="welcome-subtitle">
+                    Welcome to the CAPEX Works Valuation Tool. Manage deliveries, monitor PO progress, 
+                    and evaluate vendor performance from a single dashboard.
+                </p>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Section Actions Rapides -->
+    <section class="quick-actions-section">
+        <h2 class="section-title">
+            <i class="fas fa-bolt"></i>
+            Quick Actions
+        </h2>
+        
+        <div class="actions-grid">
+            <!-- Carte Consultation -->
+            <a href="{% url 'orders:consultation' %}" class="action-card card-1">
+                <div class="card-content">
+                    <div class="card-image" style="background-image: url('{% static 'consultation.jpg' %}');"></div>
+                    <h3 class="card-title">Delivery Overview</h3>
+                </div>
+            </a>
+            
+            <!-- Carte Réception -->
+            <a href="{% url 'orders:reception' %}" class="action-card card-2">
+                <div class="card-content">
+                    <div class="card-image" style="background-image: url('{% static 'acceptance.jpg' %}');"></div>
+                    <h3 class="card-title">Register Delivery</h3>
+                </div>
+            </a>
+        </div>
+    </section>
+    
+    <!-- Section Statistiques -->
+    <section class="stats-section">
+        <h2 class="section-title">
+            <i class="fas fa-chart-line"></i>
+            System Overview
+        </h2>
+        
+        <div class="stats-grid">
+            {% for item in po_counts_by_service %}
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-title">{{ item.service }} POs</div>
+                    <div class="stat-icon" style="background: var(--info-gradient);">
+                        <i class="fas fa-file-invoice"></i>
+                    </div>
+                </div>
+                <div class="stat-value">{{ item.count }}</div>
+                <div class="stat-change">
+                    <i class="fas fa-coins"></i>
+                    <span>Total: {{ item.total_amount|floatformat:2|intcomma }}</span>
+                </div>
+                <div class="stat-change">
+                    <i class="fas fa-truck"></i>
+                    <span>Delivered: {{ item.delivered_amount|floatformat:2|intcomma }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<!-- JS léger pour l'interaction visuelle des cartes -->
+<!-- Scripts pour la page d'accueil -->
 <script>
-    $(document).ready(function() {
-        // Effet de survol pour les cartes d'options
-        $('.option-card').hover(function() {
-            $(this).addClass('active');
-        }, function() {
-            $(this).removeClass('active');
+    // ========================================
+    // COMPOSANT DATETIME
+    // ========================================
+    class DateTimeComponent {
+        constructor() {
+            this.dateTimeElement = document.getElementById('currentDateTime');
+            this.greetingElement = document.getElementById('greetingText');
+            this.dynamicGreetingElement = document.getElementById('dynamicGreeting');
+            this.init();
+        }
+        
+        init() {
+            this.updateDateTime();
+            this.updateGreetings();
+            setInterval(() => {
+                this.updateDateTime();
+                this.updateGreetings();
+            }, 60000); // Update every minute
+        }
+        
+        updateDateTime() {
+            const now = new Date();
+            const options = { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            };
+            this.dateTimeElement.textContent = now.toLocaleDateString('en-US', options);
+        }
+        
+        updateGreetings() {
+            const hour = new Date().getHours();
+            let greeting = 'Good morning';
+            let fullGreeting = 'Good morning';
+            
+            if (hour >= 12 && hour < 18) {
+                greeting = 'Good afternoon';
+                fullGreeting = 'Good afternoon';
+            } else if (hour >= 18) {
+                greeting = 'Good evening';
+                fullGreeting = 'Good evening';
+            } else if (hour < 5) {
+                greeting = 'Good night';
+                fullGreeting = 'Working late? Good night';
+            }
+            
+            this.greetingElement.textContent = greeting;
+            this.dynamicGreetingElement.textContent = fullGreeting + ', ' + 
+                (userFullName || 'Valued User') + '!';
+        }
+    }
+    
+    // ========================================
+    // COMPOSANT STATISTIQUES
+    // ========================================
+    class StatsComponent {
+        constructor() {
+            this.deliveriesStat = document.getElementById('statDeliveries');
+            this.vendorsStat = document.getElementById('statVendors');
+            this.completionStat = document.getElementById('statCompletion');
+            this.init();
+        }
+        
+        async init() {
+            // Simuler des données pour la démonstration
+            // Dans une app réelle, vous feriez une requête API ici
+            setTimeout(() => this.loadStats(), 1000);
+        }
+        
+        loadStats() {
+            // Données simulées
+            const mockStats = {
+                deliveries: Math.floor(Math.random() * 150) + 50,
+                vendors: Math.floor(Math.random() * 30) + 10,
+                completion: Math.floor(Math.random() * 30) + 70
+            };
+            
+            this.animateValue(this.deliveriesStat, mockStats.deliveries);
+            this.animateValue(this.vendorsStat, mockStats.vendors);
+            this.animateValue(this.completionStat, mockStats.completion + '%');
+        }
+        
+        animateValue(element, target) {
+            const current = parseInt(element.textContent) || 0;
+            const increment = target > current ? 1 : -1;
+            const duration = 1000;
+            const stepTime = Math.abs(Math.floor(duration / (target - current)));
+            
+            let timer = setInterval(() => {
+                current += increment;
+                element.textContent = element.id === 'statCompletion' ? 
+                    current + '%' : current;
+                
+                if (current == target) {
+                    clearInterval(timer);
+                }
+            }, stepTime);
+        }
+    }
+    
+    // ========================================
+    // COMPOSANT CARTES INTERACTIVES
+    // ========================================
+    class CardsComponent {
+        constructor() {
+            this.cards = document.querySelectorAll('.action-card');
+            this.init();
+        }
+        
+        init() {
+            this.cards.forEach(card => {
+                card.addEventListener('mouseenter', () => this.handleHover(card, true));
+                card.addEventListener('mouseleave', () => this.handleHover(card, false));
+                card.addEventListener('click', (e) => {
+                    if (!card.getAttribute('href')) {
+                        e.preventDefault();
+                    }
+                });
+            });
+        }
+        
+        handleHover(card, isHovering) {
+            const arrow = card.querySelector('.card-arrow');
+            if (arrow) {
+                arrow.style.transform = isHovering ? 'translateX(8px)' : 'translateX(0)';
+            }
+        }
+    }
+    
+    // ========================================
+    // INITIALISATION DE L'APPLICATION
+    // ========================================
+    document.addEventListener('DOMContentLoaded', () => {
+        // Récupérer le nom d'utilisateur pour les messages de bienvenue
+        window.userFullName = '{{ user.get_full_name|default:"" }}'.trim() || 
+                             '{{ user.email|default:"Valued User" }}';
+        
+        // Initialiser les composants
+        new DateTimeComponent();
+        new StatsComponent();
+        new CardsComponent();
+        
+        // Animation d'entrée progressive
+        const cards = document.querySelectorAll('.action-card, .stat-card');
+        cards.forEach((card, index) => {
+            card.style.animationDelay = `${index * 0.1}s`;
+            card.classList.add('animate-fade-in-up');
+        });
+        
+        // Gestion des messages flash
+        const flashMessages = document.querySelectorAll('.flash-message');
+        flashMessages.forEach((message, index) => {
+            message.style.animationDelay = `${index * 0.2}s`;
+            
+            // Auto-dismiss après 5 secondes
+            setTimeout(() => {
+                message.style.opacity = '0';
+                message.style.transform = 'translateX(20px)';
+                setTimeout(() => {
+                    if (message.parentNode) {
+                        message.parentNode.removeChild(message);
+                    }
+                }, 300);
+            }, 5000);
         });
     });
 </script>

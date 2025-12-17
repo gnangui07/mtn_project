@@ -1,24 +1,5 @@
 {% extends 'users/base_auth.html' %}
-<!--
-  Template: users/confirmer_activation.html
-  Rôle: Dernière étape d'activation. L'utilisateur choisit son mot de passe.
-  Hérite de: users/base_auth.html (gabarit d'authentification)
-
-  Blocs utilisés:
-  - title: titre de l'onglet
-  - header_title / header_subtitle: en-tête de la page
-  - content: formulaire de création du mot de passe (POST + CSRF)
-  - extra_js: scripts pour vérifier la force et la correspondance des mots de passe
-
-  Données échangées:
-  - POST { new_password, confirm_password } → vue `users:confirm_password`
-  - CSRF token inclus pour sécurité
-
-  Composants UI:
-  - Alerte succès: rappelle que l'email/temp password ont été validés.
-  - Deux champs mot de passe + boutons œil pour afficher/masquer.
-  - Barre de force, messages d’erreur clairs et bouton désactivé tant que non valide.
--->
+{% load static %}
 
 {% block title %}Créer votre mot de passe - MTN CI{% endblock %}
 
@@ -26,75 +7,75 @@
 {% block header_subtitle %}Dernière étape pour accéder à CAPEX Works Valuation{% endblock %}
 
 {% block content %}
-<div class="alert alert-success mb-4">
-    <i class="fas fa-check-circle"></i>
-    <strong>Identifiants vérifiés !</strong><br>
-    Créez maintenant votre mot de passe sécurisé pour finaliser l'activation de votre compte.
-</div>
+<div class="mb-4 rounded-lg bg-green-50 text-green-900 p-3">
+    Identifiants vérifiés. Créez maintenant votre mot de passe sécurisé pour finaliser l'activation de votre compte.
+    </div>
 
-<form method="post" id="confirmForm">
+<form method="post" id="confirmForm" class="auth-form spectrum-Form spectrum-Form--labelsLeft">
     {% csrf_token %}
     
-    <div class="mb-3">
-        <label for="new_password" class="form-label">
-            <i class="fas fa-lock"></i> Nouveau mot de passe
+    <div class="spectrum-Form-item">
+        <label for="new_password" class="auth-label spectrum-Form-itemLabel spectrum-FieldLabel">
+            <svg class="auth-label-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path fill="currentColor" d="M12 1a7 7 0 0 1 7 7v3h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h1V8a7 7 0 0 1 7-7zm0 4a3 3 0 0 0-3 3v3h6V8a3 3 0 0 0-3-3z"/>
+            </svg>
+            Nouveau mot de passe
         </label>
-        <div class="input-group">
-            <span class="input-group-text">
-                <i class="fas fa-key"></i>
-            </span>
+        <div class="spectrum-Form-itemField input-with-action">
             <input 
                 type="password" 
-                class="form-control" 
+                class="auth-input spectrum-Textfield" 
                 id="new_password" 
                 name="new_password" 
                 placeholder="Minimum 8 caractères"
                 required
                 autofocus
             >
-            <button class="btn btn-outline-secondary" type="button" id="togglePassword1">
-                <i class="fas fa-eye"></i>
+            <button class="spectrum-Button spectrum-Button--sizeS" type="button" id="togglePassword1" aria-label="Voir le mot de passe">
+                <svg class="auth-toggle-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12a4.5 4.5 0 1 1 0-9a4.5 4.5 0 0 1 0 9z"/>
+                </svg>
             </button>
         </div>
-        <div class="password-strength" id="strengthBar"></div>
-        <small class="text-muted" id="strengthText"></small>
+        <div id="strengthBar" class="h-1 rounded bg-gray-200 mt-2"></div>
+        <small id="strengthText" class="text-sm"></small>
         <div id="passwordErrors" class="mt-2"></div>
     </div>
     
-    <div class="mb-4">
-        <label for="confirm_password" class="form-label">
-            <i class="fas fa-lock"></i> Confirmer le mot de passe
+    <div class="spectrum-Form-item">
+        <label for="confirm_password" class="auth-label spectrum-Form-itemLabel spectrum-FieldLabel">
+            <svg class="auth-label-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path fill="currentColor" d="M12 1a7 7 0 0 1 7 7v3h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h1V8a7 7 0 0 1 7-7zm0 4a3 3 0 0 0-3 3v3h6V8a3 3 0 0 0-3-3z"/>
+            </svg>
+            Confirmer le mot de passe
         </label>
-        <div class="input-group">
-            <span class="input-group-text">
-                <i class="fas fa-key"></i>
-            </span>
+        <div class="spectrum-Form-itemField input-with-action">
             <input 
                 type="password" 
-                class="form-control" 
+                class="auth-input spectrum-Textfield" 
                 id="confirm_password" 
                 name="confirm_password" 
                 placeholder="Retapez votre mot de passe"
                 required
             >
-            <button class="btn btn-outline-secondary" type="button" id="togglePassword2">
-                <i class="fas fa-eye"></i>
+            <button class="spectrum-Button spectrum-Button--sizeS" type="button" id="togglePassword2" aria-label="Voir le mot de passe">
+                <svg class="auth-toggle-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12a4.5 4.5 0 1 1 0-9a4.5 4.5 0 0 1 0 9z"/>
+                </svg>
             </button>
         </div>
-        <small class="text-muted" id="matchText"></small>
+        <small id="matchText" class="text-sm"></small>
         <div id="confirmErrors" class="mt-2"></div>
     </div>
     
-    <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
-        <i class="fas fa-check-double"></i> Activer mon compte
+    <button type="submit" class="auth-submit spectrum-Button spectrum-Button--cta spectrum-Button--sizeM" id="submitBtn" disabled>
+        <span class="spectrum-Button-label">Activer mon compte</span>
     </button>
 </form>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    // Section: Références DOM
-    // On récupère les éléments nécessaires pour les interactions et validations.
     const newPasswordInput = document.getElementById('new_password');
     const confirmPasswordInput = document.getElementById('confirm_password');
     const strengthBar = document.getElementById('strengthBar');
@@ -103,43 +84,26 @@
     const submitBtn = document.getElementById('submitBtn');
     const passwordErrors = document.getElementById('passwordErrors');
     const confirmErrors = document.getElementById('confirmErrors');
-    
-    // Section: Affichage/masquage des mots de passe
-    // Permet à l'utilisateur de vérifier ce qu'il tape facilement.
-    // Toggle password visibility
-    document.getElementById('togglePassword1').addEventListener('click', function() {
-        togglePasswordVisibility('new_password', this);
-    });
-    
-    document.getElementById('togglePassword2').addEventListener('click', function() {
-        togglePasswordVisibility('confirm_password', this);
-    });
-    
-    function togglePasswordVisibility(inputId, button) {
-        const input = document.getElementById(inputId);
-        const icon = button.querySelector('i');
-        
-        if (input.type === 'password') {
-            input.type = 'text';
-            icon.classList.remove('fa-eye');
-            icon.classList.add('fa-eye-slash');
-        } else {
-            input.type = 'password';
-            icon.classList.remove('fa-eye-slash');
-            icon.classList.add('fa-eye');
+    (function() {
+        const EYE = '<svg class="auth-toggle-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12a4.5 4.5 0 1 1 0-9a4.5 4.5 0 0 1 0 9z"/></svg>';
+        const EYE_OFF = '<svg class="auth-toggle-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M2 12c1.73-4.39 6-7.5 11-7.5c2.31 0 4.48.6 6.37 1.67l1.46-1.46l1.41 1.41l-19 19l-1.41-1.41l3.1-3.1C3.5 18.29 2.42 15.27 2 12zm7.28-.86l3.58 3.58A4.5 4.5 0 0 0 9.28 11.14zM12 17.5c1.03 0 2-.2 2.9-.56l-2.64-2.64A4.48 4.48 0 0 1 12 17.5z"/></svg>';
+        function wireToggle(btnId, inputId) {
+            const btn = document.getElementById(btnId);
+            const input = document.getElementById(inputId);
+            btn.addEventListener('click', function() {
+                const show = input.type === 'password';
+                input.type = show ? 'text' : 'password';
+                btn.setAttribute('aria-label', show ? 'Cacher le mot de passe' : 'Voir le mot de passe');
+                btn.innerHTML = show ? EYE_OFF : EYE;
+            });
         }
-    }
-    
-    // Section: Vérification de la force du mot de passe
-    // Critères: longueur, majuscule, minuscule, chiffre, caractère spécial.
-    // Affiche une barre (faible/moyen/fort) + liste des critères manquants.
-    // Password strength checker
+        wireToggle('togglePassword1', 'new_password');
+        wireToggle('togglePassword2', 'confirm_password');
+    })();
     newPasswordInput.addEventListener('input', function() {
         const password = this.value;
         let strength = 0;
         let errors = [];
-        
-        // Check criteria
         const checks = {
             length: { test: password.length >= 8, message: 'Au moins 8 caractères' },
             uppercase: { test: /[A-Z]/.test(password), message: 'Au moins une majuscule' },
@@ -147,8 +111,6 @@
             number: { test: /[0-9]/.test(password), message: 'Au moins un chiffre' },
             special: { test: /[!@#$%^&*(),.?":{}|<>]/.test(password), message: 'Au moins un caractère spécial (!@#$%^&*)' }
         };
-        
-        // Collect errors
         for (const [key, check] of Object.entries(checks)) {
             if (check.test) {
                 strength++;
@@ -156,83 +118,57 @@
                 errors.push(check.message);
             }
         }
-        
-        // Afficher les erreurs si des critères manquent
         if (errors.length > 0 && password.length > 0) {
-            passwordErrors.innerHTML = `
-                <div class="alert alert-danger alert-dismissible fade show py-2 px-3" role="alert" style="font-size: 13px;">
-                    <i class="fas fa-exclamation-triangle"></i> <strong>Critères manquants :</strong>
-                    <ul class="mb-0 mt-1 ps-3">
-                        ${errors.map(err => `<li>${err}</li>`).join('')}
-                    </ul>
-                </div>
-            `;
+            passwordErrors.innerHTML = `<div class="mb-2 rounded-lg bg-red-50 text-red-900 p-3 text-sm"><strong>Critères manquants :</strong><ul class="list-disc pl-5">${errors.map(err => `<li>${err}</li>`).join('')}</ul></div>`;
         } else {
             passwordErrors.innerHTML = '';
         }
-        
-        // Mettre à jour l'affichage de la force
-        strengthBar.className = 'password-strength';
         if (password.length === 0) {
+            strengthBar.className = 'h-1 rounded bg-gray-200 mt-2';
             strengthText.textContent = '';
+            strengthText.className = 'text-sm';
         } else if (strength < 3) {
-            strengthBar.classList.add('strength-weak');
+            strengthBar.className = 'h-1 rounded bg-red-500 mt-2';
             strengthText.textContent = 'Mot de passe faible';
-            strengthText.style.color = '#dc3545';
+            strengthText.className = 'text-sm text-red-600';
         } else if (strength < 5) {
-            strengthBar.classList.add('strength-medium');
+            strengthBar.className = 'h-1 rounded bg-yellow-400 mt-2';
             strengthText.textContent = 'Mot de passe moyen';
-            strengthText.style.color = '#ffc107';
+            strengthText.className = 'text-sm text-yellow-600';
         } else {
-            strengthBar.classList.add('strength-strong');
+            strengthBar.className = 'h-1 rounded bg-green-500 mt-2';
             strengthText.textContent = 'Mot de passe fort ✓';
-            strengthText.style.color = '#28a745';
+            strengthText.className = 'text-sm text-green-600';
         }
-        
         checkFormValidity();
     });
-    
-    // Section: Vérification de la correspondance des deux mots de passe
-    // Affiche un message si ça ne correspond pas, et désactive le bouton.
-    // Password match checker
     confirmPasswordInput.addEventListener('input', function() {
         const password = newPasswordInput.value;
         const confirm = this.value;
-        
         if (confirm === '') {
             matchText.textContent = '';
+            matchText.className = 'text-sm';
             confirmErrors.innerHTML = '';
         } else if (password === confirm) {
             matchText.textContent = '✓ Les mots de passe correspondent';
-            matchText.style.color = 'green';
+            matchText.className = 'text-sm text-green-600';
             confirmErrors.innerHTML = '';
         } else {
             matchText.textContent = '';
-            confirmErrors.innerHTML = `
-                <div class="alert alert-warning py-2 px-3" role="alert" style="font-size: 13px;">
-                    <i class="fas fa-exclamation-circle"></i> Les mots de passe ne correspondent pas
-                </div>
-            `;
+            matchText.className = 'text-sm';
+            confirmErrors.innerHTML = `<div class="mb-2 rounded-lg bg-yellow-50 text-yellow-900 p-3 text-sm">Les mots de passe ne correspondent pas</div>`;
         }
-        
         checkFormValidity();
     });
-    
-    // Section: Validation globale du formulaire
-    // Le bouton est activé uniquement si tous les critères sont valides
-    // et si les deux champs sont identiques.
-    // Form validation
     function checkFormValidity() {
         const password = newPasswordInput.value;
         const confirm = confirmPasswordInput.value;
-        
         const isValid = password.length >= 8 &&
                        /[A-Z]/.test(password) &&
                        /[a-z]/.test(password) &&
                        /[0-9]/.test(password) &&
                        /[!@#$%^&*(),.?":{}|<>]/.test(password) &&
                        password === confirm;
-        
         submitBtn.disabled = !isValid;
     }
 </script>

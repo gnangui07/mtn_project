@@ -4,22 +4,45 @@
 {% block title %}PO Progress Monitoring{% endblock %}
 
 {% block extra_css %}
+<style>
+    .export-excel-btn {
+        font-size: 0.875rem;
+        padding: 0.375rem 0.75rem;
+        border-radius: 0.375rem;
+        transition: all 0.15s ease-in-out;
+    }
+
+    .export-excel-btn:hover {
+        background-color: #0d6efd;
+        color: white;
+        transform: translateY(-1px);
+        box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.15);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
 <div class="container-fluid py-4">
     <div class="row">
         <div class="col-12">
             <div class="card mb-4">
                 <div class="card-header pb-0">
-                    <h6>PO Progress Monitoring</h6>
+                    <h6 class="spectrum-Heading spectrum-Heading--sizeM">PO Progress Monitoring</h6>
                 </div>
                 <div class="card-body">
-                    <p>Generate a report Excel containing a summary of each PO.</p>
-                    
+                    <p>Generate an Excel report containing a summary of each PO.</p>
+
                     <div class="text-center mt-4">
-                        <a href="{% url 'orders:export_po_progress_monitoring' %}" class="btn btn-primary">
-                            <i class="fas fa-file-excel me-2"></i>Export PO Progress Monitoring
+                        <a href="{% url 'orders:export_po_progress_monitoring' %}" class="spectrum-Button spectrum-Button--primary spectrum-Button--sizeS export-excel-btn">
+                            <i class="fas fa-file-excel me-2"></i>Export Excel
                         </a>
                     </div>
-                    
+
+                    <div class="mt-3 text-muted text-center small">
+                        <i class="fas fa-info-circle me-1"></i>
+                        This export will generate an Excel report.
+                    </div>
+
                     {% if messages %}
                     <div class="mt-4">
                         {% for message in messages %}

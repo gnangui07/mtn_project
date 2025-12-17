@@ -2,334 +2,668 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}Vendor Evaluation Details - {{ evaluation.supplier }}{% endblock %}
+{% block title %}Vendor Evaluation - {{ evaluation.supplier }} | Performance Analysis{% endblock %}
 
 {% block extra_css %}
 <style>
-    .evaluation-detail-container {
-        max-width: 1000px;
+    :root {
+        --spectrum-black: #000000;
+        --spectrum-yellow: #FFCC00;
+        --spectrum-gray-50: #FAFAFA;
+        --spectrum-gray-100: #F5F5F5;
+        --spectrum-gray-200: #EAEAEA;
+        --spectrum-gray-800: #424242;
+        --spectrum-green: #30A46C;
+        --spectrum-orange: #FF8B29;
+        --spectrum-red: #E5484D;
+        --spectrum-blue: #2680EB;
+    }
+
+    .evaluation-container {
+        max-width: 1200px;
         margin: 0 auto;
-        padding: 20px;
     }
-    
-    .evaluation-header {
-        background: linear-gradient(135deg, #FFCC00 0%, #E6B800 100%);
-        color: #000000;
-        padding: 30px;
-        border-radius: 15px;
-        margin-bottom: 30px;
-        box-shadow: 0 10px 30px rgba(255, 204, 0, 0.3);
+
+    .spectrum-page-header {
+        background: white;
+        border-bottom: 1px solid var(--spectrum-gray-200);
+        padding: 2rem 0;
+        margin-bottom: 2rem;
     }
-    
-    .evaluation-header h1 {
+
+    .page-header-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 2rem;
+    }
+
+    .header-title {
+        flex: 1;
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 0.75rem;
+    }
+
+    .spectrum-breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+        font-size: 0.875rem;
+        color: var(--spectrum-gray-800);
+    }
+
+    .breadcrumb-divider {
+        color: var(--spectrum-gray-200);
+    }
+
+    .spectrum-card {
+        background: white;
+        border-radius: 12px;
+        border: 1px solid var(--spectrum-gray-200);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        overflow: hidden;
+    }
+
+    .card-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid var(--spectrum-gray-200);
+        background: var(--spectrum-gray-50);
+    }
+
+    .card-header h3 {
         margin: 0;
-        font-size: 2.2rem;
-        font-weight: 300;
+        font-weight: 600;
+        font-size: 1.25rem;
+        color: var(--spectrum-black);
     }
-    
-    .evaluation-meta {
+
+    .card-body {
+        padding: 1.5rem;
+    }
+
+    .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .metric-card {
+        background: var(--spectrum-gray-50);
+        border-radius: 8px;
+        padding: 1.5rem;
+        border: 1px solid var(--spectrum-gray-200);
+    }
+
+    .metric-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        line-height: 1;
+        color: var(--spectrum-black);
+        margin-bottom: 0.5rem;
+    }
+
+    .metric-label {
+        font-size: 0.875rem;
+        color: var(--spectrum-gray-800);
+        font-weight: 500;
+        margin-bottom: 0.25rem;
+    }
+
+    .metric-description {
+        font-size: 0.75rem;
+        color: var(--spectrum-gray-800);
+        opacity: 0.7;
+    }
+
+    .score-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border-radius: 100px;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+
+    .score-excellent {
+        background: var(--spectrum-green);
+        color: white;
+    }
+
+    .score-good {
+        background: var(--spectrum-yellow);
+        color: var(--spectrum-black);
+    }
+
+    .score-average {
+        background: var(--spectrum-orange);
+        color: white;
+    }
+
+    .score-poor {
+        background: var(--spectrum-red);
+        color: white;
+    }
+
+    .criteria-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .criteria-card {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        border: 1px solid var(--spectrum-gray-200);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .criteria-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    }
+
+    .criteria-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+
+    .criteria-title {
+        font-weight: 600;
+        font-size: 1rem;
+        color: var(--spectrum-black);
+    }
+
+    .criteria-score {
+        font-weight: 700;
+        font-size: 1.125rem;
+    }
+
+    .score-bar {
+        height: 6px;
+        background: var(--spectrum-gray-200);
+        border-radius: 3px;
+        overflow: hidden;
+        margin: 1rem 0;
+    }
+
+    .score-fill {
+        height: 100%;
+        border-radius: 3px;
+        transition: width 0.3s ease;
+    }
+
+    .criteria-description {
+        font-size: 0.875rem;
+        color: var(--spectrum-gray-800);
+        line-height: 1.5;
+        background: var(--spectrum-gray-50);
+        padding: 1rem;
+        border-radius: 6px;
+        border-left: 4px solid var(--spectrum-blue);
+    }
+
+    .detail-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 20px;
-        margin-top: 20px;
+        gap: 1rem;
+        margin-bottom: 2rem;
     }
-    
-    .meta-item {
-        background: rgba(0,0,0,0.1);
-        padding: 15px;
-        border-radius: 10px;
-        backdrop-filter: blur(10px);
-    }
-    
-    .meta-label {
-        font-size: 0.9rem;
-        opacity: 0.8;
-        margin-bottom: 5px;
-    }
-    
-    .meta-value {
-        font-size: 1.1rem;
-        font-weight: 500;
-    }
-    
-    .scores-summary {
-        background: white;
-        border-radius: 15px;
-        padding: 30px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        margin-bottom: 30px;
-    }
-    
-    .score-circle {
-        width: 120px;
-        height: 120px;
-        border-radius: 50%;
+
+    .detail-item {
         display: flex;
         flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .detail-label {
+        font-size: 0.75rem;
+        color: var(--spectrum-gray-800);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .detail-value {
+        font-size: 1rem;
+        color: var(--spectrum-black);
+        font-weight: 500;
+    }
+
+    .rating-display {
+        display: flex;
         align-items: center;
-        justify-content: center;
-        margin: 0 auto 20px;
-        font-weight: bold;
-        color: white;
-        position: relative;
+        gap: 0.5rem;
     }
-    
-    .score-circle.excellent {
-        background: linear-gradient(135deg, #FFCC00 0%, #E6B800 100%);
-        color: #000000;
+
+    .rating-stars {
+        color: var(--spectrum-yellow);
+        font-size: 1.25rem;
     }
-    
-    .score-circle.good {
-        background: linear-gradient(135deg, #000000 0%, #222222 100%);
-        color: #FFCC00;
+
+    .rating-value {
+        font-weight: 700;
+        font-size: 1.5rem;
+        color: var(--spectrum-black);
     }
-    
-    .score-circle.average {
-        background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
-        color: #000000;
-    }
-    
-    .score-circle.poor {
-        background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
-        color: white;
-    }
-    
-    .score-main {
-        font-size: 2rem;
-        line-height: 1;
-    }
-    
-    .score-sub {
-        font-size: 0.9rem;
-        opacity: 0.9;
-    }
-    
-    .criteria-details {
-        background: white;
-        border-radius: 15px;
-        overflow: hidden;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        margin-bottom: 30px;
-    }
-    
-    .criteria-header {
-        background: #f8f9fa;
-        padding: 20px;
-        border-bottom: 2px solid #e9ecef;
-    }
-    
-    .criteria-item {
-        padding: 25px;
-        border-bottom: 1px solid #e9ecef;
-        transition: background-color 0.3s ease;
-    }
-    
-    .criteria-item:hover {
-        background-color: #f8f9fa;
-    }
-    
-    .criteria-item:last-child {
-        border-bottom: none;
-    }
-    
-    .criteria-name {
-        font-size: 1.2rem;
-        font-weight: 600;
-        color: #495057;
-        margin-bottom: 10px;
-    }
-    
-    .criteria-score {
-        display: inline-block;
-        padding: 8px 16px;
-        border-radius: 25px;
-        font-weight: 600;
-        font-size: 1.1rem;
-        margin-bottom: 15px;
-    }
-    
-    .criteria-score.excellent {
-        background: #FFCC00;
-        color: #000000;
-    }
-    
-    .criteria-score.good {
-        background: #000000;
-        color: #FFCC00;
-    }
-    
-    .criteria-score.average {
-        background: #ff9800;
-        color: #000000;
-    }
-    
-    .criteria-score.poor {
-        background: #f44336;
-        color: white;
-    }
-    
-    .criteria-description {
-        background: #f8f9fa;
-        padding: 15px;
-        border-radius: 8px;
-        font-style: italic;
-        color: #6c757d;
-        border-left: 4px solid #2196f3;
-    }
-    
-    .comments-section {
-        background: white;
-        border-radius: 15px;
-        padding: 25px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        margin-bottom: 30px;
-    }
-    
+
     .action-buttons {
         display: flex;
-        justify-content: center;
-        gap: 20px;
-        margin-top: 30px;
+        gap: 1rem;
+        margin-top: 2rem;
+        padding-top: 2rem;
+        border-top: 1px solid var(--spectrum-gray-200);
     }
-    
-    .btn-action {
-        padding: 12px 30px;
-        font-size: 1.1rem;
+
+    .spectrum-button {
         font-weight: 600;
-        border-radius: 50px;
-        transition: all 0.3s ease;
+        padding: 0.75rem 1.5rem;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
         text-decoration: none;
-        display: inline-block;
+        border: 2px solid transparent;
     }
-    
-    .btn-action:hover {
-        transform: translateY(-2px);
-        text-decoration: none;
+
+    .spectrum-button-primary {
+        background: var(--spectrum-black);
+        color: white;
     }
-    
-    .btn-edit {
-        background: linear-gradient(135deg, #FFCC00 0%, #E6B800 100%);
-        color: #000000;
-        box-shadow: 0 5px 15px rgba(255, 204, 0, 0.3);
-        border: 2px solid #000000;
+
+    .spectrum-button-primary:hover {
+        background: #333;
+        color: white;
     }
-    
-    .btn-edit:hover {
-        color: #000000;
-        box-shadow: 0 8px 25px rgba(255, 204, 0, 0.4);
-        background: linear-gradient(135deg, #E6B800 0%, #FFCC00 100%);
+
+    .spectrum-button-secondary {
+        background: white;
+        color: var(--spectrum-gray-800);
+        border-color: var(--spectrum-gray-200);
     }
-    
-    .btn-back {
-        background: #000000;
-        color: #FFCC00;
-        border: 2px solid #FFCC00;
+
+    .spectrum-button-secondary:hover {
+        background: var(--spectrum-gray-50);
+        border-color: var(--spectrum-gray-800);
     }
-    
-    .btn-back:hover {
-        background: #222222;
-        color: #FFCC00;
+
+    .spectrum-button-action {
+        background: var(--spectrum-yellow);
+        color: var(--spectrum-black);
+        border: 2px solid var(--spectrum-yellow);
+        font-weight: 700;
+        transition: all 0.2s ease;
     }
-    
+
+    .spectrum-button-action:hover {
+        background: var(--spectrum-blue);
+        color: white;
+        border-color: var(--spectrum-blue);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .progress-ring {
+        width: 120px;
+        height: 120px;
+        position: relative;
+    }
+
+    .progress-ring-circle {
+        width: 100%;
+        height: 100%;
+        fill: none;
+        stroke-width: 8;
+        transform: rotate(-90deg);
+        transform-origin: 50% 50%;
+    }
+
+    .progress-ring-bg {
+        stroke: var(--spectrum-gray-200);
+    }
+
+    .progress-ring-fill {
+        stroke-linecap: round;
+        transition: stroke-dashoffset 0.35s;
+    }
+
+    .progress-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+    }
+
+    .progress-value {
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1;
+        color: var(--spectrum-black);
+    }
+
+    .progress-label {
+        font-size: 0.75rem;
+        color: var(--spectrum-gray-800);
+        opacity: 0.7;
+    }
+
     @media (max-width: 768px) {
-        .evaluation-meta {
-            grid-template-columns: 1fr;
+        .page-header-content {
+            flex-direction: column;
+        }
+        
+        .header-actions {
+            width: 100%;
+            justify-content: flex-start;
         }
         
         .action-buttons {
             flex-direction: column;
-            align-items: center;
         }
         
-        .btn-action {
+        .spectrum-button {
             width: 100%;
-            max-width: 300px;
+            justify-content: center;
         }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="evaluation-detail-container">
-    <!-- En-tête -->
-    <div class="evaluation-header">
-        <h1><i class="fas fa-star me-3"></i>Vendor Evaluation Details</h1>
-        <div class="evaluation-meta">
-            <div class="meta-item">
-                <div class="meta-label">Supplier</div>
-                <div class="meta-value">{{ evaluation.supplier }}</div>
+<div class="evaluation-container">
+    <!-- Page Header -->
+    <div class="spectrum-page-header">
+        <div class="container">
+            <div class="spectrum-breadcrumb">
+                <a href="{% url 'orders:vendor_evaluation_list' %}" class="text-decoration-none text-dark">
+                    <i class="fas fa-arrow-left me-2"></i> Evaluations
+                </a>
+                <span class="breadcrumb-divider">/</span>
+                <span>Evaluation Details</span>
             </div>
-            <div class="meta-item">
-                <div class="meta-label">Purchase Order</div>
-                <div class="meta-value">{{ evaluation.bon_commande.numero }}</div>
-            </div>
-            <div class="meta-item">
-                <div class="meta-label">Evaluation Date</div>
-                <div class="meta-value">{{ evaluation.date_evaluation|date:"d/m/Y à H:i" }}</div>
-            </div>
-            <div class="meta-item">
-                <div class="meta-label">Evaluator</div>
-                <div class="meta-value">
-                    {% if evaluation.evaluator %}
-                        {{ evaluation.evaluator.get_full_name|default:evaluation.evaluator.email }}
-                    {% else %}
-                        System
-                    {% endif %}
+            
+            <div class="page-header-content">
+                <div class="header-title">
+                    <h1 class="h2 mb-2" style="font-weight: 700;">Vendor Performance Evaluation</h1>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-dark rounded-circle d-flex align-items-center justify-content-center me-3" 
+                                 style="width: 48px; height: 48px;">
+                                <i class="fas fa-building text-white"></i>
+                            </div>
+                            <div>
+                                <div class="fw-bold fs-4">{{ evaluation.supplier }}</div>
+                                <div class="text-muted">
+                                    PO #{{ evaluation.bon_commande.numero }} • 
+                                    {{ evaluation.date_evaluation|date:"F j, Y" }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <a href="{% url 'orders:vendor_evaluation' bon_commande_id=evaluation.bon_commande.id %}" 
+                       class="spectrum-button spectrum-button-action">
+                        <i class="fas fa-edit"></i> Edit
+                    </a>
+                    <a href="{% url 'orders:vendor_evaluation_list' %}" 
+                       class="spectrum-button spectrum-button-secondary">
+                        <i class="fas fa-list"></i> View All
+                    </a>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Résumé des scores -->
-    <div class="scores-summary">
-        <div class="row text-center">
-            <div class="col-md-6">
-                <div class="score-circle {% if total_score >= 35 %}excellent{% elif total_score >= 25 %}good{% elif total_score >= 15 %}average{% else %}poor{% endif %}">
-                    <div class="score-main">{{ total_score }}</div>
-                    <div class="score-sub">/ 50</div>
+    <div class="container">
+        <!-- Performance Metrics -->
+        <div class="spectrum-card mb-4">
+            <div class="card-header">
+                <h3><i class="fas fa-chart-line me-2"></i> Performance Overview</h3>
+            </div>
+            <div class="card-body">
+                <div class="metric-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">{{ total_score }}</div>
+                        <div class="metric-label">Total Score</div>
+                        <div class="metric-description">Out of 50 possible points</div>
+                        {% with score=total_score %}
+                        <div class="mt-2">
+                            <span class="score-badge 
+                                {% if score >= 40 %}score-excellent
+                                {% elif score >= 30 %}score-good
+                                {% elif score >= 20 %}score-average
+                                {% else %}score-poor{% endif %}">
+                                {% if score >= 40 %}Excellent
+                                {% elif score >= 30 %}Good
+                                {% elif score >= 20 %}Average
+                                {% else %}Needs Improvement{% endif %}
+                            </span>
+                        </div>
+                        {% endwith %}
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="rating-display">
+                            <div class="rating-stars">
+                                {% for i in "12345"|make_list %}
+                                    {% if forloop.counter <= evaluation.vendor_final_rating|floatformat:0|add:"0" %}
+                                        ★
+                                    {% else %}
+                                        ☆
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                            <div class="rating-value">{{ evaluation.vendor_final_rating|floatformat:1 }}</div>
+                        </div>
+                        <div class="metric-label">Final Rating</div>
+                        <div class="metric-description">Based on 5-point scale</div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-value">{{ evaluation.date_evaluation|date:"M d" }}</div>
+                        <div class="metric-label">Evaluation Date</div>
+                        <div class="metric-description">Completed {{ evaluation.date_evaluation|timesince }} ago</div>
+                    </div>
                 </div>
-                <h5>Total Score</h5>
-            </div>
-            <div class="col-md-6">
-                <div class="score-circle {% if evaluation.vendor_final_rating >= 7 %}excellent{% elif evaluation.vendor_final_rating >= 5 %}good{% elif evaluation.vendor_final_rating >= 3 %}average{% else %}poor{% endif %}">
-                    <div class="score-main">{{ evaluation.vendor_final_rating|floatformat:1 }}</div>
-                    <div class="score-sub">/ 10</div>
+
+                <!-- Detailed Information -->
+                <div class="detail-grid mt-4">
+                    <div class="detail-item">
+                        <div class="detail-label">Evaluator</div>
+                        <div class="detail-value">
+                            {% if evaluation.evaluator %}
+                                {{ evaluation.evaluator.get_full_name|default:evaluation.evaluator.email }}
+                            {% else %}
+                                System Generated
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Purchase Order</div>
+                        <div class="detail-value">#{{ evaluation.bon_commande.numero }}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Delivery Date</div>
+                        <div class="detail-value">
+                            {% if evaluation.bon_commande.date_livraison %}
+                                {{ evaluation.bon_commande.date_livraison|date:"M d, Y" }}
+                            {% else %}
+                                Not specified
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Status</div>
+                        <div class="detail-value">
+                            <span class="badge bg-success">Evaluation Complete</span>
+                        </div>
+                    </div>
                 </div>
-                <h5>Vendor Final Rating</h5>
             </div>
         </div>
-    </div>
 
-    <!-- Détails des critères -->
-    <div class="criteria-details">
-        <div class="criteria-header">
-            <h3><i class="fas fa-clipboard-list me-2"></i>Evaluation Criteria Details</h3>
-        </div>
-        
-        {% for criteria in criteria_details %}
-        <div class="criteria-item">
-            <div class="criteria-name">{{ criteria.label }}</div>
-            <div class="criteria-score {% if criteria.score >= 7 %}excellent{% elif criteria.score >= 5 %}good{% elif criteria.score >= 3 %}average{% else %}poor{% endif %}">
-                {{ criteria.score }}/10
+        <!-- Criteria Evaluation -->
+        <div class="spectrum-card mb-4">
+            <div class="card-header">
+                <h3><i class="fas fa-clipboard-check me-2"></i> Evaluation Criteria</h3>
+                <small class="text-muted">Detailed breakdown by performance category</small>
             </div>
-            <div class="criteria-description">
-                {{ criteria.description }}
+            <div class="card-body">
+                <div class="criteria-grid">
+                    {% for criteria in criteria_details %}
+                    <div class="criteria-card">
+                        <div class="criteria-header">
+                            <div class="criteria-title">{{ criteria.label }}</div>
+                            <div class="criteria-score">
+                                {{ criteria.score }}/10
+                            </div>
+                        </div>
+                        
+                        <div class="score-bar">
+                            <div class="score-fill" 
+                                 style="width: {% widthratio criteria.score 10 100 %}%;
+                                        background: {% if criteria.score >= 7 %}var(--spectrum-green)
+                                                   {% elif criteria.score >= 5 %}var(--spectrum-yellow)
+                                                   {% elif criteria.score >= 3 %}var(--spectrum-orange)
+                                                   {% else %}var(--spectrum-red){% endif %};">
+                            </div>
+                        </div>
+                        
+                        <div class="criteria-description">
+                            <strong>Assessment:</strong> {{ criteria.description }}
+                        </div>
+                        
+                        <div class="mt-3">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                {% if criteria.score >= 7 %}
+                                    Excellent performance in this category
+                                {% elif criteria.score >= 5 %}
+                                    Good performance with minor improvements needed
+                                {% elif criteria.score >= 3 %}
+                                    Average performance, significant improvements needed
+                                {% else %}
+                                    Poor performance, immediate action required
+                                {% endif %}
+                            </small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
         </div>
-        {% endfor %}
-    </div>
 
+        <!-- Visual Score Representation -->
+        <div class="spectrum-card mb-4">
+            <div class="card-header">
+                <h3><i class="fas fa-chart-pie me-2"></i> Score Distribution</h3>
+            </div>
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <div class="progress-ring mx-auto">
+                            <svg viewBox="0 0 120 120" class="progress-ring-circle">
+                                <circle class="progress-ring-bg" cx="60" cy="60" r="52"></circle>
+                                <circle class="progress-ring-fill" cx="60" cy="60" r="52" 
+                                        stroke="{% if total_score >= 35 %}var(--spectrum-green){% elif total_score >= 25 %}var(--spectrum-yellow){% elif total_score >= 15 %}var(--spectrum-orange){% else %}var(--spectrum-red){% endif %}"
+                                        stroke-dasharray="327" 
+                                        stroke-dashoffset="{% widthratio total_score|add:0 50 327 as offset %}{{ 327|add:offset|floatformat:0 }}">
+                                </circle>
+                            </svg>
+                            <div class="progress-text">
+                                <div class="progress-value">{{ total_score }}</div>
+                                <div class="progress-label">Total Score</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Overall Performance</span>
+                                <span class="fw-bold">
+                                    {% widthratio total_score 50 100 %}%
+                                </span>
+                            </div>
+                            <div class="score-bar">
+                                <div class="score-fill" 
+                                     style="width: {% widthratio total_score 50 100 %}%;
+                                            background: {% if total_score >= 35 %}var(--spectrum-green)
+                                                       {% elif total_score >= 25 %}var(--spectrum-yellow)
+                                                       {% elif total_score >= 15 %}var(--spectrum-orange)
+                                                       {% else %}var(--spectrum-red){% endif %};">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <small class="text-muted">Industry Average</small>
+                                <small class="text-muted">35/50</small>
+                            </div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: 70%; background: var(--spectrum-gray-800);"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <h6 class="mb-3">Performance Summary</h6>
+                            <div class="d-flex flex-wrap gap-2">
+                                <span class="badge {% if total_score >= 35 %}bg-success{% elif total_score >= 25 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                                    {% if total_score >= 35 %}Top Performer
+                                    {% elif total_score >= 25 %}Reliable Supplier
+                                    {% else %}Needs Monitoring{% endif %}
+                                </span>
+                                <span class="badge bg-dark">
+                                    {{ criteria_details|length }} Categories
+                                </span>
+                                <span class="badge bg-info text-dark">
+                                    Last Updated: {{ evaluation.date_evaluation|timesince }} ago
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    <!-- Boutons d'action -->
-    <div class="action-buttons">
-        <a href="{% url 'orders:vendor_evaluation' bon_commande_id=evaluation.bon_commande.id %}" 
-           class="btn-action btn-edit">
-            <i class="fas fa-edit me-2"></i>Edit Evaluation
-        </a>
-        <a href="{% url 'orders:vendor_evaluation_list' %}" 
-           class="btn-action btn-back">
-            <i class="fas fa-list me-2"></i>Back to List
-        </a>
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+            <a href="{% url 'orders:vendor_evaluation' bon_commande_id=evaluation.bon_commande.id %}" 
+               class="spectrum-button spectrum-button-action flex-fill">
+                <i class="fas fa-edit me-2"></i> Edit This Evaluation
+            </a>
+            <a href="{% url 'orders:vendor_evaluation_list' %}" 
+               class="spectrum-button spectrum-button-secondary flex-fill">
+                <i class="fas fa-list me-2"></i> Back to All Evaluations
+            </a>
+            <a href="{% url 'orders:vendor_ranking' %}" 
+               class="spectrum-button spectrum-button-primary flex-fill">
+                <i class="fas fa-trophy me-2"></i> View Rankings
+            </a>
+        </div>
     </div>
 </div>
+
+<script>
+    // Animation for progress rings
+    document.addEventListener('DOMContentLoaded', function() {
+        const progressRing = document.querySelector('.progress-ring-fill');
+        const totalScore = {{ total_score }};
+        const circumference = 2 * Math.PI * 52;
+        const offset = circumference - (totalScore / 50) * circumference;
+        
+        progressRing.style.strokeDashoffset = offset;
+    });
+</script>
 {% endblock %}

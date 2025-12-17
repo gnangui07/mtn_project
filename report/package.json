@@ -1,0 +1,28 @@
+{
+  "name": "msrn-report-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "postcss ./static/src/app.css -o ./static/dist/app.css --watch",
+    "build": "postcss ./static/src/app.css -o ./static/dist/app.css --env production"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "postcss-cli": "^11.0.0",
+    "postcss-import": "^16.1.1",
+    "tailwindcss": "^3.4.17"
+  },
+  "dependencies": {
+    "@spectrum-css/button": "^14.2.0",
+    "@spectrum-css/commons": "^11.1.0",
+    "@spectrum-css/fieldlabel": "^10.2.0",
+    "@spectrum-css/form": "^1.2.0",
+    "@spectrum-css/page": "^9.2.0",
+    "@spectrum-css/textfield": "^8.2.0",
+    "@spectrum-css/tokens": "^16.0.2",
+    "@spectrum-css/typography": "^8.2.0",
+    "@spectrum-css/vars": "^9.0.8",
+    "@spectrum-web-components/button": "^1.10.0"
+  }
+}

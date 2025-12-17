@@ -502,3 +502,537 @@ body {
 .data-table tr:hover .quantity-delivered-cell {
     background-color: #bbdefb !important; /* Bleu plus foncé au survol */
 }
+/* Spectrum Design System - Purchase Order Detail */
+
+:root {
+    --spectrum-blue: #2680eb;
+    --spectrum-blue-dark: #1a67d8;
+    --spectrum-green: #268d43;
+    --spectrum-green-dark: #1d7739;
+    --spectrum-yellow: #ffc107;
+    --spectrum-yellow-dark: #e6a800;
+    --spectrum-red: #dc3545;
+    --spectrum-red-dark: #c82333;
+    --spectrum-gray-50: #f8f9fa;
+    --spectrum-gray-100: #e9ecef;
+    --spectrum-gray-200: #dee2e6;
+    --spectrum-gray-300: #ced4da;
+    --spectrum-gray-400: #adb5bd;
+    --spectrum-gray-500: #6c757d;
+    --spectrum-gray-600: #495057;
+    --spectrum-gray-700: #343a40;
+    --spectrum-gray-800: #212529;
+    --spectrum-gray-900: #121416;
+}
+
+.spectrum-page-container {
+    min-height: 100vh;
+    background: var(--spectrum-gray-50);
+}
+
+/* Header Principal */
+.spectrum-page-header {
+    background: linear-gradient(135deg, var(--spectrum-gray-900) 0%, var(--spectrum-gray-800) 100%);
+    color: white;
+    padding: 2rem 0;
+    position: relative;
+    overflow: hidden;
+}
+
+.spectrum-page-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle at center, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+    border-radius: 50%;
+    transform: translate(30%, -30%);
+}
+
+.page-header-content {
+    position: relative;
+    z-index: 2;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+.spectrum-breadcrumb {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.breadcrumb-divider {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.page-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0 0 0.5rem 0;
+    color: white;
+}
+
+.page-title i {
+    color: var(--spectrum-yellow);
+    font-size: 2.2rem;
+}
+
+.header-subtitle {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.supplier-info {
+    font-size: 1.1rem;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.coordinator-info {
+    font-size: 0.95rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.header-action-buttons {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+/* Métriques */
+.spectrum-metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.spectrum-metric {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 1.5rem;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.spectrum-metric:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+.metric-icon {
+    width: 48px;
+    height: 48px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: var(--spectrum-yellow);
+}
+
+.metric-content {
+    flex: 1;
+}
+
+.metric-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: white;
+    line-height: 1.2;
+    margin-bottom: 0.25rem;
+}
+
+.metric-label {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.7);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Boutons Spectrum */
+.spectrum-button {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+
+.spectrum-button-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.spectrum-button-secondary:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.spectrum-button-accent {
+    background: var(--spectrum-green);
+    color: white;
+}
+
+.spectrum-button-accent:hover {
+    background: var(--spectrum-green-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(38, 141, 67, 0.3);
+}
+
+.spectrum-button-gray {
+    background: var(--spectrum-gray-100);
+    color: var(--spectrum-gray-800);
+    border: 1px solid var(--spectrum-gray-300);
+}
+
+.spectrum-button-gray:hover {
+    background: var(--spectrum-gray-200);
+    color: var(--spectrum-gray-900);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.dropdown-actions {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+}
+
+.dropdown-actions:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.dropdown-menu {
+    border-radius: 8px;
+    border: 1px solid var(--spectrum-gray-200);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    margin-top: 0.5rem;
+}
+
+.dropdown-item {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    display: flex;
+    align-items: center;
+    transition: all 0.2s ease;
+}
+
+.dropdown-item:hover {
+    background: var(--spectrum-gray-50);
+}
+
+.dropdown-item i {
+    width: 20px;
+    text-align: center;
+}
+
+/* Onglets Spectrum */
+.spectrum-tabs {
+    display: flex;
+    background: white;
+    border-bottom: 1px solid var(--spectrum-gray-200);
+    padding: 0 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.spectrum-tab {
+    padding: 1rem 1.5rem;
+    background: none;
+    border: none;
+    color: var(--spectrum-gray-600);
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-bottom: 3px solid transparent;
+    display: flex;
+    align-items: center;
+}
+
+.spectrum-tab:hover {
+    color: var(--spectrum-gray-900);
+    background: var(--spectrum-gray-50);
+}
+
+.spectrum-tab.active {
+    color: var(--spectrum-blue);
+    border-bottom-color: var(--spectrum-blue);
+}
+
+/* Contenu principal */
+.tab-content {
+    max-width: 1400px;
+    margin: 2rem auto;
+    padding: 0 2rem;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 2rem;
+}
+
+/* Cartes d'information */
+.spectrum-info-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.spectrum-info-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+.info-card-header {
+    padding: 1.5rem;
+    background: linear-gradient(135deg, var(--spectrum-gray-50) 0%, white 100%);
+    border-bottom: 1px solid var(--spectrum-gray-200);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.info-card-icon {
+    width: 48px;
+    height: 48px;
+    background: var(--spectrum-blue);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.25rem;
+}
+
+.info-card-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--spectrum-gray-900);
+    margin: 0;
+}
+
+.info-item-grid {
+    padding: 1.5rem;
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 1rem;
+}
+
+.info-label {
+    font-weight: 600;
+    color: var(--spectrum-gray-600);
+    font-size: 0.875rem;
+    padding: 0.5rem 0;
+}
+
+.info-value {
+    color: var(--spectrum-gray-800);
+    padding: 0.5rem 0;
+    font-size: 0.95rem;
+}
+
+.info-value .metric-chip {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.chip-yellow {
+    background: var(--spectrum-yellow);
+    color: var(--spectrum-gray-900);
+}
+
+.chip-white {
+    background: white;
+    color: var(--spectrum-gray-900);
+    border: 1px solid var(--spectrum-gray-300);
+}
+
+/* Barre de filtres */
+.filter-bar {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.filter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.filter-header h4 {
+    color: var(--spectrum-gray-900);
+    font-weight: 700;
+}
+
+.filter-buttons {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.spectrum-filter-btn {
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    border: 1px solid var(--spectrum-gray-300);
+    background: white;
+    color: var(--spectrum-gray-700);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+}
+
+.spectrum-filter-btn:hover {
+    border-color: var(--spectrum-gray-400);
+    background: var(--spectrum-gray-50);
+}
+
+.spectrum-filter-btn.active {
+    background: var(--spectrum-blue);
+    color: white;
+    border-color: var(--spectrum-blue);
+}
+
+.filter-badge {
+    margin-left: 0.5rem;
+    background: rgba(255, 255, 255, 0.2);
+    color: inherit;
+    padding: 0.125rem 0.5rem;
+    border-radius: 10px;
+    font-size: 0.75rem;
+}
+
+.spectrum-filter-btn.active .filter-badge {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Conteneur de tableau */
+.spectrum-table-container {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+}
+
+.table-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--spectrum-gray-200);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.table-title {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.table-title h5 {
+    margin: 0;
+    color: var(--spectrum-gray-900);
+    font-weight: 700;
+}
+
+.table-subtitle {
+    color: var(--spectrum-gray-600);
+    font-size: 0.875rem;
+}
+
+/* Alertes */
+.alert-banner {
+    margin-top: 2rem;
+    padding: 1rem 1.5rem;
+    background: rgba(220, 53, 69, 0.1);
+    border: 1px solid rgba(220, 53, 69, 0.2);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    color: var(--spectrum-red);
+}
+
+.alert-banner i {
+    font-size: 1.25rem;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    .filter-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    
+    .filter-buttons {
+        flex-wrap: wrap;
+    }
+    
+    .spectrum-tabs {
+        flex-wrap: wrap;
+    }
+    
+    .info-item-grid {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .spectrum-page-header {
+        padding: 1.5rem 0;
+    }
+    
+    .page-title {
+        font-size: 1.75rem;
+    }
+    
+    .spectrum-metric {
+        flex-direction: column;
+        text-align: center;
+    }
+}

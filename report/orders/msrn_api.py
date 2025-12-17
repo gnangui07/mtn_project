@@ -26,6 +26,14 @@ from .reports import generate_msrn_report
 from django.shortcuts import get_object_or_404
 from .emails import send_msrn_notification
 
+# Import Celery tasks avec fallback si non disponible
+try:
+    from .tasks import generate_msrn_pdf_task, send_msrn_notification_task
+    from .task_status_api import register_user_task
+    CELERY_AVAILABLE = True
+except ImportError:
+    CELERY_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 @csrf_protect

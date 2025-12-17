@@ -4,8 +4,6 @@
 {% block title %}Vendor Ranking{% endblock %}
 
 {% block extra_css %}
-<!-- Select2 CSS -->
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <style>
     body {
         background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
@@ -124,47 +122,53 @@
         box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
     }
     
-    /* Style personnalisé pour Select2 */
+    .supplier-select {
+        width: 100%;
+        height: 48px;
+        border: 3px solid #FFCC00;
+        border-radius: 8px;
+        background-color: #fff;
+        color: #000000;
+        padding: 8px 12px;
+        font-size: 1rem;
+    }
+
+    /* Select2 Customization to match theme */
     .select2-container--default .select2-selection--single {
-        height: 48px !important;
-        border: 3px solid #FFCC00 !important;
-        border-radius: 8px !important;
-        background-color: #fff !important;
+        height: 48px;
+        border: 3px solid #FFCC00;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        background-color: #fff;
     }
-    
-    .select2-container--default .select2-selection--single .select2-selection__rendered {
-        line-height: 42px !important;
-        padding-left: 15px !important;
-        color: #000000 !important;
-        font-size: 1rem !important;
-    }
-    
     .select2-container--default .select2-selection--single .select2-selection__arrow {
-        height: 42px !important;
-        right: 10px !important;
+        height: 46px;
+        top: 1px;
     }
-    
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        color: #000;
+        font-weight: 500;
+        padding-left: 12px;
+        line-height: 46px;
+    }
     .select2-dropdown {
-        border: 3px solid #FFCC00 !important;
-        border-radius: 8px !important;
+        border: 3px solid #FFCC00;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
-    
     .select2-container--default .select2-results__option--highlighted[aria-selected] {
-        background-color: #FFCC00 !important;
-        color: #000000 !important;
+        background-color: #FFCC00;
+        color: black;
     }
-    
-    .select2-container--default .select2-search--dropdown .select2-search__field {
-        border: 2px solid #FFCC00 !important;
-        border-radius: 5px !important;
-        padding: 8px !important;
-    }
-    
-    .select2-container--default .select2-search--dropdown .select2-search__field:focus {
-        outline: none !important;
-        border-color: #000000 !important;
+    .select2-search__field {
+        border: 1px solid #ddd !important;
+        border-radius: 4px !important;
     }
 </style>
+<!-- Select2 CSS -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 {% endblock %}
 
 {% block content %}
@@ -197,23 +201,24 @@
             </div>
 
             <!-- Sélecteur de fournisseur -->
-            <div class="row mb-5">
-                <div class="col-12">
+            <div class="row mb-5 justify-content-center">
+                <div class="col-md-8 col-lg-6">
                     <div class="card border-3 shadow-lg" style="border-color: #000000;">
                         <div class="card-body p-4">
                             <div class="row align-items-center">
-                                <div class="col-md-3 text-center mb-3 mb-md-0">
-                                    <i class="fas fa-search fa-3x" style="color: #FFCC00;"></i>
+                                <div class="col-md-2 text-center mb-3 mb-md-0">
+                                    <i class="fas fa-search fa-2x" style="color: #FFCC00;"></i>
                                 </div>
-                                <div class="col-md-9">
-                                    <h5 class="fw-bold mb-3" style="color: #000000;">Search & Analyze Supplier Performance</h5>
+                                <div class="col-md-10">
+                                    <h5 class="fw-bold mb-3" style="color: #000000;">Search Supplier</h5>
                                     <form method="get" action="{% url 'orders:vendor_ranking' %}" id="supplierForm">
-                                        <select class="form-select form-select-lg" id="supplier" name="supplier">
-                                            <option value="">-- Select a Supplier to View Detailed Analytics --</option>
+                                        <label for="supplierSelect" class="spectrum-FieldLabel mb-2">Supplier</label>
+                                        <select id="supplierSelect" name="supplier" class="form-control" style="width: 100%;">
+                                            <option value="">-- Select a Supplier --</option>
                                             {% for supplier in suppliers_stats %}
-                                                <option value="{{ supplier.name }}" {% if supplier.name == selected_supplier %}selected{% endif %}>
-                                                    {{ supplier.name }} - Rating: {{ supplier.avg_final_rating }}/10
-                                                </option>
+                                            <option value="{{ supplier.name }}" {% if supplier.name == selected_supplier %}selected{% endif %}>
+                                                {{ supplier.name }} - Rating: {{ supplier.avg_final_rating }}/10
+                                            </option>
                                             {% endfor %}
                                         </select>
                                     </form>
@@ -495,41 +500,30 @@
 {% endblock %}
 
 {% block extra_js %}
-<!-- Select2 JS -->
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<!-- Select2 JS -->
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Initialize Select2
+        $('#supplierSelect').select2({
+            placeholder: "-- Select a Supplier --",
+            allowClear: true,
+            width: '100%'
+        });
+
+        // Submit form on selection change
+        $('#supplierSelect').on('change', function() {
+            $('#supplierForm').submit();
+        });
+
         var yearlyStatsData = JSON.parse('{{ yearly_stats_json|escapejs }}');
         const progressBars = document.querySelectorAll('.progress-bar[data-width]');
         progressBars.forEach(function(bar) {
             const width = parseFloat(bar.getAttribute('data-width')) * 10;
             bar.style.width = width + '%';
-        });
-        
-        $('#supplier').select2({
-            placeholder: '-- Select a Supplier to View Detailed Analytics --',
-            allowClear: true,
-            width: '100%',
-            theme: 'default',
-            language: {
-                noResults: function() {
-                    return "No supplier found";
-                },
-                searching: function() {
-                    return "Searching...";
-                }
-            }
-        });
-        
-        $('#supplier').on('select2:select', function (e) {
-            this.form.submit();
-        });
-        
-        $('#supplier').on('select2:clear', function (e) {
-            this.form.submit();
         });
         
         if (typeof yearlyStatsData !== 'undefined' && yearlyStatsData && yearlyStatsData.length > 0) {

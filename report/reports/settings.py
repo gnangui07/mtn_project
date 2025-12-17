@@ -201,3 +201,52 @@ if DJANGO_ENV == 'production':
     
     # Optimisation des performances
     STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
+
+# ==================== CONFIGURATION REDIS / CACHE ====================
+
+# URL Redis (utilisez WSL, Docker ou Memurai sur Windows)
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379/0')
+
+# Configuration du cache Django avec Redis
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': REDIS_URL,
+        'OPTIONS': {
+            'db': '0',
+        },
+        'KEY_PREFIX': 'msrn',
+        'TIMEOUT': 300,  # 5 minutes par défaut
+    }
+}
+
+# Sessions via Redis (plus rapide que la base de données)
+# Décommentez ces lignes une fois Redis configuré et fonctionnel:
+# SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+# SESSION_CACHE_ALIAS = 'default'
+
+# ==================== CONFIGURATION CELERY ====================
+
+# Broker (Redis) pour la file d'attente des tâches
+CELERY_BROKER_URL = REDIS_URL
+
+# Backend de résultats (stockage en base de données Django)
+CELERY_RESULT_BACKEND = 'django-db'
+
+# Format de sérialisation
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+
+# Fuseau horaire (identique à Django)
+CELERY_TIMEZONE = TIME_ZONE
+
+# Expiration des résultats (24 heures)
+CELERY_RESULT_EXPIRES = 86400
+
+# Configuration pour les tâches
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes max par tâche
+
+# Application django-celery-results
+INSTALLED_APPS += ['django_celery_results']

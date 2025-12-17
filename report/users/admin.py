@@ -20,6 +20,13 @@ import string
 import unicodedata
 from .models import User
 
+# Import de la tâche Celery pour l'envoi asynchrone d'emails
+try:
+    from .tasks import send_activation_email_task
+    CELERY_AVAILABLE = True
+except ImportError:
+    CELERY_AVAILABLE = False
+
 
 class UserAdminForm(forms.ModelForm):
     """Formulaire admin pour créer/éditer un utilisateur avec choix de services.
@@ -177,15 +184,32 @@ class UserAdmin(admin.ModelAdmin):
             # Sauvegarde l'utilisateur sans appeler full_clean() car le formulaire a déjà validé
             obj.save()
             
-            # Envoie l'email d'activation
-            self.send_activation_email(obj, temp_password, request)
-            
-            # Message de succès
-            self.message_user(
-                request,
-                f"Utilisateur créé avec succès. Email d'activation envoyé à {obj.email}",
-                level='success'
-            )
+            # Envoie l'email d'activation (async si Celery disponible, sinon sync)
+            if CELERY_AVAILABLE:
+                try:
+                    # Envoi asynchrone via Celery
+                    send_activation_email_task.delay(obj.id, temp_password)
+                    self.message_user(
+                        request,
+                        f"Utilisateur créé avec succès. Email d'activation en cours d'envoi à {obj.email}",
+                        level='success'
+                    )
+                except Exception as e:
+                    # Fallback: envoi synchrone si Celery échoue
+                    self.send_activation_email(obj, temp_password, request)
+                    self.message_user(
+                        request,
+                        f"Utilisateur créé avec succès. Email d'activation envoyé à {obj.email}",
+                        level='success'
+                    )
+            else:
+                # Envoi synchrone (Celery non disponible)
+                self.send_activation_email(obj, temp_password, request)
+                self.message_user(
+                    request,
+                    f"Utilisateur créé avec succès. Email d'activation envoyé à {obj.email}",
+                    level='success'
+                )
         else:
             # Pour les modifications, sauvegarder directement
             obj.save()

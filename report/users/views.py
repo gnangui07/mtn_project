@@ -28,6 +28,9 @@ from .models import User, UserVoicePreference
 from functools import wraps
 from django.views.decorators.csrf import csrf_protect
 
+# Import des tâches Celery pour le cache et les opérations asynchrones
+from .tasks import cache_user_permissions, invalidate_user_cache, get_cached_user_permissions
+
 # Mixin pour ajouter des en-têtes anti-cache aux CBV (Class-Based Views)
 class NoCacheMixin:
     """Mixin qui ajoute des en-têtes anti-cache à la réponse.
@@ -89,6 +92,8 @@ def deconnexion_view(request):
         # Récupérer l'utilisateur avant la déconnexion
         if request.user.is_authenticated:
             user = request.user
+            user_id = user.id  # Sauvegarder l'ID avant déconnexion
+            
             # Mettre à jour le statut en ligne
             if hasattr(user, 'is_online'):
                 user.is_online = False
@@ -96,6 +101,13 @@ def deconnexion_view(request):
             if hasattr(user, 'date_derniere_connexion'):
                 user.date_derniere_connexion = timezone.now()
             user.save()
+            
+            # Invalider le cache utilisateur via Celery (async)
+            try:
+                invalidate_user_cache.delay(user_id)
+            except Exception:
+                # Celery non disponible, on continue
+                pass
         
         # Vider complètement la session avant la déconnexion
         request.session.flush()
@@ -312,6 +324,13 @@ def login_view(request):
                 
                 # Régénérer la clé de session pour sécurité
                 request.session.cycle_key()
+                
+                # Cache les permissions utilisateur via Celery (async)
+                try:
+                    cache_user_permissions.delay(user.id)
+                except Exception:
+                    # Celery non disponible, on continue sans cache
+                    pass
                 
                 messages.success(request, f"Bienvenue {user.get_full_name()} !")
                 

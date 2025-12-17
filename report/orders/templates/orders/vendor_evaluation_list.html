@@ -2,292 +2,537 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}Vendor Evaluations{% endblock %}
+{% block title %}Vendor Evaluations Dashboard{% endblock %}
 
 {% block extra_css %}
 <style>
-    .evaluation-card {
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    :root {
+        --spectrum-black: #000000;
+        --spectrum-yellow: #FFCC00;
+        --spectrum-gray-50: #FAFAFA;
+        --spectrum-gray-100: #F5F5F5;
+        --spectrum-gray-200: #EAEAEA;
+        --spectrum-gray-800: #424242;
+        --spectrum-blue: #2680EB;
+        --spectrum-green: #30A46C;
+        --spectrum-red: #E5484D;
     }
-    
-    .evaluation-card:hover {
+
+    .spectrum-header {
+        background: linear-gradient(135deg, var(--spectrum-black) 0%, #1a1a1a 100%);
+        color: white;
+        border-radius: 12px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .spectrum-card {
+        background: white;
+        border-radius: 12px;
+        border: 1px solid var(--spectrum-gray-200);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .spectrum-card:hover {
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
         transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
     }
-    
-    .score-badge {
-        font-size: 1.1rem;
-        padding: 8px 12px;
+
+    .spectrum-metric {
+        padding: 1.5rem;
+        border-radius: 8px;
+        background: var(--spectrum-gray-50);
+        border-left: 4px solid var(--spectrum-yellow);
     }
-    
-    .filter-section {
-        background: #f8f9fa;
-        border-radius: 10px;
-        padding: 20px;
-        margin-bottom: 30px;
+
+    .spectrum-table {
+        border-collapse: separate;
+        border-spacing: 0;
     }
-    
-    .stats-card {
-        background: linear-gradient(135deg, #FFCC00 0%, #E6B800 100%);
-        color: #000000;
-        border-radius: 15px;
-        padding: 20px;
-        text-align: center;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 15px rgba(255, 204, 0, 0.3);
+
+    .spectrum-table thead th {
+        background: var(--spectrum-gray-50);
+        color: var(--spectrum-gray-800);
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 1rem;
+        border-bottom: 2px solid var(--spectrum-gray-200);
     }
-    
-    .stats-number {
-        font-size: 2rem;
-        font-weight: bold;
-        margin-bottom: 5px;
+
+    .spectrum-table tbody tr {
+        transition: background-color 0.15s ease;
     }
-    
-    .stats-label {
-        font-size: 0.9rem;
-        opacity: 0.9;
+
+    .spectrum-table tbody tr:hover {
+        background-color: var(--spectrum-gray-50);
     }
+
+    .spectrum-badge {
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.25rem 0.75rem;
+        border-radius: 100px;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .score-indicator {
+        width: 40px;
+        height: 6px;
+        background: var(--spectrum-gray-200);
+        border-radius: 3px;
+        overflow: hidden;
+        display: inline-block;
+        vertical-align: middle;
+    }
+
+    .score-fill {
+        height: 100%;
+        border-radius: 3px;
+    }
+
+    .spectrum-button {
+        font-weight: 600;
+        padding: 0.625rem 1.25rem;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .spectrum-button-primary {
+        background: var(--spectrum-black);
+        color: white;
+        border: 2px solid var(--spectrum-black);
+    }
+
+    .spectrum-button-primary:hover {
+        background: #333;
+        border-color: #333;
+        color: white;
+    }
+
+    .spectrum-button-secondary {
+        background: transparent;
+        color: var(--spectrum-gray-800);
+        border: 2px solid var(--spectrum-gray-200);
+    }
+
+    .spectrum-button-secondary:hover {
+        background: var(--spectrum-gray-50);
+        border-color: var(--spectrum-gray-800);
+    }
+
+    .spectrum-button-accent {
+        background: var(--spectrum-yellow);
+        color: var(--spectrum-black);
+        border: 2px solid var(--spectrum-yellow);
+        font-weight: 700;
+    }
+
+    .spectrum-button-accent:hover {
+        background: #e6b800;
+        border-color: #e6b800;
+    }
+
+    .spectrum-button-action {
+        background: var(--spectrum-yellow);
+        color: var(--spectrum-black);
+        border: 2px solid var(--spectrum-yellow);
+        font-weight: 700;
+    }
+
+    .spectrum-button-action:hover {
+        background: var(--spectrum-blue);
+        color: white;
+        border-color: var(--spectrum-blue);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .spectrum-button-sm {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.875rem;
+    }
+
+    .filter-card {
+        background: var(--spectrum-gray-50);
+        border-radius: 12px;
+        padding: 1.5rem;
+        border: 1px solid var(--spectrum-gray-200);
+    }
+
+    .metric-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        line-height: 1;
+        color: var(--spectrum-black);
+    }
+
+    .metric-label {
+        font-size: 0.875rem;
+        color: var(--spectrum-gray-800);
+        font-weight: 500;
+    }
+
+    .rating-star {
+        color: var(--spectrum-yellow);
+    }
+
+    .pagination-container {
+        background: var(--spectrum-gray-50);
+        border-radius: 12px;
+        padding: 1rem;
+        border: 1px solid var(--spectrum-gray-200);
+    }
+
+    .page-item.active .page-link {
+        background: var(--spectrum-black);
+        border-color: var(--spectrum-black);
+        color: white;
+    }
+
+    .page-link {
+        color: var(--spectrum-gray-800);
+        border: 1px solid var(--spectrum-gray-200);
+        padding: 0.5rem 1rem;
+        margin: 0 0.125rem;
+        border-radius: 6px;
+    }
+
+    .status-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 0.5rem;
+    }
+
+    .status-excellent { background: var(--spectrum-green); }
+    .status-good { background: var(--spectrum-yellow); }
+    .status-poor { background: var(--spectrum-red); }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid mt-4">
-    <div class="row">
-        <div class="col-12">
-            <!-- En-tête -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1><i class="fas fa-star me-3"></i>Vendor Evaluations</h1>
-                <div>
-                    <a href="{% url 'orders:vendor_ranking' %}" class="btn btn-primary me-2">
-                        <i class="fas fa-trophy me-2"></i>Vendor Ranking
+    <!-- Header Section -->
+    <div class="spectrum-header">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="me-3" style="font-size: 2rem;">📊</div>
+                    <div>
+                        <h1 class="h3 mb-1" style="font-weight: 700;">Vendor Performance Dashboard</h1>
+                        <p class="mb-0 opacity-75">Monitor and analyze supplier evaluation metrics</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="d-flex gap-2 justify-content-md-end">
+                    <a href="{% url 'orders:vendor_ranking' %}" class="spectrum-button spectrum-button-primary">
+                        <i class="fas fa-trophy"></i> Rankings
                     </a>
                     <a href="{% url 'orders:export_vendor_evaluations' %}?supplier={{ supplier_filter }}&min_score={{ min_score }}&date_from={{ date_from }}&date_to={{ date_to }}" 
-                       class="btn me-2" style="background-color: #FFCC00; color: #000000; border: 2px solid #000000;">
-                        <i class="fas fa-file-excel me-2"></i>Export Filtered Data
-                    </a>
-                    <a href="{% url 'orders:accueil' %}" class="btn btn-secondary">
-                        <i class="fas fa-arrow-left me-2"></i>Back to Home
+                       class="spectrum-button spectrum-button-action">
+                        <i class="fas fa-file-export"></i> Export
                     </a>
                 </div>
             </div>
-
-            <!-- Statistiques -->
-            <div class="row mb-4">
-                <div class="col-md-3">
-                    <div class="stats-card">
-                        <div class="stats-number">{{ total_evaluations }}</div>
-                        <div class="stats-label">Total Evaluations</div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="stats-card">
-                        <div class="stats-number">{{ suppliers.count }}</div>
-                        <div class="stats-label">Suppliers Evaluated</div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="stats-card">
-                        <div class="stats-number">
-                            {% if page_obj.object_list %}
-                                {{ page_obj.object_list|length }}
-                            {% else %}
-                                0
-                            {% endif %}
-                        </div>
-                        <div class="stats-label">This Page</div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="stats-card">
-                        <div class="stats-number">{{ page_obj.paginator.num_pages }}</div>
-                        <div class="stats-label">Total Pages</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Filtres -->
-            <div class="filter-section">
-                <form method="get" class="row g-3">
-                    <div class="col-md-3">
-                        <label for="supplier" class="form-label"><i class="fas fa-building me-1"></i>Supplier</label>
-                        <input type="text" class="form-control" id="supplier" name="supplier" 
-                               value="{{ supplier_filter }}" placeholder="Enter supplier name...">
-                    </div>
-                    <div class="col-md-2">
-                        <label for="min_score" class="form-label"><i class="fas fa-star me-1"></i>Min Score</label>
-                        <input type="number" class="form-control" id="min_score" name="min_score" 
-                               value="{{ min_score }}" min="0" max="50" placeholder="0-50">
-                    </div>
-                    <div class="col-md-2">
-                        <label for="date_from" class="form-label"><i class="fas fa-calendar me-1"></i>From Date</label>
-                        <input type="date" class="form-control" id="date_from" name="date_from" 
-                               value="{{ date_from }}">
-                    </div>
-                    <div class="col-md-2">
-                        <label for="date_to" class="form-label"><i class="fas fa-calendar me-1"></i>To Date</label>
-                        <input type="date" class="form-control" id="date_to" name="date_to" 
-                               value="{{ date_to }}">
-                    </div>
-                    <div class="col-md-3 d-flex align-items-end">
-                        <button type="submit" class="btn btn-primary me-2">
-                            <i class="fas fa-search me-2"></i>Apply Filters
-                        </button>
-                        <a href="{% url 'orders:vendor_evaluation_list' %}" class="btn btn-outline-secondary">
-                            <i class="fas fa-times me-2"></i>Clear All
-                        </a>
-                    </div>
-                </form>
-            </div>
-
-            <!-- Liste des évaluations - Format tableau -->
-            {% if page_obj.object_list %}
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead style="background-color: #000000; color: #FFCC00;">
-                            <tr>
-                                <th>Supplier</th>
-                                <th>Purchase Order</th>
-                                <th class="text-center">Delivery Compliance</th>
-                                <th class="text-center">Timeline</th>
-                                <th class="text-center">Advising</th>
-                                <th class="text-center">After Sales</th>
-                                <th class="text-center">Relationship</th>
-                                <th class="text-center">Total Score</th>
-                                <th class="text-center">Vendor Final Rating</th>
-                                <th>Date</th>
-                                <th>Evaluator</th>
-                                <th class="text-center">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for evaluation in page_obj.object_list %}
-                            <tr class="evaluation-row">
-                                <td>
-                                    <strong style="color: #000000;">
-                                        <i class="fas fa-building me-2"></i>{{ evaluation.supplier }}
-                                    </strong>
-                                </td>
-                                <td>
-                                    <span class="badge" style="background-color: #000000; color: #FFCC00;">{{ evaluation.bon_commande.numero }}</span>
-                                </td>
-                                <td class="text-center">
-                                    <span class="badge score-badge bg-{% if evaluation.delivery_compliance >= 7 %}success{% elif evaluation.delivery_compliance >= 4 %}warning{% else %}danger{% endif %}">
-                                        {{ evaluation.delivery_compliance }}/10
-                                    </span>
-                                </td>
-                                <td class="text-center">
-                                    <span class="badge score-badge bg-{% if evaluation.delivery_timeline >= 7 %}success{% elif evaluation.delivery_timeline >= 4 %}warning{% else %}danger{% endif %}">
-                                        {{ evaluation.delivery_timeline }}/10
-                                    </span>
-                                </td>
-                                <td class="text-center">
-                                    <span class="badge score-badge bg-{% if evaluation.advising_capability >= 7 %}success{% elif evaluation.advising_capability >= 4 %}warning{% else %}danger{% endif %}">
-                                        {{ evaluation.advising_capability }}/10
-                                    </span>
-                                </td>
-                                <td class="text-center">
-                                    <span class="badge score-badge bg-{% if evaluation.after_sales_qos >= 7 %}success{% elif evaluation.after_sales_qos >= 4 %}warning{% else %}danger{% endif %}">
-                                        {{ evaluation.after_sales_qos }}/10
-                                    </span>
-                                </td>
-                                <td class="text-center">
-                                    <span class="badge score-badge bg-{% if evaluation.vendor_relationship >= 7 %}success{% elif evaluation.vendor_relationship >= 4 %}warning{% else %}danger{% endif %}">
-                                        {{ evaluation.vendor_relationship }}/10
-                                    </span>
-                                </td>
-                                <td class="text-center">
-                                    <strong style="color: #FFCC00; background-color: #000000; padding: 5px 10px; border-radius: 5px;">{{ evaluation.get_total_score }}/50</strong>
-                                </td>
-                                <td class="text-center">
-                                    <strong style="color: #000000;">{{ evaluation.vendor_final_rating|floatformat:1 }}/10</strong>
-                                </td>
-                                <td>
-                                    <small class="text-muted">
-                                        <i class="fas fa-calendar me-1"></i>{{ evaluation.date_evaluation|date:"d/m/Y" }}
-                                    </small>
-                                </td>
-                                <td>
-                                    <small class="text-muted">
-                                        {% if evaluation.evaluator %}
-                                            <i class="fas fa-user me-1"></i>{{ evaluation.evaluator.get_full_name|default:evaluation.evaluator.email }}
-                                        {% else %}
-                                            System
-                                        {% endif %}
-                                    </small>
-                                </td>
-                                <td class="text-center">
-                                    <div class="btn-group" role="group">
-                                        <a href="{% url 'orders:vendor_evaluation_detail' evaluation_id=evaluation.id %}" 
-                                           class="btn btn-sm" style="background-color: #FFCC00; color: #000000; border: 1px solid #000000;" title="View Details">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                        <a href="{% url 'orders:vendor_evaluation' bon_commande_id=evaluation.bon_commande.id %}" 
-                                           class="btn btn-sm" style="background-color: #000000; color: #FFCC00; border: 1px solid #FFCC00;" title="Edit">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Pagination -->
-                {% if page_obj.has_other_pages %}
-                <nav aria-label="Evaluations pagination">
-                    <ul class="pagination justify-content-center">
-                        {% if page_obj.has_previous %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page=1{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if min_score %}&min_score={{ min_score }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">First</a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if min_score %}&min_score={{ min_score }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Previous</a>
-                            </li>
-                        {% endif %}
-
-                        {% for num in page_obj.paginator.page_range %}
-                            {% if page_obj.number == num %}
-                                <li class="page-item active">
-                                    <span class="page-link" style="background-color: #FFCC00; color: #000000; border-color: #000000;">{{ num }}</span>
-                                </li>
-                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                                <li class="page-item">
-                                    <a class="page-link" href="?page={{ num }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if min_score %}&min_score={{ min_score }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">{{ num }}</a>
-                                </li>
-                            {% endif %}
-                        {% endfor %}
-
-                        {% if page_obj.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if min_score %}&min_score={{ min_score }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Next</a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if min_score %}&min_score={{ min_score }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Last</a>
-                            </li>
-                        {% endif %}
-                    </ul>
-                </nav>
-                {% endif %}
-            {% else %}
-                <div class="text-center py-5">
-                    <i class="fas fa-star fa-4x text-muted mb-4"></i>
-                    <h4 class="text-muted">No evaluations found</h4>
-                    <p class="text-muted">
-                        {% if supplier_filter or min_score %}
-                            No evaluations match your current filters.
-                        {% else %}
-                            No vendor evaluations have been created yet.
-                        {% endif %}
-                    </p>
-                    {% if supplier_filter or min_score %}
-                    <a href="{% url 'orders:vendor_evaluation_list' %}" class="btn btn-primary">
-                        <i class="fas fa-times me-2"></i>Clear Filters
-                    </a>
-                    {% endif %}
-                </div>
-            {% endif %}
         </div>
     </div>
+
+    <!-- Metrics Overview -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="spectrum-card h-100">
+                <div class="spectrum-metric">
+                    <div class="metric-value">{{ total_evaluations }}</div>
+                    <div class="metric-label">Total Evaluations</div>
+                    <div class="mt-2">
+                        <small class="text-muted"><i class="fas fa-calendar-alt me-1"></i> All time</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="spectrum-card h-100">
+                <div class="spectrum-metric">
+                    <div class="metric-value">{{ suppliers.count }}</div>
+                    <div class="metric-label">Active Suppliers</div>
+                    <div class="mt-2">
+                        <small class="text-muted"><i class="fas fa-building me-1"></i> Unique vendors</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="spectrum-card h-100">
+                <div class="spectrum-metric">
+                    <div class="metric-value">
+                        {% if page_obj.object_list %}
+                            {{ page_obj.object_list|length }}
+                        {% else %}
+                            0
+                        {% endif %}
+                    </div>
+                    <div class="metric-label">Showing</div>
+                    <div class="mt-2">
+                        <small class="text-muted"><i class="fas fa-filter me-1"></i> Filtered results</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="spectrum-card h-100">
+                <div class="spectrum-metric">
+                    <div class="metric-value">{{ page_obj.paginator.num_pages }}</div>
+                    <div class="metric-label">Total Pages</div>
+                    <div class="mt-2">
+                        <small class="text-muted"><i class="fas fa-file me-1"></i> Pagination</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters Section -->
+    <div class="filter-card mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0" style="font-weight: 600;">Filters & Search</h5>
+            <a href="{% url 'orders:vendor_evaluation_list' %}" class="spectrum-button spectrum-button-secondary btn-sm">
+                <i class="fas fa-redo"></i> Reset
+            </a>
+        </div>
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label small fw-bold mb-2">SUPPLIER NAME</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0">
+                        <i class="fas fa-building text-muted"></i>
+                    </span>
+                    <input type="text" class="form-control border-start-0 ps-0" 
+                           name="supplier" value="{{ supplier_filter }}" 
+                           placeholder="Search supplier...">
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold mb-2">MINIMUM SCORE</label>
+                <input type="range" class="form-range" id="scoreRange" min="0" max="50" 
+                       value="{{ min_score|default:'0' }}" oninput="updateScoreValue(this.value)">
+                <div class="d-flex justify-content-between">
+                    <small class="text-muted">0</small>
+                    <span class="fw-bold" id="scoreValue">{{ min_score|default:'0' }}</span>
+                    <small class="text-muted">50</small>
+                </div>
+                <input type="hidden" name="min_score" id="min_score" value="{{ min_score }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold mb-2">DATE RANGE</label>
+                <div class="input-group">
+                    <input type="date" class="form-control" name="date_from" value="{{ date_from }}">
+                    <span class="input-group-text">to</span>
+                    <input type="date" class="form-control" name="date_to" value="{{ date_to }}">
+                </div>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="spectrum-button spectrum-button-primary w-100">
+                    <i class="fas fa-search"></i> Apply
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Main Content -->
+    <div class="spectrum-card">
+        <div class="card-header bg-white border-bottom px-4 py-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0" style="font-weight: 600;">Evaluation Records</h5>
+                <div class="text-muted small">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Showing {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ page_obj.paginator.count }}
+                </div>
+            </div>
+        </div>
+        
+        {% if page_obj.object_list %}
+        <div class="table-responsive">
+            <table class="table spectrum-table">
+                <thead>
+                    <tr>
+                        <th style="width: 20%">Supplier</th>
+                        <th>PO Number</th>
+                        <th class="text-center">Score</th>
+                        <th class="text-center">Rating</th>
+                        <th>Date</th>
+                        <th class="text-center">Status</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for evaluation in page_obj.object_list %}
+                    <tr class="align-middle">
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="me-3">
+                                    <div class="bg-light rounded-circle d-flex align-items-center justify-content-center" 
+                                         style="width: 36px; height: 36px;">
+                                        <i class="fas fa-building text-dark"></i>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="fw-bold">{{ evaluation.supplier }}</div>
+                                    <small class="text-muted">
+                                        {{ evaluation.evaluator.get_full_name|default:evaluation.evaluator.email }}
+                                    </small>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge bg-dark text-white">#{{ evaluation.bon_commande.numero }}</span>
+                        </td>
+                        <td class="text-center">
+                            <div class="d-flex flex-column align-items-center">
+                                <div class="fw-bold">{{ evaluation.get_total_score }}/50</div>
+                                <div class="score-indicator mt-1">
+                                    <div class="score-fill" 
+                                         style="width: {% widthratio evaluation.get_total_score 50 100 %}%; 
+                                                background: {% if evaluation.get_total_score >= 40 %}var(--spectrum-green){% elif evaluation.get_total_score >= 30 %}var(--spectrum-yellow){% else %}var(--spectrum-red){% endif %};">
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            <div class="d-flex align-items-center justify-content-center">
+                                <span class="rating-star me-1">★</span>
+                                <span class="fw-bold">{{ evaluation.vendor_final_rating|floatformat:1 }}</span>
+                                <small class="text-muted ms-1">/10</small>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="text-nowrap">
+                                {{ evaluation.date_evaluation|date:"M d, Y" }}
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            {% with score=evaluation.get_total_score %}
+                            {% if score >= 40 %}
+                                <span class="spectrum-badge" style="background: var(--spectrum-green); color: white;">
+                                    <span class="status-indicator status-excellent"></span> Excellent
+                                </span>
+                            {% elif score >= 30 %}
+                                <span class="spectrum-badge" style="background: var(--spectrum-yellow); color: black;">
+                                    <span class="status-indicator status-good"></span> Good
+                                </span>
+                            {% else %}
+                                <span class="spectrum-badge" style="background: var(--spectrum-red); color: white;">
+                                    <span class="status-indicator status-poor"></span> Needs Improvement
+                                </span>
+                            {% endif %}
+                            {% endwith %}
+                        </td>
+                        <td class="text-center">
+                            <div class="d-flex justify-content-center gap-2">
+                                <a href="{% url 'orders:vendor_evaluation_detail' evaluation_id=evaluation.id %}" 
+                                   class="spectrum-button spectrum-button-action spectrum-button-sm text-decoration-none">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{% url 'orders:vendor_evaluation' bon_commande_id=evaluation.bon_commande.id %}" 
+                                   class="spectrum-button spectrum-button-action spectrum-button-sm text-decoration-none">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <div class="mb-3" style="font-size: 3rem;">📋</div>
+            <h5 class="fw-bold mb-2">No evaluations found</h5>
+            <p class="text-muted mb-4">
+                {% if supplier_filter or min_score %}
+                    Try adjusting your filters to see more results
+                {% else %}
+                    Start by creating your first vendor evaluation
+                {% endif %}
+            </p>
+            {% if not supplier_filter and not min_score %}
+            <a href="{% url 'orders:accueil' %}" class="spectrum-button spectrum-button-primary">
+                <i class="fas fa-plus me-2"></i> Create Evaluation
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+        <div class="card-footer bg-white border-top px-4 py-3">
+            <nav aria-label="Page navigation">
+                <ul class="pagination justify-content-center mb-0">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                <i class="fas fa-angle-double-left"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                <i class="fas fa-angle-left"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ num }}</span>
+                            </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ num }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                <i class="fas fa-angle-right"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                <i class="fas fa-angle-double-right"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Back to Home -->
+    <div class="mt-4 text-center">
+        <a href="{% url 'orders:accueil' %}" class="spectrum-button spectrum-button-secondary">
+            <i class="fas fa-arrow-left me-2"></i> Back to Dashboard
+        </a>
+    </div>
 </div>
+
+<script>
+    function updateScoreValue(val) {
+        document.getElementById('scoreValue').textContent = val;
+        document.getElementById('min_score').value = val;
+    }
+</script>
 {% endblock %}

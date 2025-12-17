@@ -1,17 +1,16 @@
 from django.urls import path, include
 from django.views.generic.base import RedirectView
-from . import (
-    api,
-    compensation_letter_api,
-    delay_evaluation_api,
-    msrn_api,
-    penalty_amount_api,
-    penalty_amendment_api,
-    penalty_api,
-    reception_api,
-    views,
-    views_export,
-)
+
+from . import views, views_export
+from . import api
+from . import reception_api
+from . import msrn_api
+from . import penalty_api
+from . import penalty_amendment_api
+from . import penalty_amount_api
+from . import delay_evaluation_api
+from . import compensation_letter_api
+from .task_status_api import check_task_status, get_pending_tasks
 
 
 app_name = 'orders'
@@ -77,5 +76,9 @@ urlpatterns = [
     # Timeline delays
     path('timeline-delays/<int:bon_commande_id>/', views.timeline_delays, name='timeline_delays'),
     path('api/update-delays/<int:timeline_id>/', views.update_delays, name='update_delays'),
-  
+    
+    # ==================== CELERY TASK STATUS API ====================
+    # Polling pour vérifier l'état des tâches async (exports, PDF, imports)
+    path('api/task-status/<str:task_id>/', check_task_status, name='check_task_status'),
+    path('api/pending-tasks/', get_pending_tasks, name='get_pending_tasks'),
 ]

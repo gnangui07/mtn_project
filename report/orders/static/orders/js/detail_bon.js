@@ -402,15 +402,15 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!parentCell) return;
         
         if (quantityNotDelivered === 0) {
-            // Rouge si Quantity Not Delivered = 0
-            parentCell.style.backgroundColor = '#f8d7da';
-            parentCell.style.color = '#721c24';
-            parentCell.style.fontWeight = 'bold';
+            // Vert si Quantity Not Delivered = 0 (Tout est livré)
+            parentCell.style.setProperty('background-color', '#d4edda', 'important');
+            parentCell.style.setProperty('color', '#155724', 'important');
+            parentCell.style.setProperty('font-weight', 'bold', 'important');
         } else if (quantityNotDelivered > 0) {
-            // Vert s'il reste des quantités à livrer
-            parentCell.style.backgroundColor = '#d4edda';
-            parentCell.style.color = '#155724';
-            parentCell.style.fontWeight = 'bold';
+            // Rouge s'il reste des quantités à livrer
+            parentCell.style.setProperty('background-color', '#f8d7da', 'important');
+            parentCell.style.setProperty('color', '#721c24', 'important');
+            parentCell.style.setProperty('font-weight', 'bold', 'important');
         }
     }
     
@@ -1766,7 +1766,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const resetButton = document.getElementById('resetColumnSelection');
     
     // Clé de stockage pour les préférences de colonnes
-    const storageKey = 'columnPreferences_' + '{{ bon_number }}';
+    const storageKey = 'columnPreferences_' + bonNumber;
     let selectedColumns = [];
     
     // Fonction pour ouvrir le panneau latéral
@@ -1990,7 +1990,7 @@ document.addEventListener('DOMContentLoaded', function() {
     updateDeliveryCounts();
     
     // Gérer les clics sur les boutons de filtre
-    const filterButtons = document.querySelectorAll('.filter-btn');
+    const filterButtons = document.querySelectorAll('.spectrum-filter-btn');
     filterButtons.forEach(btn => {
         btn.addEventListener('click', function() {
             // Retirer la classe active de tous les boutons
@@ -2015,7 +2015,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 updateDeliveryCounts();
                 
                 // Réappliquer le filtre actif
-                const activeFilter = document.querySelector('.filter-btn.active');
+                const activeFilter = document.querySelector('.spectrum-filter-btn.active');
                 if (activeFilter) {
                     applyDeliveryFilter(activeFilter.dataset.filter);
                 }

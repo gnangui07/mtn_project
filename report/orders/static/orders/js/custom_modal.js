@@ -88,7 +88,7 @@ function openDetailModal(log) {
     currentReceptionTbody.appendChild(currentRow);
         
     // Remplir l'historique des réceptions
-    const historyBody = document.getElementById('reception-history-table').querySelector('tbody');
+    const historyBody = document.getElementById('reception-history-body');
     historyBody.innerHTML = '';
     
     if (log.line_receptions && log.line_receptions.length > 0) {

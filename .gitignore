@@ -52,6 +52,10 @@ wheels/
 .installed.cfg
 *.egg
 
+# Frontend build artifacts (Tailwind CSS) - tracked intentionally
+!report/static/dist/
+!report/static/dist/**
+
 # Jupyter Notebook
 .ipynb_checkpoints
 

@@ -2,253 +2,450 @@
 {% load static %}
 {% load humanize %}
 
-{% block title %}Vendor Evaluation - {{ bon_commande.numero }}{% endblock %}
+{% block title %}Vendor Evaluation - {{ bon_commande.numero }} | Performance Assessment{% endblock %}
 
 {% block extra_css %}
 <style>
+    :root {
+        --spectrum-black: #000000;
+        --spectrum-yellow: #FFCC00;
+        --spectrum-gray-50: #FAFAFA;
+        --spectrum-gray-100: #F5F5F5;
+        --spectrum-gray-200: #EAEAEA;
+        --spectrum-gray-800: #424242;
+        --spectrum-green: #30A46C;
+        --spectrum-orange: #FF8B29;
+        --spectrum-red: #E5484D;
+        --spectrum-blue: #2680EB;
+        --spectrum-purple: #8E44D6;
+    }
+
     .evaluation-container {
         max-width: 1200px;
         margin: 0 auto;
-        padding: 20px;
     }
-    
-    .evaluation-header {
-        background: linear-gradient(135deg, #FFCC00 0%, #E6B800 100%);
-        color: #000000;
-        padding: 30px;
-        border-radius: 15px;
-        margin-bottom: 30px;
-        box-shadow: 0 10px 30px rgba(255, 204, 0, 0.3);
+
+    .spectrum-page-header {
+        background: white;
+        border-bottom: 1px solid var(--spectrum-gray-200);
+        padding: 2rem 0;
+        margin-bottom: 2rem;
     }
-    
-    .evaluation-header h1 {
+
+    .page-header-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 2rem;
+    }
+
+    .header-title {
+        flex: 1;
+    }
+
+    .header-badge {
+        background: var(--spectrum-yellow);
+        color: var(--spectrum-black);
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 0.875rem;
+    }
+
+    .spectrum-card {
+        background: white;
+        border-radius: 12px;
+        border: 1px solid var(--spectrum-gray-200);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        overflow: hidden;
+        margin-bottom: 1.5rem;
+    }
+
+    .card-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid var(--spectrum-gray-200);
+        background: var(--spectrum-gray-50);
+    }
+
+    .card-header h3 {
         margin: 0;
-        font-size: 2.5rem;
-        font-weight: 300;
+        font-weight: 600;
+        font-size: 1.25rem;
+        color: var(--spectrum-black);
     }
-    
-    .po-info {
+
+    .card-body {
+        padding: 1.5rem;
+    }
+
+    .po-info-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 20px;
-        margin-top: 20px;
+        gap: 1.5rem;
+        margin-bottom: 2rem;
     }
-    
-    .po-info-item {
-        background: rgba(0,0,0,0.1);
-        padding: 15px;
-        border-radius: 10px;
-        backdrop-filter: blur(10px);
+
+    .info-card {
+        background: var(--spectrum-gray-50);
+        border-radius: 8px;
+        padding: 1.5rem;
+        border: 1px solid var(--spectrum-gray-200);
     }
-    
-    .po-info-label {
-        font-size: 0.9rem;
-        opacity: 0.8;
-        margin-bottom: 5px;
-    }
-    
-    .po-info-value {
-        font-size: 1.2rem;
+
+    .info-label {
+        font-size: 0.875rem;
+        color: var(--spectrum-gray-800);
         font-weight: 500;
+        margin-bottom: 0.5rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
-    
-    .criteria-table {
-        background: white;
-        border-radius: 15px;
-        overflow: hidden;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        margin-bottom: 30px;
-    }
-    
-    .criteria-table-header {
-        background: #f8f9fa;
-        padding: 20px;
-        border-bottom: 2px solid #e9ecef;
-    }
-    
-    .criteria-table-header h3 {
-        margin: 0;
-        color: #495057;
+
+    .info-value {
+        font-size: 1.25rem;
         font-weight: 600;
+        color: var(--spectrum-black);
     }
-    
-    .criteria-row {
+
+    .info-subvalue {
+        font-size: 0.875rem;
+        color: var(--spectrum-gray-800);
+        margin-top: 0.25rem;
+    }
+
+    .evaluation-form {
+        margin-top: 2rem;
+    }
+
+    .criteria-grid {
         display: grid;
-        grid-template-columns: 2fr 1fr 3fr;
-        align-items: center;
-        padding: 20px;
-        border-bottom: 1px solid #e9ecef;
-        transition: background-color 0.3s ease;
+        gap: 1.5rem;
     }
-    
-    .criteria-row:hover {
-        background-color: #f8f9fa;
+
+    .criteria-card {
+        background: white;
+        border-radius: 8px;
+        border: 1px solid var(--spectrum-gray-200);
+        padding: 1.5rem;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
-    
-    .criteria-row:last-child {
-        border-bottom: none;
+
+    .criteria-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
     }
-    
+
+    .criteria-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1.5rem;
+    }
+
+    .criteria-title {
+        flex: 1;
+    }
+
     .criteria-name {
         font-weight: 600;
-        color: #495057;
-        font-size: 1.1rem;
+        font-size: 1.125rem;
+        color: var(--spectrum-black);
+        margin-bottom: 0.5rem;
     }
-    
+
+    .criteria-max {
+        font-size: 0.875rem;
+        color: var(--spectrum-gray-800);
+    }
+
     .score-selector {
         display: flex;
-        justify-content: center;
-    }
-    
-    .score-select {
-        padding: 10px 15px;
-        border: 2px solid #dee2e6;
-        border-radius: 8px;
-        font-size: 1.1rem;
-        font-weight: 600;
-        background: white;
-        color: #495057;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        min-width: 80px;
-        text-align: center;
-    }
-    
-    .score-select:focus {
-        outline: none;
-        border-color: #667eea;
-        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-    }
-    
-    .score-select:hover {
-        border-color: #667eea;
-    }
-    
-    .criteria-description {
-        padding: 15px;
-        background: #f8f9fa;
-        border-radius: 8px;
-        font-style: italic;
-        color: #6c757d;
-        min-height: 50px;
-        display: flex;
         align-items: center;
-        transition: all 0.3s ease;
+        gap: 1rem;
     }
-    
-    .criteria-description.active {
-        background: #e3f2fd;
-        color: #1976d2;
-        border-left: 4px solid #2196f3;
+
+    .score-value {
+        min-width: 60px;
+        text-align: center;
+        font-weight: 700;
+        font-size: 1.5rem;
+        color: var(--spectrum-black);
     }
-    
+
+    .score-slider {
+        flex: 1;
+        -webkit-appearance: none;
+        appearance: none;
+        height: 8px;
+        background: var(--spectrum-gray-200);
+        border-radius: 4px;
+        outline: none;
+    }
+
+    .score-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: var(--spectrum-black);
+        cursor: pointer;
+        border: 3px solid white;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        transition: transform 0.2s ease;
+    }
+
+    .score-slider::-webkit-slider-thumb:hover {
+        transform: scale(1.1);
+    }
+
+    .score-slider::-moz-range-thumb {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: var(--spectrum-black);
+        cursor: pointer;
+        border: 3px solid white;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .score-options {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .score-option {
+        padding: 0.5rem 1rem;
+        background: var(--spectrum-gray-100);
+        border: 1px solid var(--spectrum-gray-200);
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .score-option:hover {
+        background: var(--spectrum-gray-200);
+    }
+
+    .score-option.active {
+        background: var(--spectrum-black);
+        color: white;
+        border-color: var(--spectrum-black);
+    }
+
+    .criteria-description {
+        background: var(--spectrum-gray-50);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-top: 1.5rem;
+        border-left: 4px solid var(--spectrum-blue);
+    }
+
+    .description-text {
+        font-size: 0.9375rem;
+        color: var(--spectrum-gray-800);
+        line-height: 1.6;
+        margin: 0;
+    }
+
+    .score-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .summary-card {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        text-align: center;
+        border: 1px solid var(--spectrum-gray-200);
+    }
+
+    .summary-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        line-height: 1;
+        color: var(--spectrum-black);
+        margin-bottom: 0.5rem;
+    }
+
+    .summary-label {
+        font-size: 0.875rem;
+        color: var(--spectrum-gray-800);
+        font-weight: 500;
+    }
+
+    .summary-progress {
+        height: 6px;
+        background: var(--spectrum-gray-200);
+        border-radius: 3px;
+        margin-top: 1rem;
+        overflow: hidden;
+    }
+
+    .summary-fill {
+        height: 100%;
+        border-radius: 3px;
+        transition: width 0.3s ease;
+    }
+
     .action-buttons {
         display: flex;
-        justify-content: center;
-        gap: 20px;
-        margin-top: 30px;
+        gap: 1rem;
+        margin-top: 2rem;
+        padding-top: 2rem;
+        border-top: 1px solid var(--spectrum-gray-200);
     }
-    
-    .btn-save {
-        background: linear-gradient(135deg, #FFCC00 0%, #E6B800 100%);
-        border: 2px solid #000000;
-        color: #000000;
-        padding: 15px 40px;
-        font-size: 1.1rem;
+
+    .spectrum-button {
         font-weight: 600;
-        border-radius: 50px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        box-shadow: 0 5px 15px rgba(255, 204, 0, 0.3);
-    }
-    
-    .btn-save:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(255, 204, 0, 0.4);
-        background: linear-gradient(135deg, #E6B800 0%, #FFCC00 100%);
-    }
-    
-    .btn-cancel {
-        background: #000000;
-        border: 2px solid #FFCC00;
-        color: #FFCC00;
-        padding: 15px 40px;
-        font-size: 1.1rem;
-        font-weight: 600;
-        border-radius: 50px;
-        cursor: pointer;
-        transition: all 0.3s ease;
+        padding: 0.75rem 1.5rem;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
         text-decoration: none;
-        display: inline-block;
+        border: 2px solid transparent;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 0.9375rem;
     }
-    
-    .btn-cancel:hover {
-        background: #222222;
-        color: #FFCC00;
-        text-decoration: none;
-        transform: translateY(-2px);
+
+    .spectrum-button-primary {
+        background: var(--spectrum-black);
+        color: white;
     }
-    
-    .score-summary {
+
+    .spectrum-button-primary:hover {
+        background: #333;
+        color: white;
+    }
+
+    .spectrum-button-secondary {
         background: white;
-        border-radius: 15px;
-        padding: 25px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        margin-bottom: 30px;
+        color: var(--spectrum-gray-800);
+        border-color: var(--spectrum-gray-200);
     }
-    
-    .score-summary h4 {
-        color: #495057;
-        margin-bottom: 20px;
-        text-align: center;
+
+    .spectrum-button-secondary:hover {
+        background: var(--spectrum-gray-50);
+        border-color: var(--spectrum-gray-800);
     }
-    
-    .score-display {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        gap: 15px;
-        text-align: center;
-    }
-    
-    .score-item {
-        padding: 15px;
-        background: #f8f9fa;
-        border-radius: 10px;
-        border-left: 4px solid #667eea;
-    }
-    
-    .score-label {
-        font-size: 0.9rem;
-        color: #6c757d;
-        margin-bottom: 5px;
-    }
-    
-    .score-value {
-        font-size: 1.5rem;
+
+    .spectrum-button-action {
+        background: var(--spectrum-yellow);
+        color: var(--spectrum-black);
+        border: 2px solid var(--spectrum-yellow);
         font-weight: 700;
-        color: #495057;
+        transition: all 0.2s ease;
     }
-    
-    
+
+    .spectrum-button-action:hover {
+        background: var(--spectrum-blue);
+        color: white;
+        border-color: var(--spectrum-blue);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .score-indicator {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+
+    .score-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.25rem 0.75rem;
+        border-radius: 100px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .badge-excellent {
+        background: var(--spectrum-green);
+        color: white;
+    }
+
+    .badge-good {
+        background: var(--spectrum-yellow);
+        color: var(--spectrum-black);
+    }
+
+    .badge-average {
+        background: var(--spectrum-orange);
+        color: white;
+    }
+
+    .badge-poor {
+        background: var(--spectrum-red);
+        color: white;
+    }
+
+    .validation-message {
+        background: var(--spectrum-red);
+        color: white;
+        padding: 1rem;
+        border-radius: 6px;
+        margin-bottom: 1.5rem;
+        display: none;
+    }
+
+    .validation-message.show {
+        display: block;
+    }
+
+    .completion-indicator {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .completion-bar {
+        flex: 1;
+        height: 6px;
+        background: var(--spectrum-gray-200);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    .completion-fill {
+        height: 100%;
+        background: var(--spectrum-yellow);
+        transition: width 0.3s ease;
+    }
+
     @media (max-width: 768px) {
-        .criteria-row {
-            grid-template-columns: 1fr;
-            gap: 15px;
-            text-align: center;
+        .page-header-content {
+            flex-direction: column;
         }
         
-        .po-info {
-            grid-template-columns: 1fr;
+        .criteria-header {
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .score-selector {
+            width: 100%;
         }
         
         .action-buttons {
             flex-direction: column;
-            align-items: center;
         }
         
-        .btn-save, .btn-cancel {
+        .spectrum-button {
             width: 100%;
-            max-width: 300px;
+            justify-content: center;
         }
     }
 </style>
@@ -256,167 +453,328 @@
 
 {% block content %}
 <div class="evaluation-container">
-    <!-- En-tête avec informations du bon de commande -->
-    <div class="evaluation-header">
-        <h1><i class="fas fa-star me-3"></i>Vendor Evaluation</h1>
-        <div class="po-info">
-            <div class="po-info-item">
-                <div class="po-info-label">Purchase Order Number</div>
-                <div class="po-info-value">{{ bon_commande.numero }}</div>
-            </div>
-            <div class="po-info-item">
-                <div class="po-info-label">Supplier</div>
-                <div class="po-info-value">{{ supplier }}</div>
-            </div>
-            <div class="po-info-item">
-                <div class="po-info-label">PO Amount</div>
-                <div class="po-info-value">{{ bon_commande.montant_total|floatformat:0|intcomma }} {{ bon_commande.get_currency }}</div>
-            </div>
-            <div class="po-info-item">
-                <div class="po-info-label">Delivery Rate</div>
-                <div class="po-info-value">{{ bon_commande.taux_avancement|floatformat:2 }}%</div>
+    <!-- Page Header -->
+    <div class="spectrum-page-header">
+        <div class="container">
+            <div class="page-header-content">
+                <div class="header-title">
+                    <h1 class="h2 mb-2" style="font-weight: 700;">Vendor Performance Evaluation</h1>
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <div class="header-badge">PO #{{ bon_commande.numero }}</div>
+                        <div class="text-muted">Complete all criteria below to evaluate supplier performance</div>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <div class="completion-indicator">
+                        <div class="completion-bar">
+                            <div class="completion-fill" id="completionFill" style="width: 0%"></div>
+                        </div>
+                        <div class="text-muted small" id="completionText">0% Complete</div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Formulaire d'évaluation -->
-    <form method="post" id="evaluationForm">
-        {% csrf_token %}
-        
-        <!-- Résumé des scores -->
-        <div class="score-summary">
-            <h4><i class="fas fa-chart-bar me-2"></i>Evaluation Summary</h4>
-            <div class="score-display">
-                <div class="score-item">
-                    <div class="score-label">Total Score</div>
-                    <div class="score-value" id="totalScore">0/50</div>
-                </div>
-                <div class="score-item">
-                    <div class="score-label">Vendor Final Rating</div>
-                    <div class="score-value" id="vendorFinalRating">0.0/10</div>
-                </div>
-                <div class="score-item">
-                    <div class="score-label">Completion</div>
-                    <div class="score-value" id="completionRate">0%</div>
+    <div class="container">
+        <!-- Validation Message -->
+        <div class="validation-message" id="validationMessage">
+            <i class="fas fa-exclamation-circle me-2"></i>
+            Please complete all evaluation criteria before submitting.
+        </div>
+
+        <!-- PO Information -->
+        <div class="spectrum-card">
+            <div class="card-header">
+                <h3><i class="fas fa-file-invoice me-2"></i> Purchase Order Information</h3>
+            </div>
+            <div class="card-body">
+                <div class="po-info-grid">
+                    <div class="info-card">
+                        <div class="info-label">Supplier</div>
+                        <div class="info-value">{{ supplier }}</div>
+                        <div class="info-subvalue">Contract Partner</div>
+                    </div>
+                    
+                    <div class="info-card">
+                        <div class="info-label">Order Value</div>
+                        <div class="info-value">{{ bon_commande.montant_total|floatformat:0|intcomma }} {{ bon_commande.get_currency }}</div>
+                        <div class="info-subvalue">Total Contract Value</div>
+                    </div>
+                    
+                    <div class="info-card">
+                        <div class="info-label">Delivery Progress</div>
+                        <div class="info-value">{{ bon_commande.taux_avancement|floatformat:2 }}%</div>
+                        <div class="info-subvalue">Order Completion</div>
+                    </div>
+                    
+                    <div class="info-card">
+                        <div class="info-label">Evaluation Type</div>
+                        <div class="info-value">Periodic Review</div>
+                        <div class="info-subvalue">Standard Assessment</div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Tableau des critères -->
-        <div class="criteria-table">
-            <div class="criteria-table-header">
-                <h3><i class="fas fa-clipboard-list me-2"></i>Evaluation Criteria</h3>
+        <!-- Score Summary -->
+        <div class="spectrum-card">
+            <div class="card-header">
+                <h3><i class="fas fa-chart-line me-2"></i> Performance Summary</h3>
+            </div>
+            <div class="card-body">
+                <div class="score-summary-grid">
+                    <div class="summary-card">
+                        <div class="summary-value" id="totalScore">0</div>
+                        <div class="summary-label">Total Score</div>
+                        <div class="summary-progress">
+                            <div class="summary-fill" id="totalScoreFill" 
+                                 style="width: 0%; background: var(--spectrum-gray-800);"></div>
+                        </div>
+                        <div class="score-indicator">
+                            <span class="score-badge" id="totalScoreBadge">Not Rated</span>
+                        </div>
+                    </div>
+                    
+                    <div class="summary-card">
+                        <div class="summary-value" id="vendorRating">0.0</div>
+                        <div class="summary-label">Average Rating</div>
+                        <div class="summary-progress">
+                            <div class="summary-fill" id="ratingFill" 
+                                 style="width: 0%; background: var(--spectrum-gray-800);"></div>
+                        </div>
+                        <div class="score-indicator">
+                            <div class="rating-stars">
+                                <span>★</span><span>★</span><span>★</span><span>★</span><span>★</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="summary-card">
+                        <div class="summary-value" id="completionRate">0%</div>
+                        <div class="summary-label">Completion</div>
+                        <div class="summary-progress">
+                            <div class="summary-fill" id="completionFillBar" 
+                                 style="width: 0%; background: var(--spectrum-yellow);"></div>
+                        </div>
+                        <div class="score-indicator">
+                            <span class="text-muted small" id="completedCriteria">0/5 criteria</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Evaluation Form -->
+        <form method="post" id="evaluationForm" class="evaluation-form">
+            {% csrf_token %}
+            
+            <div class="spectrum-card">
+                <div class="card-header">
+                    <h3><i class="fas fa-clipboard-check me-2"></i> Evaluation Criteria</h3>
+                    <small class="text-muted">Rate each criteria from 0 (Poor) to 10 (Excellent)</small>
+                </div>
+                <div class="card-body">
+                    <div class="criteria-grid">
+                        
+                        <!-- Delivery Compliance -->
+                        <div class="criteria-card">
+                            <div class="criteria-header">
+                                <div class="criteria-title">
+                                    <div class="criteria-name">Delivery Compliance to Order</div>
+                                    <div class="criteria-max">Quantity & Quality Assessment</div>
+                                </div>
+                                <div class="score-selector">
+                                    <input type="range" class="score-slider" name="delivery_compliance" 
+                                           min="0" max="10" step="1" 
+                                           value="{{ evaluation.delivery_compliance|default:'0' }}"
+                                           data-criteria="delivery_compliance">
+                                    <div class="score-value" id="score_delivery_compliance">
+                                        {{ evaluation.delivery_compliance|default:'0' }}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="score-options">
+                                {% for i in "012345678910"|make_list %}
+                                <div class="score-option" data-criteria="delivery_compliance" data-value="{{ i }}">
+                                    {{ i }}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            
+                            <div class="criteria-description">
+                                <p class="description-text" id="desc_delivery_compliance">
+                                    Select a score to see detailed description
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <!-- Delivery Timeline -->
+                        <div class="criteria-card">
+                            <div class="criteria-header">
+                                <div class="criteria-title">
+                                    <div class="criteria-name">Delivery Execution Timeline</div>
+                                    <div class="criteria-max">Schedule Adherence</div>
+                                </div>
+                                <div class="score-selector">
+                                    <input type="range" class="score-slider" name="delivery_timeline" 
+                                           min="0" max="10" step="1" 
+                                           value="{{ evaluation.delivery_timeline|default:'0' }}"
+                                           data-criteria="delivery_timeline">
+                                    <div class="score-value" id="score_delivery_timeline">
+                                        {{ evaluation.delivery_timeline|default:'0' }}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="score-options">
+                                {% for i in "012345678910"|make_list %}
+                                <div class="score-option" data-criteria="delivery_timeline" data-value="{{ i }}">
+                                    {{ i }}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            
+                            <div class="criteria-description">
+                                <p class="description-text" id="desc_delivery_timeline">
+                                    Select a score to see detailed description
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <!-- Advising Capability -->
+                        <div class="criteria-card">
+                            <div class="criteria-header">
+                                <div class="criteria-title">
+                                    <div class="criteria-name">Vendor Advising Capability</div>
+                                    <div class="criteria-max">Expertise & Guidance</div>
+                                </div>
+                                <div class="score-selector">
+                                    <input type="range" class="score-slider" name="advising_capability" 
+                                           min="0" max="10" step="1" 
+                                           value="{{ evaluation.advising_capability|default:'0' }}"
+                                           data-criteria="advising_capability">
+                                    <div class="score-value" id="score_advising_capability">
+                                        {{ evaluation.advising_capability|default:'0' }}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="score-options">
+                                {% for i in "012345678910"|make_list %}
+                                <div class="score-option" data-criteria="advising_capability" data-value="{{ i }}">
+                                    {{ i }}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            
+                            <div class="criteria-description">
+                                <p class="description-text" id="desc_advising_capability">
+                                    Select a score to see detailed description
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <!-- After Sales QOS -->
+                        <div class="criteria-card">
+                            <div class="criteria-header">
+                                <div class="criteria-title">
+                                    <div class="criteria-name">After Sales Services QOS</div>
+                                    <div class="criteria-max">Post-Delivery Support</div>
+                                </div>
+                                <div class="score-selector">
+                                    <input type="range" class="score-slider" name="after_sales_qos" 
+                                           min="0" max="10" step="1" 
+                                           value="{{ evaluation.after_sales_qos|default:'0' }}"
+                                           data-criteria="after_sales_qos">
+                                    <div class="score-value" id="score_after_sales_qos">
+                                        {{ evaluation.after_sales_qos|default:'0' }}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="score-options">
+                                {% for i in "012345678910"|make_list %}
+                                <div class="score-option" data-criteria="after_sales_qos" data-value="{{ i }}">
+                                    {{ i }}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            
+                            <div class="criteria-description">
+                                <p class="description-text" id="desc_after_sales_qos">
+                                    Select a score to see detailed description
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <!-- Vendor Relationship -->
+                        <div class="criteria-card">
+                            <div class="criteria-header">
+                                <div class="criteria-title">
+                                    <div class="criteria-name">Vendor Relationship</div>
+                                    <div class="criteria-max">Communication & Responsiveness</div>
+                                </div>
+                                <div class="score-selector">
+                                    <input type="range" class="score-slider" name="vendor_relationship" 
+                                           min="0" max="10" step="1" 
+                                           value="{{ evaluation.vendor_relationship|default:'0' }}"
+                                           data-criteria="vendor_relationship">
+                                    <div class="score-value" id="score_vendor_relationship">
+                                        {{ evaluation.vendor_relationship|default:'0' }}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="score-options">
+                                {% for i in "012345678910"|make_list %}
+                                <div class="score-option" data-criteria="vendor_relationship" data-value="{{ i }}">
+                                    {{ i }}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            
+                            <div class="criteria-description">
+                                <p class="description-text" id="desc_vendor_relationship">
+                                    Select a score to see detailed description
+                                </p>
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
             </div>
             
-            <!-- Delivery Compliance to Order -->
-            <div class="criteria-row">
-                <div class="criteria-name">Delivery Compliance to Order (Quantity & Quality)</div>
-                <div class="score-selector">
-                    <select name="delivery_compliance" class="score-select" data-criteria="delivery_compliance" required>
-                        <option value="">-</option>
-                        {% for i in "0123456789" %}
-                        <option value="{{ i }}" {% if evaluation.delivery_compliance == i|add:0 %}selected{% endif %}>{{ i }}</option>
-                        {% endfor %}
-                        <option value="10" {% if evaluation.delivery_compliance == 10 %}selected{% endif %}>10</option>
-                    </select>
-                </div>
-                <div class="criteria-description" id="desc_delivery_compliance">
-                    Sélectionnez une note pour voir la description du critère
-                </div>
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button type="submit" class="spectrum-button spectrum-button-action flex-fill">
+                    <i class="fas fa-save me-2"></i> Save Evaluation
+                </button>
+                {% if fichier_id %}
+                <a href="{% url 'orders:details_bon' bon_id=fichier_id %}?selected_order_number={{ bon_commande.numero }}" 
+                   class="spectrum-button spectrum-button-secondary flex-fill">
+                    <i class="fas fa-times me-2"></i> Cancel & Return to PO
+                </a>
+                {% else %}
+                <a href="{% url 'orders:accueil' %}" 
+                   class="spectrum-button spectrum-button-secondary flex-fill">
+                    <i class="fas fa-times me-2"></i> Cancel
+                </a>
+                {% endif %}
+                <a href="{% url 'orders:vendor_evaluation_list' %}" 
+                   class="spectrum-button spectrum-button-primary flex-fill">
+                    <i class="fas fa-list me-2"></i> View All Evaluations
+                </a>
             </div>
-
-            <!-- Delivery Execution Timeline -->
-            <div class="criteria-row">
-                <div class="criteria-name">Delivery Execution Timeline</div>
-                <div class="score-selector">
-                    <select name="delivery_timeline" class="score-select" data-criteria="delivery_timeline" required>
-                        <option value="">-</option>
-                        {% for i in "0123456789" %}
-                        <option value="{{ i }}" {% if evaluation.delivery_timeline == i|add:0 %}selected{% endif %}>{{ i }}</option>
-                        {% endfor %}
-                        <option value="10" {% if evaluation.delivery_timeline == 10 %}selected{% endif %}>10</option>
-                    </select>
-                </div>
-                <div class="criteria-description" id="desc_delivery_timeline">
-                    Sélectionnez une note pour voir la description du critère
-                </div>
-            </div>
-
-            <!-- Vendor Advising Capability -->
-            <div class="criteria-row">
-                <div class="criteria-name">Vendor Advising Capability</div>
-                <div class="score-selector">
-                    <select name="advising_capability" class="score-select" data-criteria="advising_capability" required>
-                        <option value="">-</option>
-                        {% for i in "0123456789" %}
-                        <option value="{{ i }}" {% if evaluation.advising_capability == i|add:0 %}selected{% endif %}>{{ i }}</option>
-                        {% endfor %}
-                        <option value="10" {% if evaluation.advising_capability == 10 %}selected{% endif %}>10</option>
-                    </select>
-                </div>
-                <div class="criteria-description" id="desc_advising_capability">
-                    Sélectionnez une note pour voir la description du critère
-                </div>
-            </div>
-
-            <!-- After Sales Services QOS -->
-            <div class="criteria-row">
-                <div class="criteria-name">After Sales Services QOS</div>
-                <div class="score-selector">
-                    <select name="after_sales_qos" class="score-select" data-criteria="after_sales_qos" required>
-                        <option value="">-</option>
-                        {% for i in "0123456789" %}
-                        <option value="{{ i }}" {% if evaluation.after_sales_qos == i|add:0 %}selected{% endif %}>{{ i }}</option>
-                        {% endfor %}
-                        <option value="10" {% if evaluation.after_sales_qos == 10 %}selected{% endif %}>10</option>
-                    </select>
-                </div>
-                <div class="criteria-description" id="desc_after_sales_qos">
-                    Sélectionnez une note pour voir la description du critère
-                </div>
-            </div>
-
-            <!-- Vendor Relationship -->
-            <div class="criteria-row">
-                <div class="criteria-name">Vendor Relationship</div>
-                <div class="score-selector">
-                    <select name="vendor_relationship" class="score-select" data-criteria="vendor_relationship" required>
-                        <option value="">-</option>
-                        {% for i in "0123456789" %}
-                        <option value="{{ i }}" {% if evaluation.vendor_relationship == i|add:0 %}selected{% endif %}>{{ i }}</option>
-                        {% endfor %}
-                        <option value="10" {% if evaluation.vendor_relationship == 10 %}selected{% endif %}>10</option>
-                    </select>
-                </div>
-                <div class="criteria-description" id="desc_vendor_relationship">
-                    Sélectionnez une note pour voir la description du critère
-                </div>
-            </div>
-        </div>
-
-
-        <!-- Boutons d'action -->
-        <div class="action-buttons">
-            <button type="submit" class="btn-save">
-                <i class="fas fa-save me-2"></i>Save Evaluation
-            </button>
-            {% if fichier_id %}
-            <a href="{% url 'orders:details_bon' bon_id=fichier_id %}?selected_order_number={{ bon_commande.numero }}" class="btn-cancel">
-                <i class="fas fa-times me-2"></i>Cancel
-            </a>
-            {% else %}
-            <a href="{% url 'orders:accueil' %}" class="btn-cancel">
-                <i class="fas fa-times me-2"></i>Cancel
-            </a>
-            {% endif %}
-        </div>
-    </form>
+        </form>
+    </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-// Critères et descriptions
+// Critères et descriptions (mêmes données que précédemment)
 const criteriaDescriptions = {
     'delivery_compliance': {
         0: 'Non conforme',
@@ -488,77 +846,157 @@ const criteriaDescriptions = {
 // Fonction pour mettre à jour la description
 function updateDescription(criteria, score) {
     const descElement = document.getElementById(`desc_${criteria}`);
-    if (score === '' || score === null) {
-        descElement.textContent = 'Sélectionnez une note pour voir la description du critère';
-        descElement.classList.remove('active');
+    if (score === '' || score === null || score === '0') {
+        descElement.textContent = 'Select a score to see detailed description';
     } else {
         const description = criteriaDescriptions[criteria][parseInt(score)];
         descElement.textContent = description || `Score: ${score}`;
-        descElement.classList.add('active');
     }
+}
+
+// Fonction pour mettre à jour le score visuel
+function updateScoreValue(criteria, value) {
+    const scoreElement = document.getElementById(`score_${criteria}`);
+    const slider = document.querySelector(`[name="${criteria}"]`);
+    const options = document.querySelectorAll(`.score-option[data-criteria="${criteria}"]`);
+    
+    scoreElement.textContent = value;
+    slider.value = value;
+    
+    // Mettre à jour les options actives
+    options.forEach(option => {
+        option.classList.remove('active');
+        if (parseInt(option.dataset.value) === parseInt(value)) {
+            option.classList.add('active');
+        }
+    });
+    
+    // Mettre à jour la description
+    updateDescription(criteria, value);
 }
 
 // Fonction pour calculer et afficher les scores
 function updateScoreSummary() {
-    const selects = document.querySelectorAll('.score-select');
+    const criteria = ['delivery_compliance', 'delivery_timeline', 'advising_capability', 'after_sales_qos', 'vendor_relationship'];
     let totalScore = 0;
     let completedCriteria = 0;
+    let hasZeroScore = false;
     
-    selects.forEach(select => {
-        const value = parseInt(select.value);
-        if (!isNaN(value)) {
+    criteria.forEach(criteriaName => {
+        const slider = document.querySelector(`[name="${criteriaName}"]`);
+        const value = parseInt(slider.value);
+        
+        if (!isNaN(value) && value > 0) {
             totalScore += value;
             completedCriteria++;
+        } else if (value === 0) {
+            hasZeroScore = true;
+            completedCriteria++; // 0 est une note valide
         }
     });
     
-    const vendorFinalRating = completedCriteria > 0 ? (totalScore / completedCriteria) : 0;
-    const completionRate = (completedCriteria / selects.length) * 100;
+    const vendorRating = completedCriteria > 0 ? (totalScore / completedCriteria) : 0;
+    const completionRate = (completedCriteria / criteria.length) * 100;
+    const totalScorePercentage = (totalScore / 50) * 100;
+    const ratingPercentage = (vendorRating / 10) * 100;
     
-    document.getElementById('totalScore').textContent = `${totalScore}/50`;
-    document.getElementById('vendorFinalRating').textContent = `${vendorFinalRating.toFixed(1)}/10`;
+    // Mettre à jour les éléments UI
+    document.getElementById('totalScore').textContent = totalScore;
+    document.getElementById('vendorRating').textContent = vendorRating.toFixed(1);
     document.getElementById('completionRate').textContent = `${completionRate.toFixed(0)}%`;
+    document.getElementById('completedCriteria').textContent = `${completedCriteria}/5 criteria`;
+    
+    document.getElementById('totalScoreFill').style.width = `${totalScorePercentage}%`;
+    document.getElementById('ratingFill').style.width = `${ratingPercentage}%`;
+    document.getElementById('completionFillBar').style.width = `${completionRate}%`;
+    document.getElementById('completionFill').style.width = `${completionRate}%`;
+    document.getElementById('completionText').textContent = `${completionRate.toFixed(0)}% Complete`;
+    
+    // Mettre à jour le badge du score total
+    const totalScoreBadge = document.getElementById('totalScoreBadge');
+    if (totalScore >= 40) {
+        totalScoreBadge.className = 'score-badge badge-excellent';
+        totalScoreBadge.textContent = 'Excellent';
+    } else if (totalScore >= 30) {
+        totalScoreBadge.className = 'score-badge badge-good';
+        totalScoreBadge.textContent = 'Good';
+    } else if (totalScore >= 20) {
+        totalScoreBadge.className = 'score-badge badge-average';
+        totalScoreBadge.textContent = 'Average';
+    } else {
+        totalScoreBadge.className = 'score-badge badge-poor';
+        totalScoreBadge.textContent = 'Needs Improvement';
+    }
+    
+    // Mettre à jour les étoiles
+    const stars = document.querySelectorAll('.rating-stars span');
+    const starRating = Math.round(vendorRating / 2); // Convertir 0-10 à 0-5 étoiles
+    stars.forEach((star, index) => {
+        if (index < starRating) {
+            star.textContent = '★';
+            star.style.color = 'var(--spectrum-yellow)';
+        } else {
+            star.textContent = '☆';
+            star.style.color = 'var(--spectrum-gray-200)';
+        }
+    });
+    
+    return completedCriteria === criteria.length;
 }
 
 // Initialisation
 document.addEventListener('DOMContentLoaded', function() {
-    const selects = document.querySelectorAll('.score-select');
-    
-    // Ajouter les événements de changement
-    selects.forEach(select => {
-        const criteria = select.dataset.criteria;
+    // Initialiser les sliders
+    const sliders = document.querySelectorAll('.score-slider');
+    sliders.forEach(slider => {
+        const criteria = slider.name;
+        const initialValue = slider.value;
         
-        // Mettre à jour la description initiale
-        updateDescription(criteria, select.value);
+        // Mettre à jour l'affichage initial
+        updateScoreValue(criteria, initialValue);
+        updateDescription(criteria, initialValue);
         
-        // Ajouter l'événement de changement
-        select.addEventListener('change', function() {
-            updateDescription(criteria, this.value);
+        // Événement de changement sur le slider
+        slider.addEventListener('input', function() {
+            updateScoreValue(criteria, this.value);
             updateScoreSummary();
         });
     });
     
-    // Calculer le résumé initial
+    // Initialiser les boutons d'options
+    const scoreOptions = document.querySelectorAll('.score-option');
+    scoreOptions.forEach(option => {
+        option.addEventListener('click', function() {
+            const criteria = this.dataset.criteria;
+            const value = this.dataset.value;
+            updateScoreValue(criteria, value);
+            updateScoreSummary();
+        });
+    });
+    
+    // Initialiser le résumé
     updateScoreSummary();
     
     // Validation du formulaire
     document.getElementById('evaluationForm').addEventListener('submit', function(e) {
-        const selects = document.querySelectorAll('.score-select');
-        let allCompleted = true;
+        const allComplete = updateScoreSummary();
         
-        selects.forEach(select => {
-            if (select.value === '') {
-                allCompleted = false;
-                select.style.borderColor = '#dc3545';
-            } else {
-                select.style.borderColor = '#dee2e6';
-            }
-        });
-        
-        if (!allCompleted) {
+        if (!allComplete) {
             e.preventDefault();
-            alert('Veuillez compléter toutes les évaluations avant de sauvegarder.');
+            const validationMessage = document.getElementById('validationMessage');
+            validationMessage.classList.add('show');
+            validationMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // Masquer le message après 5 secondes
+            setTimeout(() => {
+                validationMessage.classList.remove('show');
+            }, 5000);
         }
+    });
+    
+    // Masquer le message de validation en cliquant dessus
+    document.getElementById('validationMessage').addEventListener('click', function() {
+        this.classList.remove('show');
     });
 });
 </script>
