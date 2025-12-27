@@ -51,10 +51,18 @@ class TestMSRNAPI(TestCase):
         
         self.assertEqual(response.status_code, 200)
         
-        response_data = json.loads(response.content)
-        self.assertTrue(response_data['success'])
-        self.assertIn('MSRN', response_data['report_number'])
-        self.assertIsNotNone(response_data['download_url'])
+        data = json.loads(response.content)
+        self.assertTrue(data['success'])
+        self.assertFalse(data['async'])
+        
+        # Vérifier que le rapport a été créé
+        msrn_report = MSRNReport.objects.filter(bon_commande=self.bon_commande).order_by('-created_at').first()
+        self.assertIsNotNone(msrn_report)
+        self.assertEqual(msrn_report.retention_rate, Decimal('5.0'))
+        
+        # Vérifier le message et l'URL
+        self.assertEqual(data['message'], f"Rapport {msrn_report.report_number} généré avec succès")
+        self.assertEqual(data['download_url'], f"/orders/msrn-report/{msrn_report.id}/")
 
     def test_generate_msrn_report_invalid_method(self):
         """Test la génération avec une méthode HTTP invalide"""

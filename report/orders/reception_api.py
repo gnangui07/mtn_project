@@ -16,6 +16,7 @@ from .data_extractors import (
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 # Configuration du logger
 logger = logging.getLogger(__name__)
 
@@ -884,4 +885,204 @@ def bulk_correction_quantity_delivered(request, fichier_id):
         return JsonResponse({'status': 'error', 'message': 'Format JSON invalide'}, status=400)
     except Exception as e:
         logger.exception(f"Erreur lors des corrections groupées: {str(e)}")
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+@csrf_protect
+@login_required
+@require_http_methods(["POST"])
+def apply_target_rate(request, fichier_id):
+    # Restriction : Seul le superuser peut appliquer un taux cible
+    if not request.user.is_superuser:
+        return JsonResponse({'status': 'error', 'message': 'Permission refusée. Seul un administrateur peut effectuer cette action.'}, status=403)
+
+    logger = logging.getLogger(__name__)
+    try:
+        fichier = FichierImporte.objects.get(id=fichier_id)
+        data = json.loads(request.body)
+        bon_number = data.get('bon_number')
+        target_rate = data.get('target_rate')
+        business_ids = data.get('business_ids', [])
+        
+        if not bon_number:
+            return JsonResponse({'status': 'error', 'message': 'Numéro de bon de commande manquant'}, status=400)
+            
+        if target_rate is None:
+            return JsonResponse({'status': 'error', 'message': 'Taux cible manquant'}, status=400)
+            
+        try:
+            target_rate = Decimal(str(target_rate))
+        except:
+            return JsonResponse({'status': 'error', 'message': 'Format de taux invalide'}, status=400)
+            
+        try:
+            bon_commande = NumeroBonCommande.objects.get(numero=bon_number)
+        except NumeroBonCommande.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Bon de commande non trouvé'}, status=404)
+        
+        # 1. Calculs globaux pour déterminer le montant monétaire nécessaire
+        # LOGIQUE: Pour atteindre un taux global (ex: 98%), il faut atteindre un montant global reçu.
+        # Target Amount = Total Amount * (Target Rate / 100)
+        # Amount Needed = Target Amount - Current Delivered Amount
+        
+        current_rate = bon_commande.taux_avancement()
+        if target_rate <= current_rate:
+             return JsonResponse({'status': 'error', 'message': f'Le taux cible ({target_rate}%) doit être supérieur au taux actuel ({current_rate}%)'}, status=400)
+             
+        total_amount = bon_commande.montant_total()
+        current_amount = bon_commande.montant_recu()
+        
+        target_amount = total_amount * (target_rate / Decimal('100'))
+        amount_needed = target_amount - current_amount
+        
+        # Safety: Si le montant nécessaire est très faible ou négatif (dû aux arrondis), on arrête
+        if amount_needed <= 0:
+            return JsonResponse({'status': 'error', 'message': 'Le taux cible est déjà atteint ou dépassé.'}, status=400)
+
+        logger.info(f"[TARGET_RATE_LOGIC] Bon {bon_number}: Target={target_rate}%, Current={current_rate}%. Need to add {amount_needed} currency units.")
+
+        # 2. Analyser les lignes sélectionnées et calculer leur capacité restante (en valeur)
+        lines_data = []
+        total_remaining_capacity = Decimal('0')
+        
+        # On attend business_ids comme une liste de {business_id, ordered_quantity}
+        lines_info = data.get('lines_info', [])
+        if not lines_info and business_ids:
+             return JsonResponse({'status': 'error', 'message': 'Données de lignes manquantes (lines_info)'}, status=400)
+             
+        for info in lines_info:
+            bid = info.get('business_id')
+            try:
+                ordered_qty = round_decimal(Decimal(str(info.get('ordered_quantity', 0))))
+            except:
+                ordered_qty = Decimal('0')
+                
+            if ordered_qty <= 0:
+                continue
+                
+            # Récupérer réception actuelle pour connaitre le reste
+            try:
+                reception = Reception.objects.get(bon_commande=bon_commande, fichier=fichier, business_id=bid)
+                current_qty = reception.quantity_delivered or Decimal('0')
+                # Important: récupérer le prix unitaire pour ActivityLog et cohérence
+                unit_price = reception.unit_price
+            except Reception.DoesNotExist:
+                current_qty = Decimal('0')
+                # Si pas de réception, on essaie de trouver le prix dans LigneFichier
+                try:
+                    ligne = LigneFichier.objects.get(fichier=fichier, business_id=bid)
+                    unit_price = Decimal(str(get_price_from_ligne(ligne)))
+                except:
+                    unit_price = Decimal('0')
+                
+            # Calcul du reste à livrer
+            remaining_qty = max(Decimal('0'), ordered_qty - current_qty)
+            
+            if remaining_qty > 0:
+                # Calculer la capacité restante en valeur pour cette ligne
+                remaining_capacity_value = remaining_qty * unit_price
+                total_remaining_capacity += remaining_capacity_value
+                
+                lines_data.append({
+                    'business_id': bid,
+                    'unit_price': unit_price,
+                    'ordered_quantity': ordered_qty,
+                    'current_quantity': current_qty,
+                    'remaining_qty': remaining_qty,
+                    'remaining_capacity_value': remaining_capacity_value
+                })
+        
+        # 3. Calculer le ratio de distribution
+        # Si la capacité totale restante est inférieure au besoin, on remplit tout (ratio = 1)
+        if total_remaining_capacity <= 0:
+             # Si pas de capacité (ex: tout prix 0 ou rien à livrer), on ne peut rien faire basé sur un montant
+             # Sauf si amount_needed <= 0 mais on a déjà checké ça
+             # Si on a des lignes mais prix 0, total_remaining_capacity = 0.
+             # Dans ce cas, impossible d'atteindre un montant cible.
+             distribution_ratio = Decimal('0')
+        elif amount_needed >= total_remaining_capacity:
+             distribution_ratio = Decimal('1')
+             logger.info(f"Amount needed ({amount_needed}) >= Total capacity ({total_remaining_capacity}). Filling all selected lines to 100%.")
+        else:
+             distribution_ratio = amount_needed / total_remaining_capacity
+             logger.info(f"Distribution ratio: {distribution_ratio} (Need: {amount_needed}, Cap: {total_remaining_capacity})")
+
+        # 4. Appliquer les mises à jour
+        updates_applied = 0
+        
+        with transaction.atomic():
+            for line in lines_data:
+                # Logique Vase Communiquant:
+                # On attribue une part du montant nécessaire proportionnelle à la capacité restante de la ligne
+                # QtyToAdd = RemainingQty * Ratio
+                
+                if distribution_ratio <= 0:
+                    continue
+                    
+                if distribution_ratio >= 1:
+                    # Remplir complètement la ligne
+                    qty_to_add = line['remaining_qty']
+                else:
+                    qty_to_add = line['remaining_qty'] * distribution_ratio
+                
+                # Arrondir à 4 décimales pour éviter des micro-quantités
+                qty_to_add = round_decimal(qty_to_add)
+                
+                if qty_to_add <= 0:
+                    continue
+                    
+                new_total = line['current_quantity'] + qty_to_add
+                
+                # Safety check
+                if new_total > line['ordered_quantity']:
+                    new_total = line['ordered_quantity']
+                
+                quantity_not_delivered = line['ordered_quantity'] - new_total
+                
+                # Update Reception
+                reception, created = Reception.objects.update_or_create(
+                    bon_commande=bon_commande,
+                    fichier=fichier,
+                    business_id=line['business_id'],
+                    defaults={
+                        'quantity_delivered': new_total,
+                        'ordered_quantity': line['ordered_quantity'],
+                        'quantity_not_delivered': quantity_not_delivered,
+                        'user': request.user.email if hasattr(request, 'user') and request.user.is_authenticated else None,
+                        'date_modification': timezone.now(),
+                        'unit_price': line['unit_price']
+                    }
+                )
+                
+                # Activity Log
+                ActivityLog.objects.create(
+                    bon_commande=bon_number,
+                    fichier=fichier,
+                    business_id=line['business_id'],
+                    ordered_quantity=line['ordered_quantity'],
+                    quantity_delivered=qty_to_add, # Delta
+                    quantity_not_delivered=quantity_not_delivered,
+                    user=reception.user,
+                    cumulative_recipe=new_total,
+                    progress_rate=bon_commande.taux_avancement()
+                )
+                updates_applied += 1
+                
+        # Forcer le refresh du bon_commande
+        bon_commande.refresh_from_db()
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': f'Mise à jour effectuée sur {updates_applied} lignes',
+            'updates_applied': updates_applied,
+            'taux_avancement': float(bon_commande.taux_avancement()),
+            'montant_total_recu': float(bon_commande.montant_recu())
+        })
+
+    except FichierImporte.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Fichier non trouvé'}, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({'status': 'error', 'message': 'Format JSON invalide'}, status=400)
+    except Exception as e:
+        logger.exception(f"Erreur lors de l'application du taux cible: {str(e)}")
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)

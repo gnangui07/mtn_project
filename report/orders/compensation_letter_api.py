@@ -32,6 +32,14 @@ from .penalty_data import collect_penalty_context
 from .compensation_letter_report import generate_compensation_letter
 from .emails import send_penalty_notification
 
+# Import Celery tasks avec fallback
+try:
+    from .tasks import generate_compensation_letter_pdf_task
+    from .task_status_api import register_user_task
+    CELERY_AVAILABLE = True
+except ImportError:
+    CELERY_AVAILABLE = False
+
 
 @csrf_exempt
 @login_required
@@ -63,6 +71,29 @@ def generate_compensation_letter_api(request, bon_id: int):
     except Exception:
         return JsonResponse({"success": False, "error": "Bon de commande non trouvé"}, status=404)
 
+    # Mode Asynchrone (Celery)
+    if CELERY_AVAILABLE:
+        try:
+            task = generate_compensation_letter_pdf_task.delay(bon_id, request.user.id)
+            
+            # Enregistrer la tâche pour le polling utilisateur
+            try:
+                register_user_task(request.user.id, task.id, 'generate_compensation_letter')
+            except Exception:
+                pass
+                
+            return JsonResponse({
+                'success': True,
+                'async': True,
+                'task_id': task.id,
+                'bon_id': bon_id,
+                'report_number': bon_commande.numero,
+                'message': f"La génération de la lettre de compensation pour {bon_commande.numero} a démarré en arrière-plan."
+            })
+        except Exception as e:
+            # Si erreur au lancement de la tâche, on continue en mode synchrone
+            pass
+
     # Étape 2: génération (les erreurs ici sont des 500)
     try:
         # Créer une entrée de log pour obtenir un identifiant séquentiel global
@@ -85,9 +116,9 @@ def generate_compensation_letter_api(request, bon_id: int):
         )
 
         # Sauvegarder le PDF dans le log
+        filename = f"CompensationLetter-{bon_commande.numero}-{sequence_number}.pdf"
         try:
             pdf_bytes = pdf_buffer.getvalue()
-            filename = f"CompensationLetter-{bon_commande.numero}-{sequence_number}.pdf"
             log_entry.file.save(filename, ContentFile(pdf_bytes), save=True)
         except Exception:
             # On évite de casser la génération de la lettre si l'enregistrement du fichier échoue
@@ -100,7 +131,8 @@ def generate_compensation_letter_api(request, bon_id: int):
                     bon_commande=bon_commande,
                     pdf_buffer=pdf_buffer,
                     user_email=getattr(request.user, "email", None),
-                    report_type='compensation_letter'
+                    report_type='compensation_letter',
+                    filename=filename
                 )
             except Exception:
                 pass
@@ -110,7 +142,6 @@ def generate_compensation_letter_api(request, bon_id: int):
         
         # Prepare response
         response = HttpResponse(pdf_buffer.read(), content_type="application/pdf")
-        filename = f"Lettre_Compensation_{bon_commande.numero}.pdf"
         safe_filename = iri_to_uri(filename)
         response["Content-Disposition"] = f'inline; filename="{safe_filename}"'
         

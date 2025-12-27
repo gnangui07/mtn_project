@@ -203,3 +203,53 @@ def generate_report_number():
     - str: ex. '5831'
     """
     return str(random.randint(1000, 9999))
+
+
+def round_decimal(value, places=2):
+    """
+    Arrondit une valeur décimale au nombre de décimales spécifié.
+    :param value: La valeur à arrondir (Decimal, float, int ou str)
+    :param places: Nombre de décimales (par défaut 2)
+    :return: Decimal arrondi
+    """
+    from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+    
+    if value is None:
+        return Decimal('0')
+    if not isinstance(value, Decimal):
+        try:
+            value = Decimal(str(value))
+        except InvalidOperation:
+            return Decimal('0')
+    # Format de quantification basé sur le nombre de décimales
+    quant_format = Decimal('0.' + ('0' * (places-1)) + '1') if places > 0 else Decimal('1')
+    return value.quantize(quant_format, rounding=ROUND_HALF_UP)
+
+
+def normalize_business_id(business_id):
+    """
+    Normalise un business_id en convertissant les valeurs numériques décimales en entiers
+    pour éviter les doublons (ex: 43.0 -> 43)
+    """
+    if not business_id:
+        return business_id
+    
+    parts = business_id.split('|')
+    normalized_parts = []
+    
+    for part in parts:
+        if ':' in part:
+            key, value = part.split(':', 1)
+            try:
+                # Essayer de convertir en float puis supprimer les .0 inutiles
+                float_val = float(value)
+                if float_val.is_integer():
+                    value = str(int(float_val))
+            except (ValueError, TypeError):
+                # Garder la valeur originale si conversion impossible
+                pass
+            normalized_parts.append(f"{key}:{value}")
+        else:
+            normalized_parts.append(part)
+    
+    return '|'.join(normalized_parts)

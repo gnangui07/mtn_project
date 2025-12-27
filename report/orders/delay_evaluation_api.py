@@ -31,6 +31,14 @@ from .delay_evaluation_data import collect_delay_evaluation_context
 from .delay_evaluation_report import generate_delay_evaluation_report
 from .emails import send_penalty_notification
 
+# Import Celery tasks avec fallback
+try:
+    from .tasks import generate_delay_evaluation_pdf_task
+    from .task_status_api import register_user_task
+    CELERY_AVAILABLE = True
+except ImportError:
+    CELERY_AVAILABLE = False
+
 
 @csrf_exempt
 @login_required
@@ -88,6 +96,26 @@ def generate_delay_evaluation_report_api(request, bon_id: int):
     if attachments:
         context["attachments"] = attachments
 
+    # Mode Asynchrone (Celery)
+    if CELERY_AVAILABLE:
+        task = generate_delay_evaluation_pdf_task.delay(bon_id, request.user.id, observation, attachments)
+        
+        # Enregistrer la tâche pour le polling utilisateur
+        try:
+            register_user_task(request.user.id, task.id, 'generate_delay_evaluation')
+        except Exception:
+            pass
+            
+        return JsonResponse({
+            'success': True,
+            'async': True,
+            'task_id': task.id,
+            'bon_id': bon_id,
+            'report_number': bon_commande.numero,
+            'message': f"La génération de l'évaluation des délais pour {bon_commande.numero} a démarré en arrière-plan."
+        })
+
+    # Mode Synchrone (Fallback)
     # Générer le PDF avec toutes les données
     pdf_buffer = generate_delay_evaluation_report(
         bon_commande,
@@ -96,6 +124,7 @@ def generate_delay_evaluation_report_api(request, bon_id: int):
     )
 
     # Sauvegarder le PDF dans le log
+    filename = f"DelayEvaluation-{bon_commande.numero}.pdf" # Fallback
     try:
         pdf_bytes = pdf_buffer.getvalue()
         log_entry = DelayEvaluationReportLog.objects.create(bon_commande=bon_commande)
@@ -112,7 +141,8 @@ def generate_delay_evaluation_report_api(request, bon_id: int):
                 bon_commande=bon_commande,
                 pdf_buffer=pdf_buffer,
                 user_email=getattr(request.user, "email", None),
-                report_type='delay_evaluation'
+                report_type='delay_evaluation',
+                filename=filename
             )
         except Exception as e:
             pass
@@ -120,7 +150,7 @@ def generate_delay_evaluation_report_api(request, bon_id: int):
     email_thread = threading.Thread(target=send_email_async, daemon=True)
     email_thread.start()
 
-    filename = iri_to_uri(f"DelayEvaluation-{bon_commande.numero}.pdf")
+    safe_filename = iri_to_uri(filename)
     response = HttpResponse(pdf_buffer.getvalue(), content_type="application/pdf")
-    response["Content-Disposition"] = f'inline; filename="{filename}"'
+    response["Content-Disposition"] = f'inline; filename="{safe_filename}"'
     return response

@@ -10,55 +10,9 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import logging
+from .utils import round_decimal, normalize_business_id
 logger = logging.getLogger(__name__)
 
-# Nouvelle fonction pour arrondir les décimales
-def round_decimal(value, places=2):
-    """
-    Arrondit une valeur décimale au nombre de décimales spécifié.
-    :param value: La valeur à arrondir (Decimal, float, int ou str)
-    :param places: Nombre de décimales (par défaut 2)
-    :return: Decimal arrondi
-    """
-    if value is None:
-        return Decimal('0')
-    if not isinstance(value, Decimal):
-        try:
-            value = Decimal(str(value))
-        except InvalidOperation:
-            return Decimal('0')
-    # Format de quantification basé sur le nombre de décimales
-    quant_format = Decimal('0.' + ('0' * (places-1)) + '1') if places > 0 else Decimal('1')
-    return value.quantize(quant_format, rounding=ROUND_HALF_UP)
-
-# Fonction utilitaire pour normaliser les business_id
-def normalize_business_id(business_id):
-    """
-    Normalise un business_id en convertissant les valeurs numériques décimales en entiers
-    pour éviter les doublons (ex: 43.0 -> 43)
-    """
-    if not business_id:
-        return business_id
-    
-    parts = business_id.split('|')
-    normalized_parts = []
-    
-    for part in parts:
-        if ':' in part:
-            key, value = part.split(':', 1)
-            try:
-                # Essayer de convertir en float puis supprimer les .0 inutiles
-                float_val = float(value)
-                if float_val.is_integer():
-                    value = str(int(float_val))
-            except (ValueError, TypeError):
-                # Garder la valeur originale si conversion impossible
-                pass
-            normalized_parts.append(f"{key}:{value}")
-        else:
-            normalized_parts.append(part)
-    
-    return '|'.join(normalized_parts)
 
 # Utiliser le JSONField standard de Django au lieu de celui spécifique à PostgreSQL
 # Ce champ est disponible dans Django depuis la version 3.1
@@ -451,20 +405,20 @@ class NumeroBonCommande(models.Model):
             for ligne in fichier.lignes.all():
                 contenu = ligne.contenu
             
-            # Trouver la clé pour le numéro de commande
-            order_key = None
-            for key in contenu.keys():
-                key_lower = key.lower() if key else ''
-                if 'order' in key_lower or 'commande' in key_lower or 'bon' in key_lower or 'bc' in key_lower:
-                    order_key = key
-                    break
-            
-            if order_key and str(contenu.get(order_key, '')).strip() == str(self.numero):
-                # Chercher la colonne Currency
-                for key, value in contenu.items():
+                # Trouver la clé pour le numéro de commande
+                order_key = None
+                for key in contenu.keys():
                     key_lower = key.lower() if key else ''
-                    if 'currency' in key_lower and value:
-                        return str(value).upper()
+                    if 'order' in key_lower or 'commande' in key_lower or 'bon' in key_lower or 'bc' in key_lower:
+                        order_key = key
+                        break
+                
+                if order_key and str(contenu.get(order_key, '')).strip() == str(self.numero):
+                    # Chercher la colonne Currency
+                    for key, value in contenu.items():
+                        key_lower = key.lower() if key else ''
+                        if 'currency' in key_lower and value:
+                            return str(value).upper()
     
         return "XOF"
         
@@ -1120,6 +1074,16 @@ class FichierImporte(models.Model):
         4) On met à jour en base les champs extension, nombre_lignes.
         5) On crée les entrées LigneFichier pour chaque ligne de données.
         """
+        # Eviter la boucle infinie si on met juste à jour des champs spécifiques
+        if kwargs.get('update_fields'):
+            super().save(*args, **kwargs)
+            return
+
+        # Support pour sauter l'extraction automatique (ex: traitement async via Celery)
+        if getattr(self, '_skip_extraction', False):
+            super().save(*args, **kwargs)
+            return
+
         is_new = self.pk is None
         super().save(*args, **kwargs)  # 1) Sauvegarde le fichier
 
@@ -1134,277 +1098,15 @@ class FichierImporte(models.Model):
 
         # 3) Extraction du contenu - avec debug en cas d'erreur
         try:
-            from .utils import extraire_depuis_fichier_relatif
-            import json
-            print(f"Extraction à partir du fichier: {chemin_relatif} (ext: {ext})")
-            contenu_extrait, nb_lignes = extraire_depuis_fichier_relatif(chemin_relatif, ext)
-            print(f"Extraction réussie. Type de données: {type(contenu_extrait)}")
+            # OPTIMISATION: Utiliser la logique partagée (Chunked + Bulk)
+            from .import_utils import import_file_optimized
+            print(f"Extraction (optimisée) à partir du fichier: {chemin_relatif} (ext: {ext})")
             
-            # 4) Mise à jour des attributs
-            self.nombre_lignes = nb_lignes
+            # Appel de la fonction optimisée
+            # Elle gère la lecture par chunks, la création des lignes, réceptions, POs, etc.
+            nb_lignes, _ = import_file_optimized(self)
             
-            # 5) Sauvegarder les métadonnées mises à jour
-            super().save(update_fields=['extension', 'nombre_lignes'])
-            
-            # 6) Créer les entrées LigneFichier et gérer les quantités reçues
-            if isinstance(contenu_extrait, list) and contenu_extrait:
-                # Initialiser les en-têtes
-                headers = []
-                # Déterminer un offset d'en-tête: si données tabulaires (liste de dicts) => +1 (ligne 1 = en-tête)
-                is_tabular = isinstance(contenu_extrait[0], dict)
-                header_offset = 1 if is_tabular else 0
-                
-                # Récupérer les lignes existantes pour mise à jour incrémentielle
-                existing_lines = {ligne.numero_ligne: ligne for ligne in self.lignes.all()}
-                lignes_a_creer = []
-                
-                # Mapping explicite selon les instructions de l'utilisateur
-                order_key = 'Order'
-                ordered_qty_key = 'Ordered Quantity'
-                received_qty_key = 'Received Quantity'
-                unit_price_key = 'Price'
-                print(f"Colonnes utilisées : order_key={order_key}, ordered_qty_key={ordered_qty_key}, received_qty_key={received_qty_key}, unit_price_key={unit_price_key}")
-                
-                print(f"Colonnes détectées : order_key={order_key}, ordered_qty_key={ordered_qty_key}, received_qty_key={received_qty_key}, unit_price_key={unit_price_key}")
-                
-                # Traiter chaque ligne du fichier
-                for i, ligne in enumerate(contenu_extrait, 1):
-                    # Calculer le numéro de ligne aligné avec la ligne visible Excel
-                    ligne_numero = i + header_offset
-                    if not isinstance(ligne, dict):
-                        continue
-                    
-                    # Préparer les données pour la table Reception si on a les clés nécessaires
-                    if order_key and order_key in ligne:
-                        try:
-                            # Récupérer les valeurs
-                            order_number = str(ligne[order_key]).strip()
-                            valeurs_invalides = ('', 'false', 'true', 'none', 'null', 'nan', '0')
-                            if order_number.lower() in valeurs_invalides:
-                                print(f"Ligne {i} ignorée : numéro de bon invalide ('{order_number}')")
-                                continue
-                            from decimal import Decimal
-                            # Détection robuste des valeurs pour cette ligne
-                            def scan_value(d, must_include):
-                                for k, v in d.items():
-                                    if not k:
-                                        continue
-                                    kl = k.lower()
-                                    if all(m in kl for m in must_include):
-                                        return v
-                                return None
-
-                            # Received Quantity
-                            rv = None
-                            if 'Received Quantity' in ligne:
-                                rv = ligne.get('Received Quantity')
-                            if rv in (None, ''):
-                                rv = scan_value(ligne, ['received', 'quantity'])
-                            received_qty_dec = round_decimal(Decimal(str(rv))) if rv not in (None, '') else Decimal('0')
-
-                            # Ordered Quantity
-                            ov = None
-                            if 'Ordered Quantity' in ligne:
-                                ov = ligne.get('Ordered Quantity')
-                            if ov in (None, ''):
-                                ov = scan_value(ligne, ['ordered', 'quantity'])
-                            ordered_qty_dec = round_decimal(Decimal(str(ov))) if ov not in (None, '') else Decimal('0')
-                            
-                            # Récupérer ou créer le bon de commande
-                            bon_commande, _ = NumeroBonCommande.objects.get_or_create(numero=order_number)
-                            
-                            # Détecter le prix unitaire
-                            from decimal import Decimal
-                            unit_price = Decimal(0)
-                            pv = None
-                            if 'Price' in ligne and ligne['Price'] not in (None, ''):
-                                pv = ligne.get('Price')
-                            if pv in (None, ''):
-                                pv = scan_value(ligne, ['price'])
-                            try:
-                                unit_price = round_decimal(Decimal(str(pv))) if pv not in (None, '') else Decimal(0)
-                            except:
-                                unit_price = Decimal(0)
-                            
-                            # DEBUG: Afficher les valeurs extraites pour chaque ligne
-                            print(f"Reception: bon_commande={order_number}, ordered_quantity={ordered_qty_dec}, quantity_delivered={received_qty_dec}, unit_price={unit_price}")
-                            
-                            # Générer l'ID métier en réutilisant exactement la même logique que LigneFichier.generate_business_id
-                            temp_lf = LigneFichier(fichier=self, numero_ligne=i, contenu=ligne)
-                            business_id = temp_lf.generate_business_id()
-                            if not business_id:
-                                print(f"ERREUR: Impossible de générer un ID métier pour la ligne {i} (order={order_number}). Vérifier les colonnes 'Line'/'Item'/'Schedule'.")
-                                continue
-                            print(f"ID métier généré: {business_id}")
-                            
-                            try:
-                                # Vérifier d'abord si une réception existe avec cet ID (exact)
-                                reception = Reception.objects.filter(business_id=business_id).first()
-                                
-                                # Si pas trouvé, chercher avec normalisation
-                                if not reception:
-                                    normalized_business_id = normalize_business_id(business_id)
-                                    if normalized_business_id != business_id:
-                                        reception = Reception.objects.filter(business_id=normalized_business_id).first()
-                                        if reception:
-                                            print(f"Réception trouvée avec ID normalisé: {normalized_business_id}")
-                                    
-                                    # Si toujours pas trouvé, chercher parmi tous les business_id normalisés
-                                    if not reception:
-                                        all_receptions = Reception.objects.filter(bon_commande=bon_commande)
-                                        for existing_reception in all_receptions:
-                                            if normalize_business_id(existing_reception.business_id) == normalized_business_id:
-                                                reception = existing_reception
-                                                print(f"Réception trouvée après normalisation: {existing_reception.business_id} -> {normalized_business_id}")
-                                                break
-                                
-                                # Debug: Vérifier les réceptions existantes
-                                existing_receptions = list(Reception.objects.filter(bon_commande=bon_commande).values_list('business_id', flat=True))
-                                print(f"Réceptions existantes pour ce bon de commande: {existing_receptions}")
-                                print(f"Recherche de l'ID: {business_id} (existe: {reception is not None})")
-                                
-                                if reception:
-                                    print(f"Réception existante trouvée (ID: {business_id}) - mise à jour du received_quantity seulement")
-                                    print(f"Détails actuels - commandé: {reception.ordered_quantity}, livré: {reception.quantity_delivered}")
-                                    
-                                    # Mettre à jour SEULEMENT le received_quantity (dans le contexte de ce fichier)
-                                    # Ne pas modifier quantity_delivered qui est la valeur cumulative
-                                    reception.ordered_quantity = ordered_qty_dec
-                                    reception.unit_price = unit_price
-                                    reception.received_quantity = received_qty_dec
-                                    reception.quantity_not_delivered = max(Decimal('0'), ordered_qty_dec - reception.quantity_delivered)
-                                    reception.fichier = self
-                                    reception.date_modification = timezone.now()
-                                    reception.save()
-                                    created = False
-                                else:
-                                    # Créer nouvelle réception avec ID métier
-                                    quantity_not_delivered_val = max(Decimal('0'), ordered_qty_dec - received_qty_dec)
-                                    reception = Reception.objects.create(
-                                        bon_commande=bon_commande,
-                                        fichier=self,
-                                        business_id=business_id,
-                                        ordered_quantity=ordered_qty_dec,
-                                        received_quantity=received_qty_dec,
-                                        quantity_delivered=received_qty_dec,
-                                        quantity_not_delivered=quantity_not_delivered_val,
-                                        user=self.utilisateur.email if self.utilisateur else 'system_import',
-                                        date_modification=timezone.now(),
-                                        unit_price=unit_price
-                                    )
-                                    created = True
-                                    print(f"Nouvelle réception ajoutée : BC={bon_commande.numero}, ID={business_id}")
-
-                                # Mettre à jour/Créer la valeur initiale par business_id (indépendante des réceptions)
-                                try:
-                                    from decimal import Decimal as _D
-                                    mt_total = round_decimal(ordered_qty_dec * unit_price)
-                                    mt_recu = round_decimal(received_qty_dec * unit_price)
-                                    taux = _D('0')
-                                    if mt_total > 0:
-                                        taux = round_decimal((mt_recu / mt_total) * _D('100'))
-
-                                    irv_bi, _ = InitialReceptionBusiness.objects.get_or_create(
-                                        business_id=business_id,
-                                        defaults={'bon_commande': bon_commande}
-                                    )
-                                    irv_bi.bon_commande = bon_commande
-                                    irv_bi.source_file = self
-                                    irv_bi.received_quantity = received_qty_dec
-                                    irv_bi.montant_total_initial = mt_total
-                                    irv_bi.montant_recu_initial = mt_recu
-                                    irv_bi.taux_avancement_initial = taux
-                                    irv_bi.save()
-                                except Exception as e:
-                                    print(f"[IRV-BI][ERROR] {business_id}: {e}")
-                                    
-                            except Exception as e:
-                                print(f"ERREUR lors de la création/mise à jour de la réception {business_id}: {str(e)}")
-                                print(f"Détails: order={order_number}, line={line_num}, item={item_num}, schedule={schedule_num}")
-                                continue
-                            
-                            # Ajouter la quantité reçue à la ligne pour l'affichage (toujours, même si la réception existe déjà)
-                            # On stocke en float dans la ligne JSON pour compatibilité UI, mais on calcule en Decimal
-                            ligne['Quantity Delivered'] = float(received_qty_dec)
-                            # Ajouter le calcul du quantity_not_delivered (calcul en Decimal puis conversion float)
-                            ligne['Quantity Not Delivered'] = float(max(Decimal('0'), ordered_qty_dec - received_qty_dec))
-                            
-                        except (ValueError, TypeError) as e:
-                            print(f"Erreur de conversion des quantités pour la ligne {i}: {e}")
-                    
-                    # S'assurer que les en-têtes Quantity Delivered et Quantity Not Delivered sont présents
-                    if 'Quantity Delivered' not in headers:
-                        headers.append('Quantity Delivered')
-                    if 'Quantity Not Delivered' not in headers:
-                        headers.append('Quantity Not Delivered')
-                    
-                    # Générer l'ID métier pour cette ligne
-                    ligne_temp = LigneFichier(fichier=self, numero_ligne=i, contenu=ligne)
-                    business_id = ligne_temp.generate_business_id()
-                    
-                    # Vérifier si une ligne avec le même ID métier existe déjà
-                    existing_business_line = None
-                    if business_id:
-                        # Recherche exacte d'abord
-                        existing_business_line = LigneFichier.objects.filter(business_id=business_id).first()
-                        
-                        # Si pas trouvé, recherche avec normalisation
-                        if not existing_business_line:
-                            normalized_bid = normalize_business_id(business_id)
-                            if normalized_bid != business_id:
-                                existing_business_line = LigneFichier.objects.filter(business_id=normalized_bid).first()
-                            
-                            # Si toujours pas trouvé, chercher parmi toutes les lignes normalisées
-                            if not existing_business_line:
-                                all_lines = LigneFichier.objects.all()
-                                for line in all_lines:
-                                    if normalize_business_id(line.business_id) == normalized_bid:
-                                        existing_business_line = line
-                                        print(f"Ligne existante trouvée après normalisation: {line.business_id} -> {normalized_bid}")
-                                        break
-                    
-                    if existing_business_line:
-                        # Ligne métier identique trouvée - mise à jour avec les nouvelles données
-                        print(f"Ligne métier identique trouvée (ID: {business_id}) - mise à jour")
-                        existing_business_line.contenu = ligne
-                        # Rattacher systématiquement la ligne au fichier courant (réimport)
-                        existing_business_line.fichier = self
-                        existing_business_line.business_id = business_id
-                        existing_business_line.save(update_fields=['contenu', 'fichier', 'business_id'])
-                        
-                        # Associer cette ligne au fichier actuel pour traçabilité
-                        # (mais ne pas créer de doublon)
-                        
-                    elif i in existing_lines:
-                        # Mise à jour de la ligne existante dans ce fichier
-                        lf = existing_lines[i]
-                        lf.contenu = ligne
-                        lf.business_id = business_id
-                        lf.save()
-                    else:
-                        # Création d'une nouvelle ligne
-                        lignes_a_creer.append(LigneFichier(
-                            fichier=self,
-                            numero_ligne=i,
-                            contenu=ligne,
-                            business_id=business_id
-                        ))
-                
-                # Créer les nouvelles lignes en une seule requête
-                if lignes_a_creer:
-                    LigneFichier.objects.bulk_create(lignes_a_creer)
-                    print(f"{len(lignes_a_creer)} nouvelles lignes ajoutées à la base de données")
-                
-                # Afficher un message récapitulatif
-                if received_qty_key:
-                    print(f"Colonnes détectées - Quantité reçue: '{received_qty_key}', "
-                          f"Quantité commandée: '{ordered_qty_key or 'Non trouvée'}', "
-                          f"N° commande: '{order_key or 'Non trouvé'}'")
-                    print(f"Les quantités reçues ont été enregistrées dans la table Reception.")
-            
-            # Appeler la méthode d'extraction des bons de commande
-            self.extraire_et_enregistrer_bons_commande()
-            
+            print(f"Extraction terminée. {nb_lignes} lignes traitées.")
             
         except Exception as e:
             import traceback
@@ -1420,6 +1122,7 @@ class FichierImporte(models.Model):
             )
 
         # Mise à jour des champs sans appeler la méthode save() pour éviter les boucles infinies
+        # Note: import_file_optimized met déjà à jour nombre_lignes et extension
         FichierImporte.objects.filter(pk=self.pk).update(
             extension=self.extension,
             nombre_lignes=self.nombre_lignes
@@ -1433,11 +1136,21 @@ class FichierImporte(models.Model):
         if nb_lignes_importees == 0:
             print("ATTENTION: Aucune ligne n'a été importée dans la table LigneFichier")
             
-        # 6) Extraction des numéros de bons de commande
-        try:
-            self.extraire_et_enregistrer_bons_commande()
-        except Exception as e:
-            print(f"Erreur lors de l'extraction des bons de commande: {str(e)}")
+        # 6) Extraction des numéros de bons de commande (déjà fait partiellement dans import_file_optimized, mais on garde pour sûreté si besoin de logique spécifique)
+        # En fait import_file_optimized gère déjà les POs et les CPUs.
+        # On peut laisser extraire_et_enregistrer_bons_commande() si elle fait d'autres choses, 
+        # mais elle risque de re-parcourir toutes les lignes (lent).
+        # Comme import_file_optimized fait déjà tout, on peut commenter ou supprimer l'appel redondant si on est sûr.
+        # Pour l'instant, on le garde mais on sait que c'est sous-optimal si elle relit tout.
+        # VERIFICATION: extraire_et_enregistrer_bons_commande itère sur self.lignes.all().
+        # C'est lent. Comme import_file_optimized le fait déjà, on peut l'éviter.
+        # On va le commenter pour performance.
+        
+        # try:
+        #    self.extraire_et_enregistrer_bons_commande()
+        # except Exception as e:
+        #    print(f"Erreur lors de l'extraction des bons de commande: {str(e)}")
+
         
 
 def import_or_update_fichier(fichier_upload, utilisateur=None):

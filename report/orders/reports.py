@@ -129,11 +129,117 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
         except Exception:
             return str(v)
     
-    # Récupérer le fournisseur, la devise et le numéro de projet
-    supplier = bon_commande.get_supplier()
-    currency = bon_commande.get_currency()
-    project_number = bon_commande.get_project_number()
+    # OPTIMISATION MAJEURE: Récupérer toutes les métadonnées en une seule fois
+    # Au lieu d'appeler 10x les méthodes du modèle qui parcourent tout le fichier à chaque fois,
+    # on cherche la première ligne correspondant au PO et on extrait tout.
     
+    # Valeurs par défaut
+    supplier = "N/A"
+    currency = "XOF"
+    project_number = "N/A"
+    cpu = "N/A"
+    project_manager = "N/A"
+    project_coordinator = "N/A"
+    senior_pm = "N/A"
+    gm_epmo = "N/A"
+    manager_portfolio = "N/A"
+    senior_technical_lead = "N/A"
+    
+    try:
+        from .models import Reception, LigneFichier
+        
+        # 1. Trouver un business_id valide pour ce PO (via Reception qui est indexé)
+        # C'est beaucoup plus rapide que de scanner LigneFichier
+        reception = Reception.objects.filter(bon_commande=bon_commande).first()
+        
+        target_ligne = None
+        
+        if reception and reception.business_id:
+            # 2. Récupérer la ligne fichier correspondante directement via business_id
+            target_ligne = LigneFichier.objects.filter(business_id=reception.business_id).first()
+            
+        # Si pas trouvé via réception (cas rare d'un PO sans réception encore), fallback sur recherche optimisée
+        if not target_ligne and bon_commande.fichiers.exists():
+            # On cherche dans le premier fichier associé, mais on filtre intelligemment
+            # Note: Cette méthode reste plus lente que via business_id mais on n'a pas le choix
+            # Pour éviter de tout scanner, on espère que le modèle a été bien fait, sinon tant pis
+            # Mais la méthode via Reception couvre 99% des cas MSRN (car on génère MSRN après réception)
+            pass
+
+        if target_ligne and target_ligne.contenu:
+            contenu = target_ligne.contenu
+            
+            # Helper pour extraction insensible à la casse/espaces
+            def get_val(keys):
+                if isinstance(keys, str): keys = [keys]
+                for k, v in contenu.items():
+                    if not k: continue
+                    norm_k = str(k).lower().strip().replace('_', ' ').replace('-', ' ')
+                    # Retirer les espaces multiples
+                    norm_k = ' '.join(norm_k.split())
+                    
+                    for key in keys:
+                        norm_target = str(key).lower().strip().replace('_', ' ')
+                        if norm_target in norm_k:
+                            return str(v).strip() if v else "N/A"
+                return "N/A"
+            
+            # Extraction des données
+            supplier_val = get_val(['supplier', 'vendor', 'fournisseur', 'vendeur'])
+            if supplier_val != "N/A": supplier = supplier_val
+                
+            currency_val = get_val(['currency', 'devise'])
+            if currency_val != "N/A": currency = currency_val.upper()
+                
+            proj_num_val = get_val(['project number', 'project_number', 'projet', 'code projet', 'project id'])
+            if proj_num_val != "N/A": project_number = proj_num_val
+                
+            cpu_val = get_val(['cpu'])
+            if cpu_val != "N/A": 
+                cpu = cpu_val
+                if ' - ' in cpu: cpu = cpu.split('-')[-1].strip()
+            
+            # Signataires
+            pm_val = get_val(['project manager', 'project_manager'])
+            if pm_val != "N/A": project_manager = pm_val
+                
+            pc_val = get_val(['project coordinator', 'project_coordinator', 'coordinator'])
+            if pc_val != "N/A": project_coordinator = pc_val
+                
+            spm_val = get_val(['senior pm', 'senior_pm'])
+            if spm_val != "N/A": senior_pm = spm_val
+                
+            gm_val = get_val(['gm epmo'])
+            if gm_val != "N/A": gm_epmo = gm_val
+                
+            mp_val = get_val(['manager portfolio', 'manager_portfolio'])
+            if mp_val != "N/A": manager_portfolio = mp_val
+            
+            stl_val = get_val(['senior technical lead', 'senior_technical_lead'])
+            if stl_val != "N/A": senior_technical_lead = stl_val
+            
+        else:
+            # Fallback si pas de ligne trouvée via l'optimisation (ex: pas de réception)
+            supplier = bon_commande.get_supplier()
+            currency = bon_commande.get_currency()
+            project_number = bon_commande.get_project_number()
+            cpu = bon_commande.get_cpu()
+            
+            project_manager = bon_commande.get_project_manager()
+            project_coordinator = bon_commande.get_project_coordinator()
+            senior_pm = bon_commande.get_senior_pm()
+            gm_epmo = bon_commande.get_gm_epmo()
+            manager_portfolio = bon_commande.get_manager_portfolio()
+            senior_technical_lead = bon_commande.get_senior_technical_lead()
+
+    except Exception as e:
+        logger.error(f"Erreur lors de l'optimisation MSRN: {e}")
+        # Fallback sur les méthodes lentes si crash
+        supplier = bon_commande.get_supplier()
+        currency = bon_commande.get_currency()
+        project_number = bon_commande.get_project_number()
+        cpu = bon_commande.get_cpu()
+
     # Chemin vers le logo
     logo_path = os.path.join(settings.BASE_DIR, 'static', 'logo_mtn.jpeg')
     
@@ -319,7 +425,20 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
     elements.append(acceptance_table)
     elements.append(Spacer(1, 3))  # Espace minimal
     
-    order_desc = bon_commande.get_order_description() if hasattr(bon_commande, 'get_order_description') else None
+    order_desc = "N/A"
+    if 'contenu' in locals() and contenu:
+        # Chercher la colonne Order Description (exact, tolérant espaces/underscores)
+        for key, value in contenu.items():
+            if not key:
+                continue
+            norm = key.strip().lower().replace('_', ' ')
+            norm = ' '.join(norm.split())  # compacter espaces
+            if norm == 'order description' and value:
+                order_desc = str(value)
+                break
+    else:
+        order_desc = bon_commande.get_order_description() if hasattr(bon_commande, 'get_order_description') else None
+        
     if order_desc and str(order_desc).strip() and str(order_desc).strip().upper() != 'N/A':
         order_desc_style = ParagraphStyle(
             'OrderDescStyle',
@@ -447,35 +566,34 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
     if msrn_report and msrn_report.payment_terms_snapshot:
         payment_terms = msrn_report.payment_terms_snapshot
     else:
+        # Optimisation: utiliser les infos déjà extraites si possible
+        # Malheureusement payment_terms est plus complexe car parfois dans 'Payment Terms ' ou 'Payment Terms'
+        # On va utiliser le contenu déjà chargé si disponible
         payment_terms = "N/A"
         try:
-            from .models import Reception, LigneFichier
-            # OPTIMISATION: Récupérer Payment Terms en une seule requête optimisée
-            
-            # Récupérer une réception avec son business_id (une seule requête)
-            reception = Reception.objects.filter(
-                bon_commande=bon_commande
-            ).only('business_id').first()
-            
-            if reception and reception.business_id:
-                # Chercher la ligne correspondante via business_id (une seule requête)
-                ligne = LigneFichier.objects.filter(
-                    business_id=reception.business_id
-                ).only('contenu').first()
+            if 'contenu' in locals() and contenu:
+                # Chercher 'Payment Terms' avec ou sans espace à la fin
+                payment_key = None
+                if 'Payment Terms ' in contenu:
+                    payment_key = 'Payment Terms '
+                elif 'Payment Terms' in contenu:
+                    payment_key = 'Payment Terms'
                 
-                if ligne and ligne.contenu:
-                    contenu = ligne.contenu
-                    # Chercher 'Payment Terms' avec ou sans espace à la fin
-                    payment_key = None
-                    if 'Payment Terms ' in contenu:  # Avec espace (clé réelle dans les données)
-                        payment_key = 'Payment Terms '
-                    elif 'Payment Terms' in contenu:  # Sans espace (fallback)
-                        payment_key = 'Payment Terms'
-                    
-                    if payment_key and contenu[payment_key]:
-                        val = str(contenu[payment_key]).strip()
-                        if val and val.lower() not in ['n/a', 'na', '', 'none']:
-                            payment_terms = val
+                if payment_key and contenu[payment_key]:
+                    val = str(contenu[payment_key]).strip()
+                    if val and val.lower() not in ['n/a', 'na', '', 'none']:
+                        payment_terms = val
+            else:
+                # Fallback si contenu non disponible (ex: pas de ligne trouvée)
+                from .models import Reception, LigneFichier
+                # ... code existant ...
+                reception = Reception.objects.filter(bon_commande=bon_commande).only('business_id').first()
+                if reception and reception.business_id:
+                    ligne = LigneFichier.objects.filter(business_id=reception.business_id).only('contenu').first()
+                    if ligne and ligne.contenu:
+                        c = ligne.contenu
+                        if 'Payment Terms ' in c: payment_terms = str(c['Payment Terms ']).strip()
+                        elif 'Payment Terms' in c: payment_terms = str(c['Payment Terms']).strip()
         except Exception as e:
             logger.warning(f"Erreur lors de la récupération des Payment Terms: {e}")
     
@@ -559,11 +677,11 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
             Paragraph("VENDOR<br/>(Stamp/Cachet &<br/>Signature)", normal_style)
         ]
         names = [
-            bon_commande.get_project_coordinator(),
-            bon_commande.get_project_manager(),
-            bon_commande.get_senior_pm(),
-            bon_commande.get_gm_epmo(),
-            bon_commande.get_manager_portfolio(),
+            project_coordinator,
+            project_manager,
+            senior_pm,
+            gm_epmo,
+            manager_portfolio,
             " "
         ]
         num_cols = 6
@@ -581,12 +699,12 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
             Paragraph("VENDOR<br/>(Stamp/Cachet &<br/>Signature)", normal_style)
         ]
         names = [
-            bon_commande.get_project_coordinator(),
-            bon_commande.get_project_manager(),
-            bon_commande.get_senior_pm(),
-            bon_commande.get_gm_epmo(),
-            bon_commande.get_senior_technical_lead(),
-            bon_commande.get_manager_portfolio(),
+            project_coordinator,
+            project_manager,
+            senior_pm,
+            gm_epmo,
+            senior_technical_lead,
+            manager_portfolio,
             "N/A"
         ]
         num_cols = 7
@@ -602,10 +720,10 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
             Paragraph("VENDOR<br/>(Stamp/Cachet &<br/>Signature)", normal_style)
         ]
         names = [
-            bon_commande.get_project_coordinator(),
-            bon_commande.get_project_manager(),
-            bon_commande.get_manager_portfolio(),
-            bon_commande.get_gm_epmo(),
+            project_coordinator,
+            project_manager,
+            manager_portfolio,
+            gm_epmo,
             " "
         ]
         num_cols = 5
@@ -622,11 +740,11 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
             Paragraph("VENDOR<br/>(Stamp/Cachet &<br/>Signature)", normal_style)
         ]
         names = [
-            bon_commande.get_project_coordinator(),
-            bon_commande.get_project_manager(),
-            bon_commande.get_senior_pm(),
-            bon_commande.get_gm_epmo(),
-            bon_commande.get_manager_portfolio(),
+            project_coordinator,
+            project_manager,
+            senior_pm,
+            gm_epmo,
+            manager_portfolio,
             " "
         ]
         num_cols = 6

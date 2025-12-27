@@ -184,11 +184,17 @@ class UserAdmin(admin.ModelAdmin):
             # Sauvegarde l'utilisateur sans appeler full_clean() car le formulaire a déjà validé
             obj.save()
             
+            # Déterminer l'URL du site dynamiquement à partir de la requête
+            # Cela permet d'avoir le bon IP:PORT (ex: 192.168.8.121:8000) même si l'IP change
+            scheme = request.scheme
+            host = request.get_host()
+            site_url = f"{scheme}://{host}"
+            
             # Envoie l'email d'activation (async si Celery disponible, sinon sync)
             if CELERY_AVAILABLE:
                 try:
                     # Envoi asynchrone via Celery
-                    send_activation_email_task.delay(obj.id, temp_password)
+                    send_activation_email_task.delay(obj.id, temp_password, site_url=site_url)
                     self.message_user(
                         request,
                         f"Utilisateur créé avec succès. Email d'activation en cours d'envoi à {obj.email}",
@@ -196,7 +202,7 @@ class UserAdmin(admin.ModelAdmin):
                     )
                 except Exception as e:
                     # Fallback: envoi synchrone si Celery échoue
-                    self.send_activation_email(obj, temp_password, request)
+                    self.send_activation_email(obj, temp_password, request, site_url)
                     self.message_user(
                         request,
                         f"Utilisateur créé avec succès. Email d'activation envoyé à {obj.email}",
@@ -204,7 +210,7 @@ class UserAdmin(admin.ModelAdmin):
                     )
             else:
                 # Envoi synchrone (Celery non disponible)
-                self.send_activation_email(obj, temp_password, request)
+                self.send_activation_email(obj, temp_password, request, site_url)
                 self.message_user(
                     request,
                     f"Utilisateur créé avec succès. Email d'activation envoyé à {obj.email}",
@@ -214,20 +220,23 @@ class UserAdmin(admin.ModelAdmin):
             # Pour les modifications, sauvegarder directement
             obj.save()
     
-    def send_activation_email(self, user, temp_password, request):
+    def send_activation_email(self, user, temp_password, request, site_url=None):
         """Construit et envoie l'email d'activation au nouvel utilisateur.
 
         Contenu:
-        - Lien d'activation absolu (basé sur `SITE_URL` + reverse URL `users:activate`).
+        - Lien d'activation absolu (basé sur `site_url` + reverse URL `users:activate`).
         - Sujet + version HTML (stylée) et texte brut (fallback).
 
         Résilience:
         - En cas d'erreur d'envoi, on log/print sans bloquer la création.
         """
         try:
-            # Construction du lien d'activation avec SITE_URL
+            # Utiliser l'URL fournie ou celle par défaut des settings
+            base_url = site_url or settings.SITE_URL
+            
+            # Construction du lien d'activation avec l'URL dynamique
             activation_path = reverse('users:activate', kwargs={'token': user.activation_token})
-            activation_url = f"{settings.SITE_URL}{activation_path}"
+            activation_url = f"{base_url}{activation_path}"
             
             # Sujet de l'email
             subject = f"Activation de votre compte - {settings.SITE_NAME if hasattr(settings, 'SITE_NAME') else 'MTN CI'}"

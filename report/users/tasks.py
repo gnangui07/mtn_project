@@ -16,13 +16,14 @@ logger = logging.getLogger(__name__)
 
 
 @shared_task(bind=True, max_retries=3)
-def send_activation_email_task(self, user_id: int, temp_password: str = None):
+def send_activation_email_task(self, user_id: int, temp_password: str = None, site_url: str = None):
     """
     Envoie un email d'activation de compte de façon asynchrone.
     
     Args:
         user_id: ID de l'utilisateur à notifier
         temp_password: Mot de passe temporaire en clair (optionnel, pour l'email)
+        site_url: URL de base du site (ex: http://192.168.8.121:8000)
         
     Returns:
         bool: True si l'email a été envoyé, False sinon
@@ -43,9 +44,10 @@ def send_activation_email_task(self, user_id: int, temp_password: str = None):
         if not user.activation_token:
             user.generate_activation_token()
         
-        # Construction du lien d'activation
+        # Construction du lien d'activation avec l'URL fournie ou par défaut
+        base_url = site_url or settings.SITE_URL
         activation_path = reverse('users:activate', kwargs={'token': user.activation_token})
-        activation_url = f"{settings.SITE_URL}{activation_path}"
+        activation_url = f"{base_url}{activation_path}"
         
         # Sujet de l'email
         site_name = getattr(settings, 'SITE_NAME', 'MTN CI')

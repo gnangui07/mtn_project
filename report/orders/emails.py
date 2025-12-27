@@ -136,7 +136,7 @@ This is an automated notification from the MSRN System.
                 pdf_path = msrn_report.pdf_file.path
                 with open(pdf_path, 'rb') as f:
                     pdf_bytes = f.read()
-                filename = f"MSRN-{msrn_report.report_number}.pdf"
+                filename = f"{msrn_report.report_number}-{msrn_report.bon_commande.numero}.pdf"
                 email.attach(filename, pdf_bytes, 'application/pdf')
         except Exception as attach_err:
             logger.warning(f"Impossible d'attacher le PDF MSRN au courriel: {attach_err}")
@@ -152,7 +152,7 @@ This is an automated notification from the MSRN System.
         return False
 
 
-def send_penalty_notification(bon_commande, pdf_buffer, user_email, report_type='penalty'):
+def send_penalty_notification(bon_commande, pdf_buffer, user_email, report_type='penalty', filename=None):
     """But:
     - Envoyer l'email pour les rapports PDF hors MSRN (pénalité, amendement, délais, compensation).
 
@@ -167,6 +167,7 @@ def send_penalty_notification(bon_commande, pdf_buffer, user_email, report_type=
     - `pdf_buffer`: buffer mémoire du PDF (BytesIO).
     - `user_email`: émetteur (mis en CC si valide).
     - `report_type`: 'penalty'|'penalty_amendment'|'delay_evaluation'|'compensation_letter'.
+    - `filename`: nom du fichier PDF (optionnel).
 
     Sorties:
     - booléen de succès d'envoi.

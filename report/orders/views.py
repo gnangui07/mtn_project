@@ -215,7 +215,7 @@ def download_msrn_report(request, report_id):
         # Préparer la réponse HTTP pour le téléchargement
         with open(msrn_report.pdf_file.path, 'rb') as pdf_file:
             response = HttpResponse(pdf_file.read(), content_type='application/pdf')
-            filename = f"MSRN-{msrn_report.report_number}.pdf"
+            filename = f"{msrn_report.report_number}-{msrn_report.bon_commande.numero}.pdf"
             response['Content-Disposition'] = f'attachment; filename="{filename}"'
             return response
             

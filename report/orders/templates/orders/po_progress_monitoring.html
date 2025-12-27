@@ -59,3 +59,9 @@
     </div>
 </div>
 {% endblock %}
+
+{% block extra_js %}
+<!-- SweetAlert2 pour des alertes et confirmations élégantes (Local) -->
+<script src="{% static 'js/vendor/sweetalert2.all.min.js' %}"></script>
+<script src="{% static 'orders/js/po_progress_monitoring.js' %}"></script>
+{% endblock %}

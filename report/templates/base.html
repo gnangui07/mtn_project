@@ -8,28 +8,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}CAPEX Works Valuation Tool{% endblock %}</title>
     
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap CSS (Local) -->
+    <link href="{% static 'css/vendor/bootstrap.min.css' %}" rel="stylesheet">
     
-    <!-- Font Awesome -->
+    <!-- Font Awesome (Local - à télécharger si absent, sinon CDN fallback) -->
     <link rel="stylesheet" href="{% static 'css/all.min.css' %}">
     
-    <!-- Spectrum Design System (Adobe) pour les composants UI -->
-    <link rel="stylesheet" href="https://unpkg.com/@adobe/spectrum-css@3.0.0/dist/spectrum-core.min.css">
-    <link rel="stylesheet" href="https://unpkg.com/@adobe/spectrum-css@3.0.0/dist/spectrum-light.min.css">
+    <!-- Spectrum Design System (Adobe) Local Fallback -->
+    <link rel="stylesheet" href="{% static 'css/vendor/spectrum-core.min.css' %}">
+    <!-- Note: Les autres fichiers Spectrum sont inclus dans le core.min.css généré ou sont vides pour éviter les 404 -->
+    
     <link rel="stylesheet" href="{% static 'dist/app.css' %}">
-    <link rel="stylesheet" href="https://unpkg.com/@adobe/spectrum-css@3.0.0/dist/vars/css/components/spectrum-tabs.css">
-    <link rel="stylesheet" href="https://unpkg.com/@adobe/spectrum-css@3.0.0/dist/vars/css/components/spectrum-dialog.css">
-    <link rel="stylesheet" href="https://unpkg.com/@adobe/spectrum-css@3.0.0/dist/vars/css/components/spectrum-table.css">
-    <link rel="stylesheet" href="https://unpkg.com/@adobe/spectrum-css@3.0.0/dist/vars/css/components/spectrum-inlinealert.css">
-    <link rel="stylesheet" href="https://unpkg.com/@adobe/spectrum-css@3.0.0/dist/vars/css/components/spectrum-statuslight.css">
-    <link rel="stylesheet" href="https://unpkg.com/@adobe/spectrum-css@3.0.0/dist/vars/css/components/spectrum-progresscircle.css">
-    <link rel="stylesheet" href="https://unpkg.com/@adobe/spectrum-css@3.0.0/dist/vars/css/components/spectrum-alertbanner.css">
-    <link rel="stylesheet" href="https://unpkg.com/@adobe/spectrum-css@3.0.0/dist/vars/css/components/spectrum-badge.css">
-    <link rel="stylesheet" href="https://unpkg.com/@adobe/spectrum-css@3.0.0/dist/vars/css/components/spectrum-menu.css">
-    <link rel="stylesheet" href="https://unpkg.com/@adobe/spectrum-css@3.0.0/dist/vars/css/components/spectrum-picker.css">
-    <link rel="stylesheet" href="https://unpkg.com/@adobe/spectrum-css@3.0.0/dist/vars/css/components/spectrum-popover.css">
-    <link rel="stylesheet" href="https://unpkg.com/@adobe/spectrum-css@3.0.0/dist/vars/css/components/spectrum-icon.css">
+    
+    <!-- Styles locaux pour éviter les requêtes externes -->
+    <link rel="stylesheet" href="{% static 'css/vendor/spectrum-tabs.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vendor/spectrum-dialog.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vendor/spectrum-table.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vendor/spectrum-inlinealert.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vendor/spectrum-statuslight.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vendor/spectrum-progresscircle.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vendor/spectrum-alertbanner.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vendor/spectrum-badge.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vendor/spectrum-menu.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vendor/spectrum-picker.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vendor/spectrum-popover.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vendor/spectrum-icon.css' %}">
     
     <style>
         :root {
@@ -475,7 +478,7 @@
     
     {% block extra_css %}{% endblock %}
 </head>
-<body class="spectrum spectrum--light">
+<body class="spectrum spectrum--light spectrum--medium">
     <!-- Bouton mobile (visible seulement sur petits écrans) -->
     <button class="mobile-menu-btn" id="mobileMenuBtn">
         <i class="fas fa-bars"></i>
@@ -717,10 +720,14 @@
         });
     </script>
     
-    <!-- Bibliothèques JavaScript -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://unpkg.com/@adobe/spectrum-css@3.0.0/dist/spectrum-core.min.js"></script>
+    <!-- Bibliothèques JavaScript (Local) -->
+    <script src="{% static 'js/vendor/jquery.min.js' %}"></script>
+    <script src="{% static 'js/vendor/bootstrap.bundle.min.js' %}"></script>
+    <!-- Adobe Spectrum JS non requis pour la version CSS-only -->
+    <!-- SweetAlert2 pour les notifications globales (Local) -->
+    <script src="{% static 'js/vendor/sweetalert2.all.min.js' %}"></script>
+    <!-- Système de notifications globales -->
+    <script src="{% static 'orders/js/global_notifications.js' %}"></script>
     
     {% block extra_js %}{% endblock %}
 </body>

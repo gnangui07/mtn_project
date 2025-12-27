@@ -289,14 +289,6 @@ def generate_compensation_letter(
     elements.append(Spacer(1, 30))
 
     # Signatures - Espacées à gauche et droite
-    signature_left_style = ParagraphStyle(
-        "SignatureLeft",
-        parent=styles["Normal"],
-        fontName="Times-Roman",
-        fontSize=11,
-        alignment=TA_LEFT,
-        textColor=colors.black,
-    )
     
     signature_right_style = ParagraphStyle(
         "SignatureRight",
@@ -309,12 +301,12 @@ def generate_compensation_letter(
     
     signatures_data = [
         [
-            Paragraph("<b>Eric DJEDJE</b><br/>GM EPMO", signature_left_style),
+            "",
             Paragraph("<b>Moriba BAMBA</b><br/>Senior Manager. Supply Chain Management", signature_right_style)
         ]
     ]
     
-    signatures_table = Table(signatures_data, colWidths=[276, 276])
+    signatures_table = Table(signatures_data, colWidths=[256, 256])
     signatures_table.setStyle(
         TableStyle(
             [

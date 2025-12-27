@@ -27,7 +27,7 @@ if DJANGO_ENV == 'production':
     ALLOWED_HOSTS = ['ton-domaine.com', 'www.ton-domaine.com', '127.0.0.1']
     print("Mode PRODUCTION active")
 else:
-    ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '192.168.8.121']
+    ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '192.168.8.135']
     print("Mode DEVELOPPEMENT active")
 
 # ==================== APPLICATIONS ====================

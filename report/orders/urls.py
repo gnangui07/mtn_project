@@ -10,7 +10,7 @@ from . import penalty_amendment_api
 from . import penalty_amount_api
 from . import delay_evaluation_api
 from . import compensation_letter_api
-from .task_status_api import check_task_status, get_pending_tasks
+from .task_status_api import check_task_status, get_pending_tasks, check_user_tasks_notifications
 
 
 app_name = 'orders'
@@ -44,6 +44,7 @@ urlpatterns = [
     # Nouvelles APIs pour correction groupée
     path('api/reception-history/<int:fichier_id>/', reception_api.get_reception_history, name='get_reception_history'),
     path('api/bulk-correction/<int:fichier_id>/', reception_api.bulk_correction_quantity_delivered, name='bulk_correction_quantity_delivered'),
+    path('api/apply-target-rate/<int:fichier_id>/', reception_api.apply_target_rate, name='apply_target_rate'),
    
     
     # Journal d'activité
@@ -81,4 +82,5 @@ urlpatterns = [
     # Polling pour vérifier l'état des tâches async (exports, PDF, imports)
     path('api/task-status/<str:task_id>/', check_task_status, name='check_task_status'),
     path('api/pending-tasks/', get_pending_tasks, name='get_pending_tasks'),
+    path('api/check-notifications/', check_user_tasks_notifications, name='check_user_tasks_notifications'),
 ]

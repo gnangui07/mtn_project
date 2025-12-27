@@ -4,9 +4,10 @@
 {% block title %}Consultation des Bons de Commande - MTN{% endblock %}
 
 {% block extra_css %}
-<!-- Inclure Select2 CSS -->
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-<link href="https://cdn.jsdelivr.net/npm/@ttskch/select2-bootstrap4-theme@x.x.x/dist/select2-bootstrap4.min.css" rel="stylesheet" />
+<!-- Inclure Select2 CSS (Local) -->
+<link href="{% static 'css/vendor/select2.min.css' %}" rel="stylesheet" />
+<!-- Thème Bootstrap 5 pour Select2 (Local) -->
+<link href="{% static 'css/vendor/select2-bootstrap-5-theme.min.css' %}" rel="stylesheet" />
 
 <!-- Inclure notre CSS personnalisé -->
 <link href="{% static 'orders/css/consultation.css' %}" rel="stylesheet" />
@@ -17,11 +18,11 @@
 :root {
     --soft-yellow: #FFE58F;
     --soft-yellow-bg: #FFF7D6;
-    --soft-black: #1f1f1f;
+    --soft-black: #000000;
     --soft-gray: #f6f7f9;
-    --card-shadow: 0 6px 16px rgba(0,0,0,0.08);
+    --card-shadow: 0 6px 16px rgba(0,0,0,0.1);
     --modal-backdrop: rgba(0, 0, 0, 0.5);
-    --modal-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    --modal-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
     --modal-radius: 16px;
     --border-color: #e5e7eb;
     --primary-color: #3b82f6;
@@ -46,7 +47,8 @@
 .page-header { margin-top: 24px; margin-bottom: 16px; color: var(--soft-black); }
 .table-responsive { background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 12px; }
 .spectrum-Table { width: 100%; }
-.spectrum-Table thead { background: #222; color: var(--soft-yellow); }
+.spectrum-Table thead { background: #222; }
+.spectrum-Table-headCell { color: var(--soft-yellow) !important; background-color: #222 !important; }
 .spectrum-Table-row:hover { background: rgba(255,229,143,0.2); }
 .excel-table { width:100%; border-collapse: collapse; }
 .excel-table th, .excel-table td { border-bottom: 1px solid #eee; padding: 10px; }
@@ -954,13 +956,13 @@
 
 {% block extra_js %}
 <!-- Inclure Select2 JS -->
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="{% static 'js/vendor/select2.min.js' %}"></script>
 
 <!-- Inclure Chart.js pour les graphiques -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script src="{% static 'js/vendor/chart.umd.min.js' %}"></script>
 
 <!-- Inclure XLSX pour l'export Excel -->
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="{% static 'js/vendor/xlsx.full.min.js' %}"></script>
 
 <!-- Variables pour les URLs Django -->
 <script>

@@ -28,7 +28,7 @@ from .emails import send_msrn_notification
 
 # Import Celery tasks avec fallback si non disponible
 try:
-    from .tasks import generate_msrn_pdf_task, send_msrn_notification_task
+    from .tasks import generate_msrn_pdf_task
     from .task_status_api import register_user_task
     CELERY_AVAILABLE = True
 except ImportError:
@@ -89,10 +89,7 @@ def generate_msrn_report_api(request, bon_id):
     
     # Créer et sauvegarder le rapport, générer le PDF et notifier
     try:
-        # Mesurer le temps de génération
-        start_time = time.time()
-        
-        # Créer le rapport MSRN
+        # Créer le rapport MSRN (Initialisation en base)
         report = MSRNReport(
             bon_commande=bon_commande,
             user=request.user.email,
@@ -101,42 +98,54 @@ def generate_msrn_report_api(request, bon_id):
         )
         report.save()
         
-        logger.info(f"MSRN report created in {time.time() - start_time:.2f}s")
-        pdf_start = time.time()
+        # Mode Asynchrone (Celery)
+        if CELERY_AVAILABLE:
+            logger.info(f"Lancement tâche async pour {report.report_number}")
+            task = generate_msrn_pdf_task.delay(report.id, request.user.id)
+            
+            # Enregistrer la tâche pour le polling utilisateur
+            try:
+                register_user_task(request.user.id, task.id, 'generate_msrn')
+            except Exception:
+                pass
+                
+            return JsonResponse({
+                'success': True,
+                'async': True,
+                'task_id': task.id,
+                'msrn_report_id': report.id,
+                'report_number': report.report_number,
+                'message': f"La génération du rapport {report.report_number} a démarré en arrière-plan."
+            })
+
+        # Mode Synchrone (Fallback)
+        logger.info(f"Génération synchrone pour {report.report_number}")
+        start_time = time.time()
         
         # Générer le PDF avec le numéro de rapport qui vient d'être créé
         pdf_buffer = generate_msrn_report(bon_commande, report.report_number, user_email=request.user.email)
         
-        logger.info(f"PDF generated in {time.time() - pdf_start:.2f}s")
-        
         # Enregistrer le PDF dans le champ fichier du rapport
+        # Format du nom de fichier: MSRN250020-CI-OR-3000001373.pdf (au lieu de MSRN-MSRN250020-...)
         report.pdf_file.save(
-            f"MSRN-{report.report_number}.pdf",
+            f"{report.report_number}-{bon_commande.numero}.pdf",
             File(pdf_buffer)
         )
         report.save()
         
-        total_time = time.time() - start_time
-        logger.info(f"Rapport MSRN généré avec succès: MSRN-{report.report_number} (Total: {total_time:.2f}s)")
-        
         # Envoyer la notification email aux superusers (non bloquant pour la réponse)
         try:
-            email_sent = send_msrn_notification(report)
-            if email_sent:
-                logger.info(f"Notification email envoyée pour MSRN-{report.report_number}")
-            else:
-                logger.warning(f"Notification email non envoyée pour MSRN-{report.report_number}")
+            send_msrn_notification(report)
         except Exception as email_error:
-            # Ne pas bloquer la génération du MSRN si l'email échoue
-            logger.error(f"Erreur lors de l'envoi de la notification email pour MSRN-{report.report_number}: {str(email_error)}")
+            logger.error(f"Erreur email MSRN: {email_error}")
         
-        # Préparer la réponse
         return JsonResponse({
             'success': True,
+            'async': False,
             'msrn_report_id': report.id,
             'report_number': report.report_number,
             'download_url': f"/orders/msrn-report/{report.id}/",
-            'message': f"Rapport MSRN-{report.report_number} généré avec succès"
+            'message': f"Rapport {report.report_number} généré avec succès"
         })
         
     except Exception as e:
@@ -352,7 +361,7 @@ def update_msrn_retention(request, msrn_id):
             
             # Mettre à jour le fichier PDF
             msrn_report.pdf_file.save(
-                f"MSRN-{msrn_report.report_number}.pdf",
+                f"{msrn_report.report_number}-{msrn_report.bon_commande.numero}.pdf",
                 File(pdf_buffer),
                 save=False  # Ne pas sauvegarder tout de suite pour éviter double sauvegarde
             )

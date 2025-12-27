@@ -30,6 +30,14 @@ from .penalty_amendment_data import collect_penalty_amendment_context
 from .penalty_amendment_report import generate_penalty_amendment_report
 from .emails import send_penalty_notification
 
+# Import Celery tasks avec fallback
+try:
+    from .tasks import generate_penalty_amendment_pdf_task
+    from .task_status_api import register_user_task
+    CELERY_AVAILABLE = True
+except ImportError:
+    CELERY_AVAILABLE = False
+
 
 def _decimal_or_default(value, default: str = "0") -> Decimal:
     try:
@@ -85,19 +93,55 @@ def generate_penalty_amendment_report_api(request, bon_id: int):
         payload = request.GET
 
     # 4) Champs libres: doléance du fournisseur et proposition du PM
-    context["supplier_plea"] = (payload.get("supplier_plea") or "").strip()
-    context["pm_proposal"] = (payload.get("pm_proposal") or "").strip()
+    supplier_plea = (payload.get("supplier_plea") or "").strip()
+    pm_proposal = (payload.get("pm_proposal") or "").strip()
+    context["supplier_plea"] = supplier_plea
+    context["pm_proposal"] = pm_proposal
 
     # 5) Statut de la pénalité (trois valeurs autorisées)
     status = (payload.get("penalty_status") or "").strip().lower()
     if status in {"annulee", "reduite", "reconduite"}:
         context["penalty_status"] = status
+    else:
+        status = ""
 
     # 6) Nouvelle pénalité demandée (montant optionnel)
     requested_new_penalty = payload.get("new_penalty_due")
+    new_penalty_due = None
     if requested_new_penalty not in (None, ""):
-        context["new_penalty_due"] = _decimal_or_default(requested_new_penalty)
+        new_penalty_due = _decimal_or_default(requested_new_penalty)
+        context["new_penalty_due"] = new_penalty_due
 
+    # Mode Asynchrone (Celery)
+    if CELERY_AVAILABLE:
+        # Convertir new_penalty_due en str pour sérialisation JSON si nécessaire
+        new_penalty_str = str(new_penalty_due) if new_penalty_due is not None else None
+        
+        task = generate_penalty_amendment_pdf_task.delay(
+            bon_id, 
+            request.user.id, 
+            supplier_plea, 
+            pm_proposal, 
+            status, 
+            new_penalty_str
+        )
+        
+        # Enregistrer la tâche pour le polling utilisateur
+        try:
+            register_user_task(request.user.id, task.id, 'generate_penalty_amendment')
+        except Exception:
+            pass
+            
+        return JsonResponse({
+            'success': True,
+            'async': True,
+            'task_id': task.id,
+            'bon_id': bon_id,
+            'report_number': bon_commande.numero,
+            'message': f"La génération de l'amendement pour {bon_commande.numero} a démarré en arrière-plan."
+        })
+
+    # Mode Synchrone (Fallback)
     # 7) Générer le PDF en mémoire
     pdf_buffer = generate_penalty_amendment_report(
         bon_commande,
@@ -106,6 +150,7 @@ def generate_penalty_amendment_report_api(request, bon_id: int):
     )
 
     # Sauvegarder le PDF dans le log
+    filename = f"PenaltyAmendment-{bon_commande.numero}.pdf" # Fallback
     try:
         pdf_bytes = pdf_buffer.getvalue()
         log_entry = PenaltyAmendmentReportLog.objects.create(bon_commande=bon_commande)
@@ -122,7 +167,8 @@ def generate_penalty_amendment_report_api(request, bon_id: int):
                 bon_commande=bon_commande,
                 pdf_buffer=pdf_buffer,
                 user_email=getattr(request.user, "email", None),
-                report_type='penalty_amendment'
+                report_type='penalty_amendment',
+                filename=filename
             )
         except Exception as e:
             pass
@@ -131,7 +177,7 @@ def generate_penalty_amendment_report_api(request, bon_id: int):
     email_thread.start()
 
     # 9) Retourner le PDF inline
-    filename = iri_to_uri(f"PenaltyAmendment-{bon_commande.numero}.pdf")
+    safe_filename = iri_to_uri(filename)
     response = HttpResponse(pdf_buffer.getvalue(), content_type="application/pdf")
-    response["Content-Disposition"] = f'inline; filename="{filename}"'
+    response["Content-Disposition"] = f'inline; filename="{safe_filename}"'
     return response

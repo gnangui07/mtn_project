@@ -1516,7 +1516,7 @@ class TestDownloadMSRNReportSuccess(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/pdf')
         self.assertIn('attachment', response['Content-Disposition'])
-        self.assertIn('MSRN-PDFTEST.pdf', response['Content-Disposition'])
+        self.assertIn('MSRN-PDFTEST-PDF-BON.pdf', response['Content-Disposition'])
         self.assertIn(b'%PDF', response.content)
 
 

@@ -467,7 +467,7 @@
 
 {% block extra_js %}
 <!-- SweetAlert2 pour des alertes et confirmations élégantes -->
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="{% static 'js/vendor/sweetalert2.all.min.js' %}"></script>
 
 <!-- Variables pour le JavaScript -->
 <script>
@@ -483,6 +483,8 @@
     const supplier = "{{ supplier|default:'N/A' }}";
     const retentionRate = "{{ retention_rate|default:'0' }}";
     const retentionCause = "{{ retention_cause|default:'N/A' }}";
+    // Sécurité : Indicateur de privilèges
+    const isSuperUser = {{ user.is_superuser|yesno:"true,false" }};
 </script>
 
 <script src="{% static 'orders/js/detail_bon.js' %}"></script>

@@ -30,6 +30,14 @@ from .penalty_data import collect_penalty_context
 from .penalty_report import generate_penalty_report
 from .emails import send_penalty_notification
 
+# Import Celery tasks avec fallback
+try:
+    from .tasks import generate_penalty_pdf_task
+    from .task_status_api import register_user_task
+    CELERY_AVAILABLE = True
+except ImportError:
+    CELERY_AVAILABLE = False
+
 
 @csrf_protect
 @login_required
@@ -80,6 +88,26 @@ def generate_penalty_report_api(request, bon_id: int):
     if observation:
         context["observation"] = observation
 
+    # Mode Asynchrone (Celery)
+    if CELERY_AVAILABLE:
+        task = generate_penalty_pdf_task.delay(bon_id, request.user.id, observation)
+        
+        # Enregistrer la tâche pour le polling utilisateur
+        try:
+            register_user_task(request.user.id, task.id, 'generate_penalty')
+        except Exception:
+            pass
+            
+        return JsonResponse({
+            'success': True,
+            'async': True,
+            'task_id': task.id,
+            'bon_id': bon_id,
+            'report_number': bon_commande.numero,
+            'message': f"La génération de la fiche de pénalité pour {bon_commande.numero} a démarré en arrière-plan."
+        })
+
+    # Mode Synchrone (Fallback)
     # Générer le PDF de la fiche de pénalité en mémoire (pas de fichier sur disque)
     pdf_buffer = generate_penalty_report(
         bon_commande,
@@ -88,6 +116,7 @@ def generate_penalty_report_api(request, bon_id: int):
     )
 
     # Sauvegarder le PDF dans le log
+    filename = f"PenaltySheet-{bon_commande.numero}.pdf" # Fallback filename
     try:
         pdf_bytes = pdf_buffer.getvalue()
         log_entry = PenaltyReportLog.objects.create(bon_commande=bon_commande)
@@ -105,7 +134,8 @@ def generate_penalty_report_api(request, bon_id: int):
                 bon_commande=bon_commande,
                 pdf_buffer=pdf_buffer,
                 user_email=getattr(request.user, "email", None),
-                report_type='penalty'
+                report_type='penalty',
+                filename=filename
             )
         except Exception as e:
             pass
@@ -114,9 +144,9 @@ def generate_penalty_report_api(request, bon_id: int):
     email_thread.start()
 
     # Préparer la réponse HTTP avec le PDF affiché dans le navigateur (inline)
-    filename = iri_to_uri(f"PenaltySheet-{bon_commande.numero}.pdf")
+    safe_filename = iri_to_uri(filename)
     response = HttpResponse(pdf_buffer.getvalue(), content_type="application/pdf")
-    response["Content-Disposition"] = f'inline; filename="{filename}"'
+    response["Content-Disposition"] = f'inline; filename="{safe_filename}"'
     # Indiquer le montant calculé dans un en-tête pour usage côté front
     response["X-Penalty-Due"] = str(context.get("penalties_due", "0"))
     return response

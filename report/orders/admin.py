@@ -13,10 +13,39 @@ Sorties:
 - Pages d'administration enrichies avec aperçus, liens et boutons d'export.
 """
 import os
+from django import forms
 from django.contrib import admin
+from django.contrib import messages
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from .models import FichierImporte, MSRNReport, NumeroBonCommande, LigneFichier
+
+# Try to import Celery tasks and helpers
+try:
+    from .tasks import import_fichier_task
+    from .task_status_api import register_user_task
+    CELERY_AVAILABLE = True
+except ImportError:
+    CELERY_AVAILABLE = False
+
+
+class FichierImporteForm(forms.ModelForm):
+    async_import = forms.BooleanField(
+        required=False, 
+        initial=False,
+        label="Import en arrière-plan (Async)",
+        help_text="Recommandé pour les gros fichiers (> 10 Mo). L'import se fera en tâche de fond et vous rendra la main immédiatement."
+    )
+
+    class Meta:
+        model = FichierImporte
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not CELERY_AVAILABLE:
+            self.fields['async_import'].disabled = True
+            self.fields['async_import'].help_text = "Celery non disponible (Import synchrone uniquement)"
 
 
 @admin.register(FichierImporte)
@@ -25,12 +54,55 @@ class FichierImporteAdmin(admin.ModelAdmin):
     L'admin permet au superuser d'importer directement n'importe quel fichier via un unique champ 'File'.
     Après sauvegarde, on affiche directement les données sous forme tabulaire.
     """
+    form = FichierImporteForm
     
     def save_model(self, request, obj, form, change):
         """Capture automatiquement l'utilisateur courant lors de l'enregistrement"""
         if not change:  # Seulement pour les nouveaux fichiers
             obj.utilisateur = request.user
-        super().save_model(request, obj, form, change)
+        
+        # Gestion de l'import Async
+        is_async = form.cleaned_data.get('async_import')
+        
+        if is_async and CELERY_AVAILABLE and not change:
+            # 1. Marquer pour sauter l'extraction automatique dans save()
+            obj._skip_extraction = True
+            
+            # 2. Sauvegarder le fichier physique (upload)
+            super().save_model(request, obj, form, change)
+            
+            # 3. Lancer la tâche Celery
+            try:
+                # On utilise le path absolu du fichier uploadé
+                file_path = obj.fichier.path
+                
+                task = import_fichier_task.delay(
+                    file_path=file_path,
+                    user_id=request.user.id,
+                    original_filename=os.path.basename(obj.fichier.name),
+                    fichier_id=obj.id
+                )
+                
+                # 4. Enregistrer la tâche pour le suivi UI
+                register_user_task(request.user.id, task.id, 'import_fichier')
+                
+                # 5. Notifier l'utilisateur
+                messages.info(
+                    request, 
+                    format_html(
+                        "<strong>Import démarré en arrière-plan !</strong><br>"
+                        "Vous pouvez continuer à naviguer. Tâche ID: <code>{}</code>",
+                        task.id
+                    )
+                )
+            except Exception as e:
+                # Fallback si erreur de lancement de tâche
+                messages.error(request, f"Erreur lors du lancement de la tâche async: {e}")
+                # On pourrait relancer en synchrone ici si on voulait, 
+                # mais pour l'instant on laisse l'utilisateur réessayer.
+        else:
+            # Comportement standard (Synchrone)
+            super().save_model(request, obj, form, change)
 
     list_display = ['file_link', 'extension', 'date_importation', 'nombre_lignes', 'user_display', 'export_excel_button']
     readonly_fields = ('extension', 'date_importation', 'nombre_lignes', 'data_table_view', 'user_display')
@@ -40,7 +112,7 @@ class FichierImporteAdmin(admin.ModelAdmin):
 
     fieldsets = (
         (None, {
-            'fields': ('fichier',)
+            'fields': ('fichier', 'async_import')
         }),
         ('File Metadata', {
             'fields': ('extension', 'date_importation', 'nombre_lignes'),
