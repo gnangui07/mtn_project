@@ -3,10 +3,40 @@
 
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
+from django.utils import timezone
 from .models import User
+from .models_history import PasswordHistory
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+@receiver(post_save, sender=User)
+def save_password_history(sender, instance, created, **kwargs):
+    """
+    Sauvegarde le mot de passe dans l'historique lors d'un changement.
+    """
+    # Ne pas sauvegarder lors de la création initiale
+    if created:
+        return
+    
+    # Vérifier si le mot de passe a été changé
+    if hasattr(instance, '_password_has_changed') and instance._password_has_changed:
+        # Sauvegarder l'ancien mot de passe dans l'historique
+        if hasattr(instance, '_original_password') and instance._original_password:
+            PasswordHistory.objects.create(
+                user=instance,
+                password_hash=instance._original_password
+            )
+        
+        # Mettre à jour la date de changement (sans déclencher le signal à nouveau)
+        User.objects.filter(pk=instance.pk).update(password_changed_at=timezone.now())
+        
+        # Nettoyer les anciens mots de passe (garder seulement les 24 derniers)
+        PasswordHistory.cleanup_old_passwords(instance, keep_count=24)
+        
+        # Réinitialiser le flag
+        instance._password_has_changed = False
 
 
 @receiver(post_save, sender=User)

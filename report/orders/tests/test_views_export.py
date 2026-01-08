@@ -8,6 +8,7 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.utils import timezone
+from unittest.mock import patch, Mock, MagicMock
 from orders.models import (
     NumeroBonCommande, FichierImporte, LigneFichier, 
     Reception, MSRNReport, VendorEvaluation, InitialReceptionBusiness
@@ -1323,3 +1324,462 @@ class TestExportBonExcelCompletion(TestCase):
 
         response = self.client.get(f'/orders/export-excel/{fichier.id}/')
         self.assertEqual(response.status_code, 200)
+
+
+class TestExportUtils(TestCase):
+    """Test les fonctions utilitaires d'export"""
+    
+    def test_normalize_header(self):
+        """Test normalisation des en-têtes"""
+        from orders.views_export import normalize_header
+        
+        # Test cas standards
+        self.assertEqual(normalize_header('Order Number'), 'order_number')
+        self.assertEqual(normalize_header('CPU'), 'cpu')
+        self.assertEqual(normalize_header('  SPONSOR  '), 'sponsor')
+        self.assertEqual(normalize_header('PIP_END_DATE'), 'pip_end_date')
+        
+        # Test cas avec caractères spéciaux
+        self.assertEqual(normalize_header('Price (USD)'), 'price_usd')
+        self.assertEqual(normalize_header('Quantity%'), 'quantity')
+        
+        # Test cas avec underscores
+        self.assertEqual(normalize_header('Order_ID'), 'order_id')
+    
+    def test_get_value_tolerant(self):
+        """Test récupération tolérante des valeurs"""
+        from orders.views_export import get_value_tolerant
+        
+        contenu = {
+            'Order Number': 'PO001',
+            'CPU': 'ITS',
+            'Price USD': '100.50',
+            'Quantity Delivered': '50'
+        }
+        
+        # Test avec candidats exacts
+        self.assertEqual(get_value_tolerant(contenu, exact_candidates=['Order Number']), 'PO001')
+        self.assertEqual(get_value_tolerant(contenu, exact_candidates=['CPU']), 'ITS')
+        
+        # Test avec tokens
+        self.assertEqual(get_value_tolerant(contenu, tokens=['price']), '100.50')
+        self.assertEqual(get_value_tolerant(contenu, tokens=['quantity', 'delivered']), '50')
+        
+        # Test non trouvé
+        self.assertIsNone(get_value_tolerant(contenu, exact_candidates=['NotFound']))
+        self.assertIsNone(get_value_tolerant(contenu, tokens=['not', 'found']))
+    
+    def test_find_order_key(self):
+        """Test recherche de la clé Order"""
+        from orders.views_export import find_order_key
+        
+        # Test cas exact
+        contenu1 = {'Order': 'PO001', 'CPU': 'ITS'}
+        self.assertEqual(find_order_key(contenu1), 'Order')
+        
+        # Test cas variantes
+        contenu2 = {'Order Number': 'PO001', 'CPU': 'ITS'}
+        self.assertEqual(find_order_key(contenu2), 'Order Number')
+        
+        contenu3 = {'Bon de commande': 'PO001', 'CPU': 'ITS'}
+        self.assertEqual(find_order_key(contenu3), 'Bon de commande')
+        
+        contenu4 = {'BC': 'PO001', 'CPU': 'ITS'}
+        self.assertEqual(find_order_key(contenu4), 'BC')
+        
+        # Test non trouvé
+        contenu5 = {'CPU': 'ITS', 'Sponsor': 'Test'}
+        self.assertIsNone(find_order_key(contenu5))
+    
+    def test_make_export_payload(self):
+        """Test création payload pour export"""
+        from orders.views_export import _make_export_payload
+        
+        # Créer données de test
+        bon = NumeroBonCommande.objects.create(numero='PO001', cpu='ITS')
+        fichier = FichierImporte(fichier='test.csv')
+        fichier._skip_extraction = True
+        fichier.save()
+        bon.fichiers.add(fichier)
+        
+        ligne = LigneFichier.objects.create(
+            fichier=fichier,
+            numero_ligne=1,
+            business_id='BID001',
+            contenu={'Order': 'PO001', 'CPU': 'ITS'}
+        )
+        
+        reception = Reception.objects.create(
+            bon_commande=bon,
+            fichier=fichier,
+            business_id='BID001',
+            ordered_quantity=Decimal('100'),
+            quantity_delivered=Decimal('50')
+        )
+        
+        # Appeler la fonction
+        payload = _make_export_payload(bon.id)
+        
+        # Vérifications
+        self.assertIsInstance(payload, list)
+        self.assertGreater(len(payload), 0)
+        
+        # Vérifier structure
+        first_item = payload[0]
+        self.assertIn('order', first_item)
+        self.assertIn('cpu', first_item)
+        self.assertEqual(first_item['order'], 'PO001')
+        self.assertEqual(first_item['cpu'], 'ITS')
+    
+    def test_make_export_payload_no_data(self):
+        """Test payload sans données"""
+        from orders.views_export import _make_export_payload
+        
+        bon = NumeroBonCommande.objects.create(numero='PO999', cpu='TEST')
+        
+        payload = _make_export_payload(bon.id)
+        
+        # Devrait retourner une liste vide
+        self.assertEqual(payload, [])
+    
+    def test_make_export_payload_with_irb(self):
+        """Test payload avec données de réception"""
+        from orders.views_export import _make_export_payload
+        
+        bon = NumeroBonCommande.objects.create(numero='PO001', cpu='ITS')
+        fichier = FichierImporte(fichier='test.csv')
+        fichier._skip_extraction = True
+        fichier.save()
+        bon.fichiers.add(fichier)
+        
+        # Créer une ligne de fichier
+        LigneFichier.objects.create(
+            fichier=fichier,
+            numero_ligne=1,
+            business_id='BID001',
+            contenu={'Order': 'PO001', 'Item': 'TEST'}
+        )
+        
+        # Créer une réception (remplace InitialReceptionBusiness qui n'est plus utilisé par _make_export_payload)
+        reception = Reception.objects.create(
+            business_id='BID001',
+            bon_commande=bon,
+            fichier=fichier,
+            received_quantity=Decimal('50'),
+            ordered_quantity=Decimal('100')
+        )
+        
+        payload = _make_export_payload(bon.id)
+        
+        # Vérifier que les données sont incluses
+        self.assertGreater(len(payload), 0)
+        first_item = payload[0]
+        self.assertIn('business_id', first_item)
+        self.assertEqual(first_item['business_id'], 'BID001')
+        self.assertEqual(first_item['received_quantity'], '50.00')
+
+
+class TestExportVendorEvaluations(TestCase):
+    """Test l'export des évaluations fournisseurs"""
+    
+    def setUp(self):
+        self.client = self.client_class()
+        self.user = User.objects.create_user('test@example.com', 'testpass')
+        self.user.is_active = True
+        self.user.save()
+        self.client.force_login(self.user)
+        
+        self.bon = NumeroBonCommande.objects.create(numero='PO001', cpu='ITS')
+        self.evaluation = VendorEvaluation.objects.create(
+            bon_commande=self.bon,
+            supplier='SUPPLIER1',
+            delivery_compliance=8,
+            delivery_timeline=7,
+            advising_capability=6,
+            after_sales_qos=9,
+            vendor_relationship=8,
+            evaluator=self.user
+        )
+    
+    def test_export_evaluations_success(self):
+        """Test export réussi des évaluations"""
+        url = reverse('orders:export_vendor_evaluations')
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 
+                       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        self.assertIn('attachment', response['Content-Disposition'])
+        self.assertIn('vendor_evaluations', response['Content-Disposition'])
+    
+    def test_export_evaluations_async(self):
+        """Test export asynchrone des évaluations"""
+        url = reverse('orders:export_vendor_evaluations')
+        
+        with patch('orders.views_export.export_vendor_evaluations_task') as mock_task:
+            with patch('orders.views_export.register_user_task'):
+                mock_task.delay.return_value = Mock(id='task-123')
+                
+                response = self.client.get(url, {'async': '1'})
+                
+                self.assertEqual(response.status_code, 200)
+                data = response.json()
+                self.assertTrue(data['success'])
+                self.assertTrue(data.get('async', False))
+                self.assertEqual(data['task_id'], 'task-123')
+    
+    def test_export_evaluations_filter_supplier(self):
+        """Test export avec filtre fournisseur"""
+        # Créer une deuxième évaluation
+        VendorEvaluation.objects.create(
+            bon_commande=self.bon,
+            supplier='SUPPLIER2',
+            delivery_compliance=9,
+            delivery_timeline=5,
+            advising_capability=5,
+            after_sales_qos=5,
+            vendor_relationship=5,
+            evaluator=self.user
+        )
+        
+        url = reverse('orders:export_vendor_evaluations')
+        response = self.client.get(url, {'supplier': 'SUPPLIER1'})
+        
+        self.assertEqual(response.status_code, 200)
+        # Vérifier que le fichier contient les données
+        content = response.content
+        self.assertGreater(len(content), 0)
+    
+    def test_export_evaluations_service_filter(self):
+        """Test export avec filtre service"""
+        # Ajouter un service à l'utilisateur
+        self.user.service = 'ITS'
+        self.user.save()
+        
+        # Créer un bon d'un autre service
+        bon2 = NumeroBonCommande.objects.create(numero='PO002', cpu='NWG')
+        VendorEvaluation.objects.create(
+            bon_commande=bon2,
+            supplier='SUPPLIER2',
+            delivery_compliance=9,
+            delivery_timeline=5,
+            advising_capability=5,
+            after_sales_qos=5,
+            vendor_relationship=5,
+            evaluator=self.user
+        )
+        
+        url = reverse('orders:export_vendor_evaluations')
+        response = self.client.get(url)
+        
+        # Ne devrait voir que l'évaluation du bon ITS
+        self.assertEqual(response.status_code, 200)
+        content = response.content
+        # Le contenu devrait être plus petit car seulement une évaluation
+        self.assertGreater(len(content), 0)
+
+
+class TestExportBonExcel(TestCase):
+    """Test l'export Excel des bons"""
+    
+    def setUp(self):
+        self.client = self.client_class()
+        self.user = User.objects.create_user('test@example.com', 'testpass')
+        self.user.is_active = True
+        self.user.save()
+        self.client.force_login(self.user)
+        
+        self.bon = NumeroBonCommande.objects.create(numero='PO001', cpu='ITS')
+        self.fichier = FichierImporte(fichier='test.csv')
+        self.fichier._skip_extraction = True
+        self.fichier.save()
+        self.bon.fichiers.add(self.fichier)
+        
+        # Créer des lignes
+        for i in range(3):
+            LigneFichier.objects.create(
+                fichier=self.fichier,
+                numero_ligne=i+1,
+                business_id=f'BID{i+1:03d}',
+                contenu={
+                    'Order': 'PO001',
+                    'Item': f'ITEM{i+1}',
+                    'Ordered Quantity': str(10 * (i+1)),
+                    'Price': str(100.0 * (i+1))
+                }
+            )
+    
+    def test_export_bon_excel_success(self):
+        """Test export Excel réussi"""
+        url = reverse('orders:export_bon_excel', args=[self.fichier.id])
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 
+                       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        self.assertIn('attachment', response['Content-Disposition'])
+    
+    def test_export_bon_excel_with_receptions(self):
+        """Test export avec données de réception"""
+        # Créer des réceptions
+        for ligne in self.fichier.lignes.all():
+            Reception.objects.create(
+                bon_commande=self.bon,
+                fichier=self.fichier,
+                business_id=ligne.business_id,
+                ordered_quantity=Decimal('10'),
+                quantity_delivered=Decimal('5'),
+                received_quantity=Decimal('5')
+            )
+        
+        url = reverse('orders:export_bon_excel', args=[self.fichier.id])
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, 200)
+        content = response.content
+        self.assertGreater(len(content), 0)
+    
+    def test_export_bon_excel_file_not_found(self):
+        """Test avec fichier non trouvé"""
+        url = reverse('orders:export_bon_excel', args=[99999])
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, 404)
+    
+    def test_export_bon_excel_no_lines(self):
+        """Test avec fichier sans lignes"""
+        fichier_vide = FichierImporte.objects.create(fichier='vide.csv')
+        
+        url = reverse('orders:export_bon_excel', args=[fichier_vide.id])
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, 200)
+        # Devrait quand même générer un fichier Excel vide
+        content = response.content
+        self.assertGreater(len(content), 0)
+
+
+class TestExportFunctionsEdgeCases(TestCase):
+    """Test cas limites des fonctions d'export"""
+    
+    def setUp(self):
+        self.client = self.client_class()
+        self.user = User.objects.create_user('test2@example.com', 'testpass')
+        self.user.is_active = True
+        self.user.save()
+        self.client.force_login(self.user)
+    
+    def test_get_value_tolerant_empty_dict(self):
+        """Test get_value_tolerant avec dictionnaire vide"""
+        from orders.views_export import get_value_tolerant
+        
+        result = get_value_tolerant({})
+        self.assertIsNone(result)
+    
+    def test_get_value_tolerant_none_values(self):
+        """Test get_value_tolerant avec valeurs None"""
+        from orders.views_export import get_value_tolerant
+        
+        contenu = {
+            'Order': None,
+            'CPU': '',
+            'Price': '100.50'
+        }
+        
+        self.assertIsNone(get_value_tolerant(contenu, exact_candidates=['Order']))
+        self.assertIsNone(get_value_tolerant(contenu, exact_candidates=['CPU']))
+        self.assertEqual(get_value_tolerant(contenu, exact_candidates=['Price']), '100.50')
+    
+    def test_normalize_header_special_chars(self):
+        """Test normalisation avec caractères spéciaux"""
+        from orders.views_export import normalize_header
+        
+        # Accents
+        self.assertEqual(normalize_header('Général'), 'general')
+        self.assertEqual(normalize_header('Référence'), 'reference')
+        
+        # Symboles
+        self.assertEqual(normalize_header('Price@#%'), 'price')
+        self.assertEqual(normalize_header('Quantity++'), 'quantity')
+        
+        # Espaces multiples
+        self.assertEqual(normalize_header('  Multiple   Spaces  '), 'multiple_spaces')
+    
+    def test_find_order_key_case_insensitive(self):
+        """Test find_order_key insensible à la casse"""
+        from orders.views_export import find_order_key
+        
+        contenu = {'ORDER': 'PO001', 'cpu': 'ITS'}
+        self.assertEqual(find_order_key(contenu), 'ORDER')
+        
+        contenu = {'order': 'PO001', 'CPU': 'ITS'}
+        self.assertEqual(find_order_key(contenu), 'order')
+        
+        contenu = {'OrDeR': 'PO001', 'CpU': 'ITS'}
+        self.assertEqual(find_order_key(contenu), 'OrDeR')
+    
+    def test_make_export_payload_decimal_handling(self):
+        """Test gestion des décimales dans le payload"""
+        from orders.views_export import _make_export_payload
+        
+        bon = NumeroBonCommande.objects.create(numero='PO_DECIMAL', cpu='ITS')
+        fichier = FichierImporte(fichier='test_decimal.csv')
+        fichier._skip_extraction = True
+        fichier.save()
+        bon.fichiers.add(fichier)
+        
+        # Créer avec valeurs décimales précises
+        ligne = LigneFichier.objects.create(
+            fichier=fichier,
+            numero_ligne=1,
+            business_id='BID001',
+            contenu={'Order': 'PO001'}
+        )
+        
+        Reception.objects.create(
+            bon_commande=bon,
+            fichier=fichier,
+            business_id='BID001',
+            ordered_quantity=Decimal('100.123456'),
+            unit_price=Decimal('99.987654')
+        )
+        
+        payload = _make_export_payload(bon.id)
+        
+        # Vérifier que les décimaux sont correctement formatés
+        self.assertGreater(len(payload), 0)
+        # Les valeurs devraient être arrondies à 2 décimales
+        self.assertEqual(payload[0]['ordered_quantity'], '100.12')
+        self.assertEqual(payload[0]['unit_price'], '99.99')
+    
+    def test_export_with_large_dataset(self):
+        """Test export avec jeu de données volumineux"""
+        # Créer beaucoup de données
+        bon = NumeroBonCommande.objects.create(numero='PO001', cpu='ITS')
+        fichier = FichierImporte(fichier='large.csv')
+        fichier._skip_extraction = True
+        fichier.save()
+        bon.fichiers.add(fichier)
+        
+        # Créer 1000 lignes
+        for i in range(1000):
+            LigneFichier.objects.create(
+                fichier=fichier,
+                numero_ligne=i+1,
+                business_id=f'BID{i+1:04d}',
+                contenu={'Order': 'PO001', 'Item': f'ITEM{i+1}'}
+            )
+        
+        url = reverse('orders:export_bon_excel', args=[fichier.id])
+        
+        # Mesurer le temps
+        import time
+        start_time = time.time()
+        response = self.client.get(url)
+        end_time = time.time()
+        
+        self.assertEqual(response.status_code, 200)
+        # L'export devrait prendre moins de 5 secondes
+        self.assertLess(end_time - start_time, 5)
+        content = response.content
+        self.assertGreater(len(content), 0)

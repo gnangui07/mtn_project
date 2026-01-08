@@ -18,15 +18,17 @@ Aucune logique métier critique n'est implémentée ici.
 """
  
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import login, authenticate, logout
+from django.contrib.auth import login, authenticate, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.urls import reverse
 from django.utils import timezone
 from django.http import JsonResponse
+from django.core.exceptions import ValidationError
 from .models import User, UserVoicePreference
 from functools import wraps
 from django.views.decorators.csrf import csrf_protect
+from .forms import CustomPasswordResetForm
 
 # Import des tâches Celery pour le cache et les opérations asynchrones
 from .tasks import cache_user_permissions, invalidate_user_cache, get_cached_user_permissions
@@ -242,12 +244,14 @@ def confirm_password(request, token):
     - GET: affiche le formulaire de saisie du nouveau mot de passe (x2).
     - POST: valide, enregistre le mot de passe, et active définitivement le compte.
     Entrées: `token` (URL), en POST: `new_password`, `confirm_password`.
-    Règles: mots de passe identiques et 8+ caractères.
+    Règles: mots de passe identiques et respectent la politique de sécurité.
     Sorties:
     - HTML: `users/confirmer_activation.html` avec messages d'erreur si besoin.
     - Redirect: `users:login` si succès ou si token invalide/déjà actif.
     Effets de bord: `set_password`, `activate_account()` sur le modèle User.
     """
+    from django.contrib.auth import password_validation
+    
     user = get_object_or_404(User, activation_token=token)
     
     # Vérifie si le token est encore valide
@@ -273,12 +277,17 @@ def confirm_password(request, token):
             messages.error(request, "Les mots de passe ne correspondent pas.")
             return render(request, 'users/confirmer_activation.html', {'user': user})
         
-        if len(new_password) < 8:
-            messages.error(request, "Le mot de passe doit contenir au moins 8 caractères.")
+        # Valider le mot de passe avec les validateurs Django
+        try:
+            password_validation.validate_password(new_password, user)
+        except ValidationError as errors:
+            for error in errors:
+                messages.error(request, error)
             return render(request, 'users/confirmer_activation.html', {'user': user})
         
         # Définit le nouveau mot de passe et active le compte
         user.set_password(new_password)
+        user.password_changed_at = timezone.now()  # Enregistrer la date de changement
         user.activate_account()
         
         messages.success(request, "Votre compte a été activé avec succès ! Vous pouvez maintenant vous connecter.")
@@ -308,7 +317,7 @@ def login_view(request):
         return redirect('core:accueil')
     
     if request.method == 'POST':
-        email = request.POST.get('email')
+        email = request.POST.get('email', '').strip().lower()
         password = request.POST.get('password')
         
         # Authentification
@@ -355,3 +364,36 @@ def login_view(request):
     response['Pragma'] = 'no-cache'
     response['Expires'] = '0'
     return response
+
+
+@login_required
+def change_password_view(request):
+    """
+    Vue pour changer le mot de passe d'un utilisateur connecté.
+    
+    GET: Affiche le formulaire de changement de mot de passe.
+    POST: Valide et change le mot de passe avec les nouvelles règles de sécurité.
+    """
+    from .forms import ChangePasswordForm
+    
+    if request.method == 'POST':
+        form = ChangePasswordForm(request.user, request.POST)
+        
+        if form.is_valid():
+            # Le formulaire valide déjà le mot de passe avec les validateurs
+            form.save()
+            
+            # Forcer la reconnexion avec le nouveau mot de passe
+            update_session_auth_hash(request, request.user)
+            
+            messages.success(request, "Votre mot de passe a été changé avec succès.")
+            return redirect('core:accueil')
+        else:
+            # Afficher les erreurs du formulaire
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, error)
+    else:
+        form = ChangePasswordForm(request.user)
+    
+    return render(request, 'users/changement_password.html', {'form': form})

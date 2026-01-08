@@ -35,7 +35,9 @@ class TestDelayEvaluationData:
             'Total': '1000000'
         }
 
-        context = collect_delay_evaluation_context(bon_commande)
+        # Mock bon.montant_total() car le code l'utilise au lieu du contenu
+        with patch.object(bon_commande, 'montant_total', return_value=Decimal('1000000.00')):
+            context = collect_delay_evaluation_context(bon_commande)
 
         assert context['po_number'] == 'TEST123'
         assert context['supplier'] == 'Test Supplier'

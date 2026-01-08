@@ -3,6 +3,7 @@ import random
 import tempfile
 
 import pandas as pd
+from datetime import datetime
 from django.core.files.storage import default_storage
 
 
@@ -22,7 +23,8 @@ def _lire_csv(chemin_absolu):
     Sorties:
     - (list[dict], int): contenu sous forme de liste de lignes + nombre de lignes.
     """
-    df = pd.read_csv(chemin_absolu, dtype=str, keep_default_na=False)
+    # Utiliser utf-8-sig pour gérer automatiquement le BOM si présent
+    df = pd.read_csv(chemin_absolu, dtype=str, keep_default_na=False, encoding='utf-8-sig')
     df = df.where(pd.notnull(df), None)
     return df.to_dict(orient='records'), len(df)
 
@@ -141,22 +143,39 @@ def extraire_depuis_fichier_relatif(chemin_relatif, ext):
     Sorties:
     - (any, int): contenu extrait (liste/dict/texte/binaire hex) + nb_lignes estimé.
     """
+    # 1) Deviner l'extension si non fournie
+    if not ext and chemin_relatif:
+        _, guessed_ext = os.path.splitext(chemin_relatif)
+        ext = guessed_ext.lstrip('.').lower()
+
     from django.conf import settings
 
     # 1) Obtenir un chemin local
+    # 1) Obtenir un chemin local
+    chemin_absolu = None
+    chemin_tmp = None
     try:
-        chemin_absolu = os.path.join(settings.MEDIA_ROOT, chemin_relatif)
-        if not os.path.exists(chemin_absolu):
-            raise FileNotFoundError
-    except Exception:
-        # Storage distant → récupère dans un temporaire local  
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
-        chemin_tmp = tmp.name
-        tmp.close()
-        with default_storage.open(chemin_relatif, "rb") as src:
-            with open(chemin_tmp, "wb") as dst:
-                dst.write(src.read())
-        chemin_absolu = chemin_tmp
+        chemin_check = os.path.join(settings.MEDIA_ROOT, chemin_relatif)
+        if os.path.exists(chemin_check):
+            chemin_absolu = chemin_check
+        else:
+            # Storage distant → récupère dans un temporaire local
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
+            chemin_tmp = tmp.name
+            tmp.close()
+            with default_storage.open(chemin_relatif, "rb") as src:
+                with open(chemin_tmp, "wb") as dst:
+                    dst.write(src.read())
+            chemin_absolu = chemin_tmp
+    except Exception as e:
+        if 'chemin_tmp' in locals() and chemin_tmp and os.path.exists(chemin_tmp):
+             try:
+                 os.remove(chemin_tmp)
+             except: pass
+        return {"error": f"File retrieval failed: {str(e)}"}, 0
+
+    if not chemin_absolu:
+         return {"error": "File not found"}, 0
 
     # 2) Lire/extraction selon extension
     try:
@@ -192,17 +211,11 @@ def extraire_depuis_fichier_relatif(chemin_relatif, ext):
 
 def generate_report_number():
     """
-    But:
-    - Générer un petit numéro de rapport aléatoire (4 chiffres).
-
-    Étapes:
-    1) Tirer un nombre entre 1000 et 9999.
-    2) Le convertir en chaîne.
-
-    Sorties:
-    - str: ex. '5831'
+    Génère un numéro de rapport au format MSRN-YYYYMMDD-XXXX.
     """
-    return str(random.randint(1000, 9999))
+    date_str = datetime.now().strftime("%Y%m%d")
+    suffix = str(random.randint(1000, 9999))
+    return f"MSRN-{date_str}-{suffix}"
 
 
 def round_decimal(value, places=2):

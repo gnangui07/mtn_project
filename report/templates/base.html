@@ -34,14 +34,66 @@
     <link rel="stylesheet" href="{% static 'css/vendor/spectrum-popover.css' %}">
     <link rel="stylesheet" href="{% static 'css/vendor/spectrum-icon.css' %}">
     
+    <!-- Styles responsive globaux pour toutes les pages -->
+    <link rel="stylesheet" href="{% static 'css/responsive-global.css' %}">
+    
     <style>
         :root {
-            --sidebar-width: 260px;
-            --sidebar-collapsed: 70px;
+            /* Variables de base MTN / Thème Enterprise */
+            --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            
+            --primary-blue: #0052CC;
+            --primary-blue-dark: #0747A6;
             --mtn-yellow: #FFCC00;
             --mtn-black: #000000;
             --mtn-dark: #222222;
             --mtn-gray: #F2F2F2;
+            
+            --neutral-0: #FFFFFF;
+            --border-color: #DFE1E6;
+            
+            --success: #00875A;
+            --success-light: #E3FCEF;
+            
+            --space-xxs: 4px;
+            --space-xs: 8px;
+            --space-sm: 12px;
+            --space-lg: 24px;
+            
+            --font-size-xs: 0.75rem; /* 12px */
+            --font-size-sm: 0.875rem; /* 14px */
+            
+            --border-radius-sm: 4px;
+            --border-radius-lg: 8px;
+            
+            --shadow-sm: 0 1px 2px rgba(9, 30, 66, 0.25);
+            --shadow-md: 0 4px 8px -2px rgba(9, 30, 66, 0.25), 0 0 1px rgba(9, 30, 66, 0.31);
+            
+            --sidebar-width: 260px;
+            --sidebar-collapsed: 70px;
+
+            /* Variables Spectrum Globales */
+            --spectrum-black: #000000;
+            --spectrum-yellow: #FFCC00;
+            --spectrum-gray-50: #FAFAFA;
+            --spectrum-gray-100: #F5F5F5;
+            --spectrum-gray-200: #EAEAEA;
+            --spectrum-gray-300: #D5D5D5;
+            --spectrum-gray-400: #B3B3B3;
+            --spectrum-gray-500: #909090;
+            --spectrum-gray-600: #6D6D6D;
+            --spectrum-gray-700: #464646;
+            --spectrum-gray-800: #424242;
+            --spectrum-gray-900: #323232;
+            --spectrum-blue: #2680EB;
+            --spectrum-green: #30A46C;
+            --spectrum-red: #E5484D;
+            --spectrum-orange: #F29400;
+            
+            --dashboard-bg: #f5f5f5;
+            --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            --card-hover-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+            --transition-base: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
         body {
@@ -50,22 +102,171 @@
             background: #f5f5f5;
             margin: 0;
             padding: 0;
+            font-family: var(--font-family);
+            color: #172B4D; /* Couleur texte standard enterprise */
+            overflow-x: hidden; /* Empêche le scroll horizontal */
         }
         
-        /* SIDEBAR PRINCIPALE */
+        /* Règles globales anti-débordement */
+        * {
+            box-sizing: border-box;
+        }
+        
+        .container,
+        .container-fluid,
+        .row,
+        .col,
+        [class*="col-"] {
+            max-width: 100%;
+            overflow-x: auto;
+        }
+        
+        /* Forcer tous les éléments à respecter les limites */
+        table, .table, .spectrum-table {
+            table-layout: fixed !important;
+            width: 100% !important;
+        }
+        
+        .table th, .table td,
+        .spectrum-table th, .spectrum-table td {
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+        }
+        
+        /* Empêcher tout débordement d'images et contenus */
+        img, canvas, video, iframe {
+            max-width: 100% !important;
+            height: auto !important;
+        }
+
+        /* --- Composants Standardisés (Design System) --- */
+
+        /* Layout Global */
+        .dashboard-container {
+            min-height: calc(100vh - 2rem);
+            background: var(--dashboard-bg);
+            padding: 2rem;
+            animation: fadeIn 0.6s ease-out;
+            max-width: 100%;
+            margin: 0 auto;
+            box-sizing: border-box;
+        }
+
+        /* Spectrum Card Global */
+        .spectrum-card {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid var(--spectrum-gray-200);
+            box-shadow: var(--card-shadow);
+            transition: var(--transition-base);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        
+        .spectrum-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--card-hover-shadow);
+            border-color: var(--spectrum-gray-300);
+        }
+
+        /* Spectrum Badge Global */
+        .spectrum-badge {
+            background: white;
+            padding: 0.5rem 1rem;
+            border-radius: 100px;
+            border: 1px solid var(--spectrum-gray-200);
+            font-family: var(--font-family);
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--spectrum-gray-800);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            box-shadow: var(--card-shadow);
+        }
+        
+        .spectrum-badge i {
+            color: var(--spectrum-yellow);
+        }
+
+        /* Boutons */
+        .btn { 
+            display: inline-flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: var(--space-xs); 
+            padding: var(--space-sm) var(--space-lg); 
+            font-size: var(--font-size-sm); 
+            font-weight: 500; 
+            border-radius: var(--border-radius-sm); 
+            transition: all 0.2s ease; 
+            border: 1px solid transparent; /* Reset border */
+            cursor: pointer;
+        } 
+        
+        .btn-primary { 
+            background: var(--primary-blue);
+            color: var(--neutral-0); 
+            border-color: var(--primary-blue); 
+        } 
+        
+        .btn-primary:hover { 
+            background: var(--primary-blue-dark);
+            color: var(--neutral-0);
+        }
+
+        /* Badges de statut */
+        .status-badge { 
+            display: inline-flex; 
+            align-items: center; 
+            padding: var(--space-xxs) var(--space-sm); 
+            border-radius: 12px; 
+            font-size: var(--font-size-xs); 
+            font-weight: 700; 
+            text-transform: uppercase; 
+            letter-spacing: 0.5px;
+        } 
+        
+        .status-active { 
+            background: var(--success-light);
+            color: var(--success);
+        }
+
+        /* Cartes Enterprise */
+        .enterprise-card { 
+            background: var(--neutral-0); 
+            border: 1px solid var(--border-color); 
+            border-radius: var(--border-radius-lg); 
+            margin-bottom: var(--space-lg); 
+            box-shadow: var(--shadow-sm);
+            transition: box-shadow 0.2s ease; 
+        } 
+        
+        .enterprise-card:hover { 
+            box-shadow: var(--shadow-md);
+        } 
+        
+        .card-body { 
+            padding: var(--space-lg); 
+        }
+        
+        /* ============================================
+           SIDEBAR HOVERABLE - Style moderne MTN
+           ============================================ */
         .sidebar {
-            width: var(--sidebar-width);
-            background: var(--mtn-black);
-            color: white;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             position: fixed;
             top: 0;
             left: 0;
             height: 100vh;
+            width: var(--sidebar-width);
+            background: var(--mtn-black);
+            padding: 15px 10px;
+            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
+            transition: all 0.4s ease;
             z-index: 1050;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
             border-right: 3px solid var(--mtn-yellow);
         }
         
@@ -84,27 +285,32 @@
             z-index: 0;
         }
         
-        .sidebar-header,
-        .sidebar-nav,
-        .sidebar-footer {
+        .sidebar > * {
             position: relative;
             z-index: 1;
         }
         
-        .sidebar.collapsed {
+        .sidebar.close {
             width: var(--sidebar-collapsed);
         }
         
-        .sidebar-header {
-            padding: 1.5rem 1rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        /* Header avec logo */
+        .logo_items {
             display: flex;
             align-items: center;
             gap: 12px;
-            flex-shrink: 0;
+            padding: 10px 5px;
+            margin-bottom: 20px;
         }
         
-        .sidebar-logo {
+        .nav_image {
+            display: flex;
+            min-width: 50px;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .nav_image .sidebar-logo {
             width: 40px;
             height: 40px;
             border-radius: 8px;
@@ -115,133 +321,180 @@
             color: var(--mtn-black);
             font-weight: 700;
             font-size: 1.2rem;
-            flex-shrink: 0;
         }
         
-        .sidebar-title {
-            font-size: 1.1rem;
-            font-weight: 600;
+        .logo_name {
+            font-size: 18px;
             color: white;
-            margin: 0;
+            font-weight: 600;
+            transition: all 0.3s ease;
             white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            transition: opacity 0.3s;
         }
         
-        .sidebar.collapsed .sidebar-title {
+        .sidebar.close .logo_name,
+        .sidebar.close #lock-icon {
             opacity: 0;
-            width: 0;
+            pointer-events: none;
         }
         
-        /* NAVIGATION */
-        .sidebar-nav {
-            flex: 1;
-            padding: 1rem 0;
-            overflow-y: auto;
+        #lock-icon {
+            padding: 8px;
+            color: var(--mtn-yellow);
+            font-size: 20px;
+            cursor: pointer;
+            margin-left: auto;
+            transition: all 0.3s ease;
+            border-radius: 4px;
+        }
+        
+        #lock-icon:hover {
+            background: rgba(255, 204, 0, 0.15);
+        }
+        
+        /* Menu container */
+        .menu_container {
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            justify-content: space-between;
+            height: calc(100vh - 120px);
+            overflow-y: auto;
+            overflow-x: hidden;
         }
         
-        .nav-section {
-            margin-bottom: 1rem;
+        .menu_container::-webkit-scrollbar {
+            width: 4px;
         }
         
-        .section-label {
-            font-size: 0.75rem;
+        .menu_container::-webkit-scrollbar-thumb {
+            background: var(--mtn-yellow);
+            border-radius: 2px;
+        }
+        
+        /* Menu items */
+        .menu_items {
+            flex: 1;
+        }
+        
+        .menu_item {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 15px 0;
+        }
+        
+        .menu_title {
+            position: relative;
+            height: 40px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .menu_title .title {
+            margin-left: 15px;
+            font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             color: rgba(255, 255, 255, 0.6);
-            padding: 0 1rem 0.5rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
             white-space: nowrap;
-            transition: opacity 0.3s;
         }
         
-        .sidebar.collapsed .section-label {
+        .sidebar.close .title {
             opacity: 0;
         }
         
-        .nav-link {
+        .menu_title .line {
+            position: absolute;
+            left: 25px;
+            height: 3px;
+            width: 20px;
+            border-radius: 25px;
+            background: rgba(255, 204, 0, 0.5);
+            transition: all 0.3s ease;
+            opacity: 0;
+        }
+        
+        .sidebar.close .line {
+            opacity: 1;
+        }
+        
+        /* Items de navigation */
+        .item {
+            list-style: none;
+        }
+        
+        .link {
+            text-decoration: none;
+            border-radius: 8px;
+            margin-bottom: 4px;
+            color: rgba(255, 255, 255, 0.85);
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 0.75rem 1rem;
-            color: rgba(255, 255, 255, 0.85);
-            text-decoration: none;
             transition: all 0.2s ease;
-            position: relative;
-            margin: 0 0.5rem;
-            border-radius: 8px;
-            white-space: nowrap;
         }
         
-        .nav-link:hover {
-            background: rgba(255, 204, 0, 0.15);
-            color: white;
+        .link:hover {
+            color: var(--mtn-black);
+            background-color: var(--mtn-yellow);
         }
         
-        .nav-link.active {
+        .link.active {
             background: var(--mtn-yellow);
             color: var(--mtn-black);
             font-weight: 600;
         }
         
-        .nav-link.active::before {
-            content: '';
-            position: absolute;
-            left: -8px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 4px;
-            height: 60%;
-            background: var(--mtn-yellow);
-            border-radius: 0 2px 2px 0;
-        }
-        
-        .nav-icon {
-            width: 24px;
-            height: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-            font-size: 1.1rem;
-        }
-        
-        .nav-text {
-            transition: opacity 0.3s;
+        .link span {
             white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            transition: all 0.3s ease;
         }
         
-        .sidebar.collapsed .nav-text {
+        .sidebar.close .link span {
             opacity: 0;
             width: 0;
         }
         
-        /* FOOTER UTILISATEUR */
-        .sidebar-footer {
-            padding: 1rem;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-            background: rgba(0, 0, 0, 0.3);
-        }
-        
-        .user-profile {
+        .link i {
+            height: 45px;
+            min-width: 50px;
             display: flex;
+            font-size: 18px;
             align-items: center;
-            gap: 12px;
-            transition: opacity 0.3s;
-        }
-        
-        .sidebar.collapsed .user-profile {
             justify-content: center;
         }
         
-        .user-avatar {
+        /* Badge */
+        .nav-badge {
+            background: #dc3545;
+            color: white;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-left: auto;
+            margin-right: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .sidebar.close .nav-badge {
+            opacity: 0;
+            width: 0;
+            margin: 0;
+        }
+        
+        /* Profile footer */
+        .sidebar_profile {
+            padding-top: 15px;
+            margin-top: 15px;
+            border-top: 2px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .sidebar_profile .user-avatar {
             width: 40px;
             height: 40px;
+            min-width: 40px;
             border-radius: 50%;
             background: var(--mtn-yellow);
             color: var(--mtn-black);
@@ -249,97 +502,243 @@
             align-items: center;
             justify-content: center;
             font-weight: 600;
-            flex-shrink: 0;
             border: 2px solid rgba(255, 255, 255, 0.2);
         }
         
-        .user-info {
+        .sidebar_profile .data_text {
             flex: 1;
             min-width: 0;
+            transition: all 0.3s ease;
         }
         
-        .user-name {
-            font-size: 0.9rem;
-            font-weight: 600;
+        .sidebar_profile .name {
+            font-size: 14px;
             color: white;
+            font-weight: 600;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
         }
         
-        .user-email {
-            font-size: 0.75rem;
+        .sidebar_profile .email {
+            font-size: 12px;
             color: rgba(255, 255, 255, 0.6);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.6);
         }
         
-        .sidebar.collapsed .user-info {
+        .sidebar.close .sidebar_profile .data_text {
             opacity: 0;
             width: 0;
         }
         
-        /* TOGGLE BUTTON */
-        .sidebar-toggle {
-            position: absolute;
-            top: 1rem;
-            right: -12px;
-            width: 24px;
-            height: 24px;
-            background: var(--mtn-yellow);
-            border: 2px solid var(--mtn-black);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        .sidebar_profile .logout-btn {
+            background: transparent;
+            color: rgba(255, 255, 255, 0.7);
+            border: none;
+            padding: 8px;
             cursor: pointer;
-            z-index: 1060;
-            color: var(--mtn-black);
-            font-size: 0.8rem;
-            transition: all 0.3s;
+            transition: all 0.2s ease;
+            border-radius: 4px;
         }
         
-        .sidebar-toggle:hover {
-            transform: scale(1.1);
+        .sidebar_profile .logout-btn:hover {
+            background: rgba(255, 204, 0, 0.15);
+            color: var(--mtn-yellow);
+        }
+        
+        .sidebar.close .sidebar_profile .logout-btn {
+            display: none;
         }
         
         /* CONTENU PRINCIPAL */
         .main-content {
             flex: 1;
             margin-left: var(--sidebar-width);
-            transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            width: calc(100% - var(--sidebar-width));
+            max-width: calc(100vw - var(--sidebar-width));
+            transition: all 0.4s ease;
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            overflow-x: hidden;
         }
         
-        .sidebar.collapsed ~ .main-content {
+        .sidebar.close ~ .main-content {
             margin-left: var(--sidebar-collapsed);
+            width: calc(100% - var(--sidebar-collapsed));
+            max-width: calc(100vw - var(--sidebar-collapsed));
         }
         
         .content-wrapper {
             flex: 1;
             padding: 1.5rem;
             overflow-y: auto;
+            overflow-x: hidden;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
         }
         
-        /* RESPONSIVE */
-        @media (max-width: 768px) {
+        /* Correction globale pour tous les containers */
+        .container-fluid,
+        .evaluation-container,
+        .minimal-container {
+            margin-left: 0 !important;
+            width: 100% !important;
+            box-sizing: border-box;
+        }
+        
+        /* Containers qui ne sont pas dans main-content doivent respecter la sidebar */
+        body > .container-fluid,
+        body > .evaluation-container,
+        body > .minimal-container {
+            margin-left: var(--sidebar-width);
+            width: calc(100% - var(--sidebar-width));
+        }
+        
+        /* ============================================
+           RESPONSIVE GLOBAL - Support tous écrans
+           ============================================ */
+        
+        /* Très petits laptops (max 1280px) - Écrans 11-13 pouces */
+        @media (max-width: 1280px) {
+            .dashboard-container {
+                padding: 0.5rem;
+            }
+            
+            .content-wrapper {
+                padding: 0.75rem;
+            }
+            
+            /* Grilles ultra-compactes */
+            .stats-grid {
+                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important;
+                gap: 0.5rem !important;
+            }
+            
+            /* Tableaux encore plus petits */
+            .details-table {
+                min-width: 600px !important;
+                font-size: 0.75rem;
+            }
+            
+            /* Boutons ultra-compacts */
+            .btn-group .btn,
+            .btn-group .period-btn {
+                min-width: 60px;
+                padding: 0.3rem 0.5rem;
+                font-size: 0.7rem;
+            }
+            
+            /* Cards ultra-compactes */
+            .card-body {
+                padding: 0.5rem;
+            }
+            
+            /* Colonnes Bootstrap plus serrées */
+            .col,
+            [class*="col-"] {
+                padding-left: 0.25rem !important;
+                padding-right: 0.25rem !important;
+            }
+        }
+        
+        /* Petits laptops (1024px - 1366px) */
+        @media (max-width: 1366px) {
+            .dashboard-container {
+                padding: 1rem;
+                max-width: 100%;
+            }
+            
+            .content-wrapper {
+                padding: 1rem;
+            }
+            
+            /* Réduire les grilles de stats */
+            .stats-grid {
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
+                gap: 0.75rem !important;
+            }
+            
+            /* Tableaux scrollables horizontalement */
+            .table-responsive,
+            .table-container,
+            .details-table-container {
+                overflow-x: auto !important;
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            /* Réduire les largeurs minimales des tableaux */
+            .details-table {
+                min-width: 700px !important;
+            }
+            
+            /* Boutons en mode compact */
+            .btn-group {
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+            
+            .btn-group .btn,
+            .btn-group .period-btn {
+                flex: 1 1 auto;
+                min-width: 70px;
+                padding: 0.4rem 0.6rem;
+                font-size: 0.75rem;
+            }
+            
+            /* Cards plus compactes */
+            .spectrum-card,
+            .enterprise-card {
+                margin-bottom: 1rem;
+            }
+            
+            .card-body {
+                padding: 0.75rem;
+            }
+            
+            /* Forcer les éléments à ne pas déborder */
+            .row {
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+            }
+            
+            .col,
+            [class*="col-"] {
+                padding-left: 0.5rem !important;
+                padding-right: 0.5rem !important;
+            }
+        }
+        
+        /* Tablettes et petits PC (max 1024px) */
+        @media (max-width: 1024px) {
             .sidebar {
                 transform: translateX(-100%);
                 width: 280px;
+                z-index: 2000;
             }
             
             .sidebar.mobile-open {
                 transform: translateX(0);
+                box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
             }
             
             .main-content {
                 margin-left: 0 !important;
-                width: 100%;
+                width: 100% !important;
+                max-width: 100vw !important;
+                padding-top: 50px; 
+            }
+            
+            /* Containers en mode mobile */
+            body > .container-fluid,
+            body > .evaluation-container,
+            body > .minimal-container {
+                margin-left: 0 !important;
+                width: 100% !important;
+                padding-top: 70px;
             }
             
             .mobile-overlay {
@@ -363,7 +762,163 @@
                 top: 1rem;
                 left: 1rem;
                 z-index: 1030;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.2);
             }
+            
+            .sidebar-toggle {
+                display: none;
+            }
+            
+            /* Grilles en colonnes simples */
+            .stats-grid {
+                grid-template-columns: 1fr 1fr !important;
+            }
+            
+            /* En-têtes de page responsives */
+            .page-header,
+            .d-flex.justify-content-between {
+                flex-direction: column !important;
+                align-items: flex-start !important;
+                gap: 1rem;
+            }
+            
+            .page-header h1,
+            .page-header .d-flex {
+                width: 100%;
+            }
+            
+            /* Boutons en pleine largeur */
+            .page-header .btn,
+            .d-flex.justify-content-between > div .btn {
+                flex: 1;
+                text-align: center;
+            }
+        }
+        
+        /* Mobiles et très petits écrans */
+        @media (max-width: 768px) {
+            .dashboard-container {
+                padding: 0.5rem;
+            }
+            
+            .content-wrapper {
+                padding: 0.75rem;
+            }
+            
+            /* Grilles en une seule colonne */
+            .stats-grid,
+            .row.g-4 {
+                grid-template-columns: 1fr !important;
+            }
+            
+            .row.g-4 > [class*='col-'] {
+                flex: 0 0 100%;
+                max-width: 100%;
+            }
+            
+            /* Tableaux plus compacts */
+            .details-table {
+                min-width: 600px !important;
+                font-size: 0.8rem;
+            }
+            
+            .details-table th,
+            .details-table td {
+                padding: 0.5rem !important;
+            }
+            
+            /* Titres plus petits */
+            h1 {
+                font-size: 1.5rem !important;
+            }
+            
+            h2 {
+                font-size: 1.25rem !important;
+            }
+            
+            /* Cards très compactes */
+            .stats-card {
+                padding: 1rem !important;
+            }
+            
+            .supplier-info-card {
+                padding: 1.5rem !important;
+            }
+            
+            /* Boutons empilés */
+            .btn-group {
+                flex-direction: column;
+                width: 100%;
+            }
+            
+            .btn-group .btn {
+                width: 100%;
+            }
+            
+            /* Modal plein écran sur mobile */
+            .modern-modal-content {
+                max-width: 100% !important;
+                margin: 0;
+                border-radius: 0 !important;
+                max-height: 100vh !important;
+            }
+            
+            .modal-tabs {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+            }
+            
+            .tab-btn {
+                min-width: 100px;
+                font-size: 0.75rem;
+                padding: 0.5rem;
+            }
+        }
+        
+        /* Utilitaires responsive globaux */
+        .overflow-x-auto {
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .w-100-mobile {
+            width: auto;
+        }
+        
+        @media (max-width: 768px) {
+            .w-100-mobile {
+                width: 100% !important;
+            }
+            
+            .hide-mobile {
+                display: none !important;
+            }
+            
+            .show-mobile {
+                display: block !important;
+            }
+        }
+        
+        /* Amélioration du scroll des tableaux */
+        .table-scroll {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+            scrollbar-color: var(--mtn-yellow) #f0f0f0;
+        }
+        
+        .table-scroll::-webkit-scrollbar {
+            height: 8px;
+        }
+        
+        .table-scroll::-webkit-scrollbar-track {
+            background: #f0f0f0;
+            border-radius: 4px;
+        }
+        
+        .table-scroll::-webkit-scrollbar-thumb {
+            background: var(--mtn-yellow);
+            border-radius: 4px;
         }
         
         /* BOUTON MOBILE */
@@ -487,134 +1042,152 @@
     <!-- Overlay mobile -->
     <div class="mobile-overlay" id="mobileOverlay"></div>
     
-    <!-- SIDEBAR -->
-    <aside class="sidebar" id="sidebar">
-        <!-- En-tête avec logo -->
-        <div class="sidebar-header">
-            <div class="sidebar-logo">
-                <i class="fas fa-chart-line"></i>
-            </div>
-            <h2 class="sidebar-title spectrum-Heading spectrum-Heading--sizeM">CAPEX Valuation</h2>
+    <!-- SIDEBAR HOVERABLE -->
+    <nav class="sidebar locked" id="sidebar">
+        <!-- Header avec logo et lock -->
+        <div class="logo_items">
+            <span class="nav_image">
+                <div class="sidebar-logo">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+            </span>
+            <span class="logo_name">CAPEX Valuation</span>
+            <i class="fas fa-lock" id="lock-icon" title="Unlock Sidebar"></i>
         </div>
-        
-        <!-- Bouton de réduction/extension -->
-        <div class="sidebar-toggle" id="sidebarToggle">
-            <i class="fas fa-chevron-left" id="toggleIcon"></i>
-        </div>
-        
-        <!-- Navigation principale -->
-        <nav class="sidebar-nav">
-            <!-- Section: Accueil -->
-            <div class="nav-section">
-                <div class="section-label spectrum-Body spectrum-Body--sizeS">Navigation</div>
-                <a href="{% url 'core:accueil' %}" class="nav-link {% if request.resolver_match.url_name == 'accueil' %}active{% endif %}">
-                    <div class="nav-icon">
-                        <i class="fas fa-home"></i>
+
+        <div class="menu_container">
+            <div class="menu_items">
+                <!-- Section: Navigation -->
+                <ul class="menu_item">
+                    <div class="menu_title">
+                        <span class="title">Navigation</span>
+                        <span class="line"></span>
                     </div>
-                    <span class="nav-text spectrum-Body spectrum-Body--sizeM">Accueil</span>
-                </a>
-            </div>
-            
-            <!-- Section: Gestion des livraisons -->
-            <div class="nav-section">
-                <div class="section-label spectrum-Body spectrum-Body--sizeS">Gestion des livraisons</div>
-                <a href="{% url 'orders:reception' %}" class="nav-link {% if request.resolver_match.url_name == 'reception' %}active{% endif %}">
-                    <div class="nav-icon">
-                        <i class="fas fa-truck-loading"></i>
+                    <li class="item">
+                        <a href="{% url 'core:accueil' %}" class="link {% if request.resolver_match.url_name == 'accueil' %}active{% endif %}">
+                            <i class="fas fa-home"></i>
+                            <span>Accueil</span>
+                        </a>
+                    </li>
+                </ul>
+
+                <!-- Section: Gestion des livraisons -->
+                <ul class="menu_item">
+                    <div class="menu_title">
+                        <span class="title">Gestion livraisons</span>
+                        <span class="line"></span>
                     </div>
-                    <span class="nav-text spectrum-Body spectrum-Body--sizeM">Register Delivery</span>
-                </a>
-                
-                <a href="{% url 'orders:consultation' %}" class="nav-link {% if request.resolver_match.url_name == 'consultation' %}active{% endif %}">
-                    <div class="nav-icon">
-                        <i class="fas fa-clipboard-list"></i>
+                    <li class="item">
+                        <a href="{% url 'orders:reception' %}" class="link {% if request.resolver_match.url_name == 'reception' %}active{% endif %}">
+                            <i class="fas fa-truck-loading"></i>
+                            <span>Register Delivery</span>
+                        </a>
+                    </li>
+                    <li class="item">
+                        <a href="{% url 'orders:consultation' %}" class="link {% if request.resolver_match.url_name == 'consultation' %}active{% endif %}">
+                            <i class="fas fa-clipboard-list"></i>
+                            <span>Delivery Overview</span>
+                        </a>
+                    </li>
+                    <li class="item">
+                        <a href="{% url 'orders:msrn_archive' %}" class="link {% if request.resolver_match.url_name == 'msrn_archive' %}active{% endif %}">
+                            <i class="fas fa-archive"></i>
+                            <span>MSRN Archive</span>
+                        </a>
+                    </li>
+                </ul>
+
+                <!-- Section: Monitoring & Évaluation -->
+                <ul class="menu_item">
+                    <div class="menu_title">
+                        <span class="title">Monitoring</span>
+                        <span class="line"></span>
                     </div>
-                    <span class="nav-text spectrum-Body spectrum-Body--sizeM">Delivery Overview</span>
-                </a>
-                
-                <a href="{% url 'orders:msrn_archive' %}" class="nav-link {% if request.resolver_match.url_name == 'msrn_archive' %}active{% endif %}">
-                    <div class="nav-icon">
-                        <i class="fas fa-archive"></i>
-                    </div>
-                    <span class="nav-text spectrum-Body spectrum-Body--sizeM">MSRN Archive</span>
-                </a>
-            </div>
-            
-            <!-- Section: Monitoring & Évaluation -->
-            <div class="nav-section">
-                <div class="section-label spectrum-Body spectrum-Body--sizeS">Monitoring & Évaluation</div>
-                <a href="{% url 'orders:po_progress_monitoring' %}" class="nav-link {% if request.resolver_match.url_name == 'po_progress_monitoring' %}active{% endif %}">
-                    <div class="nav-icon">
-                        <i class="fas fa-chart-line"></i>
-                    </div>
-                    <span class="nav-text spectrum-Body spectrum-Body--sizeM">PO Progress Monitoring</span>
-                </a>
-                
-                <a href="{% url 'orders:vendor_evaluation_list' %}" class="nav-link {% if request.resolver_match.url_name == 'vendor_evaluation_list' %}active{% endif %}">
-                    <div class="nav-icon">
-                        <i class="fas fa-star"></i>
-                    </div>
-                    <span class="nav-text spectrum-Body spectrum-Body--sizeM">Vendor Evaluations</span>
-                </a>
-                
-                <a href="{% url 'orders:vendor_ranking' %}" class="nav-link {% if 'vendor_ranking' in request.path %}active{% endif %}">
-                    <div class="nav-icon">
-                        <i class="fas fa-trophy"></i>
-                    </div>
-                    <span class="nav-text">Vendor Ranking</span>
-                    <span class="nav-badge spectrum-Badge spectrum-Badge--sizeS">New</span>
-                </a>
-            </div>
-            
-            <!-- Section: Administration -->
-            <div class="nav-section">
-                <div class="section-label spectrum-Body spectrum-Body--sizeS">Administration</div>
-                
+                    <li class="item">
+                        <a href="{% url 'orders:po_progress_monitoring' %}" class="link {% if request.resolver_match.url_name == 'po_progress_monitoring' %}active{% endif %}">
+                            <i class="fas fa-chart-line"></i>
+                            <span>PO Progress</span>
+                        </a>
+                    </li>
+                    <li class="item">
+                        <a href="{% url 'orders:vendor_evaluation_list' %}" class="link {% if request.resolver_match.url_name == 'vendor_evaluation_list' %}active{% endif %}">
+                            <i class="fas fa-star"></i>
+                            <span>Vendor Evaluations</span>
+                        </a>
+                    </li>
+                    <li class="item">
+                        <a href="{% url 'orders:vendor_ranking' %}" class="link {% if 'vendor_ranking' in request.path %}active{% endif %}">
+                            <i class="fas fa-trophy"></i>
+                            <span>Vendor Ranking</span>
+                            <span class="nav-badge">New</span>
+                        </a>
+                    </li>
+                </ul>
+
+                <!-- Section: Administration -->
                 {% if user.is_superuser %}
-                <a href="{% url 'orders:export_po_progress_monitoring' %}" class="nav-link">
-                    <div class="nav-icon">
-                        <i class="fas fa-file-export"></i>
+                <ul class="menu_item">
+                    <div class="menu_title">
+                        <span class="title">Administration</span>
+                        <span class="line"></span>
                     </div>
-                    <span class="nav-text spectrum-Body spectrum-Body--sizeM">Export Data</span>
-                </a>
+                    <li class="item">
+                        <a href="{% url 'orders:export_po_progress_monitoring' %}" class="link">
+                            <i class="fas fa-file-export"></i>
+                            <span>Export Data</span>
+                        </a>
+                    </li>
+                </ul>
+                {% endif %}
+
+                <!-- Section: Utilisateur -->
+                {% if user.is_authenticated %}
+                <ul class="menu_item">
+                    <div class="menu_title">
+                        <span class="title">Mon compte</span>
+                        <span class="line"></span>
+                    </div>
+                    <li class="item">
+                        <a href="{% url 'users:change_password' %}" class="link">
+                            <i class="fas fa-key"></i>
+                            <span class="link_text">Changer mot de passe</span>
+                        </a>
+                    </li>
+                </ul>
                 {% endif %}
             </div>
-        </nav>
-        
-        <!-- Pied de page avec profil utilisateur -->
-        <div class="sidebar-footer">
-            {% if user.is_authenticated %}
-            <div class="user-profile">
+
+            <!-- Profil utilisateur -->
+            <div class="sidebar_profile">
+                {% if user.is_authenticated %}
                 <div class="user-avatar">
                     {{ user.first_name|default:'U'|slice:':1'|upper }}
                 </div>
-                <div class="user-info">
-                    <div class="user-name spectrum-Body spectrum-Body--sizeM">{{ user.get_full_name|default:user.email }}</div>
-                    <div class="user-email spectrum-Body spectrum-Body--sizeS">{{ user.email }}</div>
+                <div class="data_text">
+                    <span class="name">{{ user.get_full_name|default:user.email }}</span>
+                    <span class="email">{{ user.email }}</span>
                 </div>
                 <form method="post" action="{% url 'deconnexion' %}" style="display: inline;">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-sm" style="background: transparent; color: rgba(255,255,255,0.7); border: none; padding: 4px 8px;">
+                    <button type="submit" class="logout-btn" title="Déconnexion">
                         <i class="fas fa-sign-out-alt"></i>
                     </button>
                 </form>
-            </div>
-            {% else %}
-            <div class="user-profile">
+                {% else %}
                 <div class="user-avatar">
                     <i class="fas fa-user"></i>
                 </div>
-                <div class="user-info">
-                    <div class="user-name spectrum-Body spectrum-Body--sizeM">Guest User</div>
-                    <div class="user-email spectrum-Body spectrum-Body--sizeS">Not authenticated</div>
+                <div class="data_text">
+                    <span class="name">Guest User</span>
+                    <span class="email">Not authenticated</span>
                 </div>
-                <a href="{% url 'connexion' %}" class="btn btn-sm" style="background: var(--mtn-yellow); color: var(--mtn-black); border: none; padding: 4px 8px;">
+                <a href="{% url 'connexion' %}" class="logout-btn" title="Connexion">
                     <i class="fas fa-sign-in-alt"></i>
                 </a>
+                {% endif %}
             </div>
-            {% endif %}
         </div>
-    </aside>
+    </nav>
     
     <!-- CONTENU PRINCIPAL -->
     <main class="main-content">
@@ -625,98 +1198,126 @@
         
     </main>
     
-    <!-- JavaScript pour la gestion de la sidebar -->
+    <!-- JavaScript pour la gestion de la sidebar hoverable -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
-            const sidebarToggle = document.getElementById('sidebarToggle');
-            const toggleIcon = document.getElementById('toggleIcon');
+            const sidebarLockBtn = document.getElementById('lock-icon');
             const mobileMenuBtn = document.getElementById('mobileMenuBtn');
             const mobileOverlay = document.getElementById('mobileOverlay');
-            
-            // Vérifier la préférence utilisateur pour la sidebar
-            const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
-            if (isCollapsed) {
-                sidebar.classList.add('collapsed');
-                toggleIcon.classList.remove('fa-chevron-left');
-                toggleIcon.classList.add('fa-chevron-right');
+
+            if (!sidebar) return;
+
+            // Charger l'état sauvegardé
+            const isLocked = localStorage.getItem('sidebarLocked') !== 'false';
+            if (isLocked) {
+                sidebar.classList.add('locked');
+                sidebar.classList.remove('hoverable', 'close');
+            } else {
+                sidebar.classList.remove('locked');
+                sidebar.classList.add('hoverable', 'close');
             }
-            
-            // Toggle sidebar (bureau)
-            sidebarToggle.addEventListener('click', function() {
-                sidebar.classList.toggle('collapsed');
-                const isNowCollapsed = sidebar.classList.contains('collapsed');
-                localStorage.setItem('sidebarCollapsed', isNowCollapsed);
+            updateLockIcon();
+
+            // Toggle lock/unlock
+            function toggleLock() {
+                sidebar.classList.toggle('locked');
                 
-                // Changer l'icône
-                if (isNowCollapsed) {
-                    toggleIcon.classList.remove('fa-chevron-left');
-                    toggleIcon.classList.add('fa-chevron-right');
+                if (!sidebar.classList.contains('locked')) {
+                    sidebar.classList.add('hoverable', 'close');
+                    localStorage.setItem('sidebarLocked', 'false');
                 } else {
-                    toggleIcon.classList.remove('fa-chevron-right');
-                    toggleIcon.classList.add('fa-chevron-left');
+                    sidebar.classList.remove('hoverable', 'close');
+                    localStorage.setItem('sidebarLocked', 'true');
+                }
+                updateLockIcon();
+            }
+
+            function updateLockIcon() {
+                if (sidebarLockBtn) {
+                    if (sidebar.classList.contains('locked')) {
+                        sidebarLockBtn.classList.remove('fa-lock-open');
+                        sidebarLockBtn.classList.add('fa-lock');
+                        sidebarLockBtn.title = 'Unlock Sidebar';
+                    } else {
+                        sidebarLockBtn.classList.remove('fa-lock');
+                        sidebarLockBtn.classList.add('fa-lock-open');
+                        sidebarLockBtn.title = 'Lock Sidebar';
+                    }
+                }
+            }
+
+            // Masquer sidebar au survol (mode hoverable)
+            function hideSidebar() {
+                if (sidebar.classList.contains('hoverable')) {
+                    sidebar.classList.add('close');
+                }
+            }
+
+            // Afficher sidebar au survol (mode hoverable)
+            function showSidebar() {
+                if (sidebar.classList.contains('hoverable')) {
+                    sidebar.classList.remove('close');
+                }
+            }
+
+            // Toggle mobile
+            function toggleMobileSidebar() {
+                sidebar.classList.toggle('mobile-open');
+                if (mobileOverlay) {
+                    mobileOverlay.classList.toggle('active');
+                }
+            }
+
+            function closeMobileSidebar() {
+                sidebar.classList.remove('mobile-open');
+                if (mobileOverlay) {
+                    mobileOverlay.classList.remove('active');
+                }
+            }
+
+            // Event listeners
+            if (sidebarLockBtn) {
+                sidebarLockBtn.addEventListener('click', toggleLock);
+            }
+
+            sidebar.addEventListener('mouseleave', hideSidebar);
+            sidebar.addEventListener('mouseenter', showSidebar);
+
+            if (mobileMenuBtn) {
+                mobileMenuBtn.addEventListener('click', toggleMobileSidebar);
+            }
+
+            if (mobileOverlay) {
+                mobileOverlay.addEventListener('click', closeMobileSidebar);
+            }
+
+            // Fermer sidebar mobile sur clic lien
+            document.querySelectorAll('.sidebar .link').forEach(link => {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth < 800) {
+                        closeMobileSidebar();
+                    }
+                });
+            });
+
+            // Resize handler
+            window.addEventListener('resize', function() {
+                if (window.innerWidth >= 800) {
+                    closeMobileSidebar();
                 }
             });
-            
-            // Toggle mobile sidebar
-            if (mobileMenuBtn) {
-                mobileMenuBtn.addEventListener('click', function() {
-                    sidebar.classList.add('mobile-open');
-                });
-                
-                mobileOverlay.addEventListener('click', function() {
-                    sidebar.classList.remove('mobile-open');
-                });
-                
-                // Fermer la sidebar en cliquant sur un lien (mobile)
-                document.querySelectorAll('.nav-link').forEach(link => {
-                    link.addEventListener('click', function() {
-                        if (window.innerWidth <= 768) {
-                            sidebar.classList.remove('mobile-open');
-                        }
-                    });
-                });
-            }
-            
-            // Détecter la taille de l'écran
-            function handleResize() {
-                if (window.innerWidth > 768) {
-                    sidebar.classList.remove('mobile-open');
-                }
-            }
-            
-            window.addEventListener('resize', handleResize);
-            
-            // Surligner le lien actif basé sur l'URL
+
+            // Surligner le lien actif
             function highlightActiveLink() {
                 const currentPath = window.location.pathname;
-                document.querySelectorAll('.nav-link').forEach(link => {
-                    link.classList.remove('active');
+                document.querySelectorAll('.sidebar .link').forEach(link => {
                     if (link.getAttribute('href') === currentPath) {
                         link.classList.add('active');
                     }
                 });
             }
-            
             highlightActiveLink();
-            
-            // Animation d'entrée progressive
-            const navLinks = document.querySelectorAll('.nav-link');
-            navLinks.forEach((link, index) => {
-                link.style.animationDelay = `${index * 0.05}s`;
-            });
-            
-            // Gestion des préférences utilisateur avancées
-            const userPrefs = {
-                sidebarWidth: isCollapsed ? 'collapsed' : 'expanded',
-                theme: localStorage.getItem('theme') || 'light',
-                save: function() {
-                    localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
-                }
-            };
-            
-            // Exposer pour le débogage
-            window.userPrefs = userPrefs;
         });
     </script>
     

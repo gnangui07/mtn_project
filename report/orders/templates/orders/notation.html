@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 {% load humanize %}
+{% load orders_extras %}
 
 {% block title %}Vendor Evaluation - {{ bon_commande.numero }} | Performance Assessment{% endblock %}
 
@@ -21,8 +22,11 @@
     }
 
     .evaluation-container {
-        max-width: 1200px;
+        max-width: 100%;
+        width: 100%;
         margin: 0 auto;
+        padding: 0 1.5rem;
+        box-sizing: border-box;
     }
 
     .spectrum-page-header {
@@ -36,7 +40,9 @@
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        gap: 2rem;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+        width: 100%;
     }
 
     .header-title {
@@ -80,9 +86,10 @@
 
     .po-info-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 1.5rem;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
         margin-bottom: 2rem;
+        width: 100%;
     }
 
     .info-card {
@@ -120,6 +127,7 @@
     .criteria-grid {
         display: grid;
         gap: 1.5rem;
+        width: 100%;
     }
 
     .criteria-card {
@@ -253,9 +261,10 @@
 
     .score-summary-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 1.5rem;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 1rem;
         margin-bottom: 2rem;
+        width: 100%;
     }
 
     .summary-card {
@@ -296,10 +305,12 @@
 
     .action-buttons {
         display: flex;
-        gap: 1rem;
+        gap: 0.75rem;
         margin-top: 2rem;
         padding-top: 2rem;
         border-top: 1px solid var(--spectrum-gray-200);
+        flex-wrap: wrap;
+        width: 100%;
     }
 
     .spectrum-button {
@@ -425,27 +436,126 @@
         transition: width 0.3s ease;
     }
 
+    /* ============================================
+       RESPONSIVE - Support tous écrans
+       ============================================ */
+
+    /* Petits laptops (1024px - 1366px) */
+    @media (max-width: 1366px) {
+        .evaluation-container {
+            max-width: 100%;
+            padding: 0 1rem;
+        }
+
+        .po-info-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .score-summary-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    /* Tablettes (max 1024px) */
+    @media (max-width: 1024px) {
+        .spectrum-page-header {
+            padding: 1.5rem 0;
+        }
+
+        .page-header-content {
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .header-badge {
+            align-self: flex-start;
+        }
+
+        .po-info-grid {
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+
+        .criteria-header {
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .score-selector {
+            width: 100%;
+        }
+
+        .score-options {
+            justify-content: center;
+        }
+
+        .action-buttons {
+            flex-wrap: wrap;
+        }
+
+        .action-buttons .spectrum-button {
+            flex: 1;
+            min-width: 100px;
+        }
+    }
+
+    /* Mobiles (max 768px) */
     @media (max-width: 768px) {
+        .evaluation-container {
+            padding: 0 0.5rem;
+        }
+
+        .spectrum-page-header {
+            padding: 1rem 0;
+        }
+
         .page-header-content {
             flex-direction: column;
         }
-        
+
+        .card-header,
+        .card-body {
+            padding: 1rem;
+        }
+
+        .criteria-card {
+            padding: 1rem;
+        }
+
         .criteria-header {
             flex-direction: column;
             gap: 1rem;
         }
-        
+
         .score-selector {
             width: 100%;
+            flex-direction: column;
+            align-items: stretch;
         }
-        
+
+        .score-value {
+            text-align: left;
+        }
+
+        .score-summary-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .summary-value {
+            font-size: 2rem;
+        }
+
         .action-buttons {
             flex-direction: column;
         }
-        
+
         .spectrum-button {
             width: 100%;
             justify-content: center;
+        }
+
+        .info-value {
+            font-size: 1rem;
         }
     }
 </style>
@@ -495,19 +605,19 @@
                         <div class="info-value">{{ supplier }}</div>
                         <div class="info-subvalue">Contract Partner</div>
                     </div>
-                    
+
                     <div class="info-card">
                         <div class="info-label">Order Value</div>
                         <div class="info-value">{{ bon_commande.montant_total|floatformat:0|intcomma }} {{ bon_commande.get_currency }}</div>
                         <div class="info-subvalue">Total Contract Value</div>
                     </div>
-                    
+
                     <div class="info-card">
                         <div class="info-label">Delivery Progress</div>
                         <div class="info-value">{{ bon_commande.taux_avancement|floatformat:2 }}%</div>
                         <div class="info-subvalue">Order Completion</div>
                     </div>
-                    
+
                     <div class="info-card">
                         <div class="info-label">Evaluation Type</div>
                         <div class="info-value">Periodic Review</div>
@@ -528,20 +638,20 @@
                         <div class="summary-value" id="totalScore">0</div>
                         <div class="summary-label">Total Score</div>
                         <div class="summary-progress">
-                            <div class="summary-fill" id="totalScoreFill" 
-                                 style="width: 0%; background: var(--spectrum-gray-800);"></div>
+                            <div class="summary-fill" id="totalScoreFill"
+                                style="width: 0%; background: var(--spectrum-gray-800);"></div>
                         </div>
                         <div class="score-indicator">
                             <span class="score-badge" id="totalScoreBadge">Not Rated</span>
                         </div>
                     </div>
-                    
+
                     <div class="summary-card">
                         <div class="summary-value" id="vendorRating">0.0</div>
                         <div class="summary-label">Average Rating</div>
                         <div class="summary-progress">
-                            <div class="summary-fill" id="ratingFill" 
-                                 style="width: 0%; background: var(--spectrum-gray-800);"></div>
+                            <div class="summary-fill" id="ratingFill"
+                                style="width: 0%; background: var(--spectrum-gray-800);"></div>
                         </div>
                         <div class="score-indicator">
                             <div class="rating-stars">
@@ -549,13 +659,13 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="summary-card">
                         <div class="summary-value" id="completionRate">0%</div>
                         <div class="summary-label">Completion</div>
                         <div class="summary-progress">
-                            <div class="summary-fill" id="completionFillBar" 
-                                 style="width: 0%; background: var(--spectrum-yellow);"></div>
+                            <div class="summary-fill" id="completionFillBar"
+                                style="width: 0%; background: var(--spectrum-yellow);"></div>
                         </div>
                         <div class="score-indicator">
                             <span class="text-muted small" id="completedCriteria">0/5 criteria</span>
@@ -568,7 +678,7 @@
         <!-- Evaluation Form -->
         <form method="post" id="evaluationForm" class="evaluation-form">
             {% csrf_token %}
-            
+
             <div class="spectrum-card">
                 <div class="card-header">
                     <h3><i class="fas fa-clipboard-check me-2"></i> Evaluation Criteria</h3>
@@ -576,7 +686,7 @@
                 </div>
                 <div class="card-body">
                     <div class="criteria-grid">
-                        
+
                         <!-- Delivery Compliance -->
                         <div class="criteria-card">
                             <div class="criteria-header">
@@ -585,31 +695,30 @@
                                     <div class="criteria-max">Quantity & Quality Assessment</div>
                                 </div>
                                 <div class="score-selector">
-                                    <input type="range" class="score-slider" name="delivery_compliance" 
-                                           min="0" max="10" step="1" 
-                                           value="{{ evaluation.delivery_compliance|default:'0' }}"
-                                           data-criteria="delivery_compliance">
+                                    <input type="range" class="score-slider" name="delivery_compliance" min="0" max="10"
+                                        step="1" value="{{ evaluation.delivery_compliance|default:'0' }}"
+                                        data-criteria="delivery_compliance">
                                     <div class="score-value" id="score_delivery_compliance">
                                         {{ evaluation.delivery_compliance|default:'0' }}
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div class="score-options">
-                                {% for i in "012345678910"|make_list %}
+                                {% for i in "0,1,2,3,4,5,6,7,8,9,10"|split:"," %}
                                 <div class="score-option" data-criteria="delivery_compliance" data-value="{{ i }}">
                                     {{ i }}
                                 </div>
                                 {% endfor %}
                             </div>
-                            
+
                             <div class="criteria-description">
                                 <p class="description-text" id="desc_delivery_compliance">
                                     Select a score to see detailed description
                                 </p>
                             </div>
                         </div>
-                        
+
                         <!-- Delivery Timeline -->
                         <div class="criteria-card">
                             <div class="criteria-header">
@@ -618,31 +727,30 @@
                                     <div class="criteria-max">Schedule Adherence</div>
                                 </div>
                                 <div class="score-selector">
-                                    <input type="range" class="score-slider" name="delivery_timeline" 
-                                           min="0" max="10" step="1" 
-                                           value="{{ evaluation.delivery_timeline|default:'0' }}"
-                                           data-criteria="delivery_timeline">
+                                    <input type="range" class="score-slider" name="delivery_timeline" min="0" max="10"
+                                        step="1" value="{{ evaluation.delivery_timeline|default:'0' }}"
+                                        data-criteria="delivery_timeline">
                                     <div class="score-value" id="score_delivery_timeline">
                                         {{ evaluation.delivery_timeline|default:'0' }}
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div class="score-options">
-                                {% for i in "012345678910"|make_list %}
+                                {% for i in "0,1,2,3,4,5,6,7,8,9,10"|split:"," %}
                                 <div class="score-option" data-criteria="delivery_timeline" data-value="{{ i }}">
                                     {{ i }}
                                 </div>
                                 {% endfor %}
                             </div>
-                            
+
                             <div class="criteria-description">
                                 <p class="description-text" id="desc_delivery_timeline">
                                     Select a score to see detailed description
                                 </p>
                             </div>
                         </div>
-                        
+
                         <!-- Advising Capability -->
                         <div class="criteria-card">
                             <div class="criteria-header">
@@ -651,31 +759,30 @@
                                     <div class="criteria-max">Expertise & Guidance</div>
                                 </div>
                                 <div class="score-selector">
-                                    <input type="range" class="score-slider" name="advising_capability" 
-                                           min="0" max="10" step="1" 
-                                           value="{{ evaluation.advising_capability|default:'0' }}"
-                                           data-criteria="advising_capability">
+                                    <input type="range" class="score-slider" name="advising_capability" min="0" max="10"
+                                        step="1" value="{{ evaluation.advising_capability|default:'0' }}"
+                                        data-criteria="advising_capability">
                                     <div class="score-value" id="score_advising_capability">
                                         {{ evaluation.advising_capability|default:'0' }}
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div class="score-options">
-                                {% for i in "012345678910"|make_list %}
+                                {% for i in "0,1,2,3,4,5,6,7,8,9,10"|split:"," %}
                                 <div class="score-option" data-criteria="advising_capability" data-value="{{ i }}">
                                     {{ i }}
                                 </div>
                                 {% endfor %}
                             </div>
-                            
+
                             <div class="criteria-description">
                                 <p class="description-text" id="desc_advising_capability">
                                     Select a score to see detailed description
                                 </p>
                             </div>
                         </div>
-                        
+
                         <!-- After Sales QOS -->
                         <div class="criteria-card">
                             <div class="criteria-header">
@@ -684,31 +791,30 @@
                                     <div class="criteria-max">Post-Delivery Support</div>
                                 </div>
                                 <div class="score-selector">
-                                    <input type="range" class="score-slider" name="after_sales_qos" 
-                                           min="0" max="10" step="1" 
-                                           value="{{ evaluation.after_sales_qos|default:'0' }}"
-                                           data-criteria="after_sales_qos">
+                                    <input type="range" class="score-slider" name="after_sales_qos" min="0" max="10"
+                                        step="1" value="{{ evaluation.after_sales_qos|default:'0' }}"
+                                        data-criteria="after_sales_qos">
                                     <div class="score-value" id="score_after_sales_qos">
                                         {{ evaluation.after_sales_qos|default:'0' }}
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div class="score-options">
-                                {% for i in "012345678910"|make_list %}
+                                {% for i in "0,1,2,3,4,5,6,7,8,9,10"|split:"," %}
                                 <div class="score-option" data-criteria="after_sales_qos" data-value="{{ i }}">
                                     {{ i }}
                                 </div>
                                 {% endfor %}
                             </div>
-                            
+
                             <div class="criteria-description">
                                 <p class="description-text" id="desc_after_sales_qos">
                                     Select a score to see detailed description
                                 </p>
                             </div>
                         </div>
-                        
+
                         <!-- Vendor Relationship -->
                         <div class="criteria-card">
                             <div class="criteria-header">
@@ -717,53 +823,51 @@
                                     <div class="criteria-max">Communication & Responsiveness</div>
                                 </div>
                                 <div class="score-selector">
-                                    <input type="range" class="score-slider" name="vendor_relationship" 
-                                           min="0" max="10" step="1" 
-                                           value="{{ evaluation.vendor_relationship|default:'0' }}"
-                                           data-criteria="vendor_relationship">
+                                    <input type="range" class="score-slider" name="vendor_relationship" min="0" max="10"
+                                        step="1" value="{{ evaluation.vendor_relationship|default:'0' }}"
+                                        data-criteria="vendor_relationship">
                                     <div class="score-value" id="score_vendor_relationship">
                                         {{ evaluation.vendor_relationship|default:'0' }}
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div class="score-options">
-                                {% for i in "012345678910"|make_list %}
+                                {% for i in "0,1,2,3,4,5,6,7,8,9,10"|split:"," %}
                                 <div class="score-option" data-criteria="vendor_relationship" data-value="{{ i }}">
                                     {{ i }}
                                 </div>
                                 {% endfor %}
                             </div>
-                            
+
                             <div class="criteria-description">
                                 <p class="description-text" id="desc_vendor_relationship">
                                     Select a score to see detailed description
                                 </p>
                             </div>
                         </div>
-                        
+
                     </div>
                 </div>
             </div>
-            
+
             <!-- Action Buttons -->
             <div class="action-buttons">
                 <button type="submit" class="spectrum-button spectrum-button-action flex-fill">
                     <i class="fas fa-save me-2"></i> Save Evaluation
                 </button>
                 {% if fichier_id %}
-                <a href="{% url 'orders:details_bon' bon_id=fichier_id %}?selected_order_number={{ bon_commande.numero }}" 
-                   class="spectrum-button spectrum-button-secondary flex-fill">
+                <a href="{% url 'orders:details_bon' bon_id=fichier_id %}?selected_order_number={{ bon_commande.numero }}"
+                    class="spectrum-button spectrum-button-secondary flex-fill">
                     <i class="fas fa-times me-2"></i> Cancel & Return to PO
                 </a>
                 {% else %}
-                <a href="{% url 'orders:accueil' %}" 
-                   class="spectrum-button spectrum-button-secondary flex-fill">
+                <a href="{% url 'orders:accueil' %}" class="spectrum-button spectrum-button-secondary flex-fill">
                     <i class="fas fa-times me-2"></i> Cancel
                 </a>
                 {% endif %}
-                <a href="{% url 'orders:vendor_evaluation_list' %}" 
-                   class="spectrum-button spectrum-button-primary flex-fill">
+                <a href="{% url 'orders:vendor_evaluation_list' %}"
+                    class="spectrum-button spectrum-button-primary flex-fill">
                     <i class="fas fa-list me-2"></i> View All Evaluations
                 </a>
             </div>
@@ -774,230 +878,230 @@
 
 {% block extra_js %}
 <script>
-// Critères et descriptions (mêmes données que précédemment)
-const criteriaDescriptions = {
-    'delivery_compliance': {
-        0: 'Non conforme',
-        1: 'Non conforme',
-        2: 'Conformité : 25% par rapport au besoin exprimé',
-        3: 'Conformité : 25% par rapport au besoin exprimé',
-        4: 'Conformité : 25% par rapport au besoin exprimé',
-        5: 'Conformité : 50% par rapport au besoin exprimé',
-        6: 'Conformité : 50% par rapport au besoin exprimé',
-        7: 'Conforme au besoin',
-        8: 'Conforme au besoin',
-        9: 'Conforme au besoin',
-        10: 'Supérieure / Meilleur que le besoin exprimé par MTN CI mais au même coût'
-    },
-    'delivery_timeline': {
-        0: 'Aucune livraison effectuée',
-        1: 'Aucune livraison effectuée',
-        2: 'Retard dans la livraison sans le notifier à MTN CI',
-        3: 'Retard dans la livraison sans le notifier à MTN CI',
-        4: 'Retard négocié avec MTN CI et non respect du nouveau planning avec explication donné à MTN',
-        5: 'Retard négocié avec MTN CI et non respect du nouveau planning avec explication donné à MTN',
-        6: 'Retard négocié avec MTN CI et non respect du nouveau planning avec explication donné à MTN',
-        7: 'Respect des délais',
-        8: 'Respect des délais',
-        9: 'Respect des délais',
-        10: 'En avance sur le délai de livraison prévue'
-    },
-    'advising_capability': {
-        0: 'Conseil inexistant',
-        1: 'Conseil inexistant',
-        2: 'Sur demande de MTN CI - Conseil donné mais pas utile',
-        3: 'Sur demande de MTN CI - Conseil donné mais pas utile',
-        4: 'Sur demande de MTN CI - Conseil donné utile mais incomplet',
-        5: 'Sur demande de MTN CI - Conseil donné utile mais incomplet',
-        6: 'Sur demande de MTN CI - Conseil donné utile mais incomplet',
-        7: 'Capacité à conseiller répond à nos attentes',
-        8: 'Capacité à conseiller répond à nos attentes',
-        9: 'Capacité à conseiller répond à nos attentes',
-        10: 'Transfert de compétence & formation régulière du client'
-    },
-    'after_sales_qos': {
-        0: 'SAV inexistant',
-        1: 'SAV inexistant',
-        2: 'Pas adapté à nos attentes',
-        3: 'Pas adapté à nos attentes',
-        4: 'Adapté à 50% à nos attentes sans respecter les délais',
-        5: 'Adapté à 50% à nos attentes sans respecter les délais',
-        6: 'Adapté à 50% à nos attentes sans respecter les délais',
-        7: '100% des requêtes et des plaintes résolues dans les délais',
-        8: '100% des requêtes et des plaintes résolues dans les délais',
-        9: '100% des requêtes et des plaintes résolues dans les délais',
-        10: 'Anticipation des problèmes / Aucun incident n\'est à signaler'
-    },
-    'vendor_relationship': {
-        0: 'Aucun contact',
-        1: 'Aucun contact',
-        2: 'Injoignable en dehors des visites / événements / pendant l\'exécution d\'une commande',
-        3: 'Injoignable en dehors des visites / événements / pendant l\'exécution d\'une commande',
-        4: 'Joignable après 2 ou 3 jours de relance, rappels …',
-        5: 'Joignable après 2 ou 3 jours de relance, rappels …',
-        6: 'Joignable après 2 ou 3 jours de relance, rappels …',
-        7: 'Bon contact / Prestataire réactif',
-        8: 'Bon contact / Prestataire réactif',
-        9: 'Bon contact / Prestataire réactif',
-        10: 'Bon contact / Prestataire très réactif'
-    }
-};
-
-// Fonction pour mettre à jour la description
-function updateDescription(criteria, score) {
-    const descElement = document.getElementById(`desc_${criteria}`);
-    if (score === '' || score === null || score === '0') {
-        descElement.textContent = 'Select a score to see detailed description';
-    } else {
-        const description = criteriaDescriptions[criteria][parseInt(score)];
-        descElement.textContent = description || `Score: ${score}`;
-    }
-}
-
-// Fonction pour mettre à jour le score visuel
-function updateScoreValue(criteria, value) {
-    const scoreElement = document.getElementById(`score_${criteria}`);
-    const slider = document.querySelector(`[name="${criteria}"]`);
-    const options = document.querySelectorAll(`.score-option[data-criteria="${criteria}"]`);
-    
-    scoreElement.textContent = value;
-    slider.value = value;
-    
-    // Mettre à jour les options actives
-    options.forEach(option => {
-        option.classList.remove('active');
-        if (parseInt(option.dataset.value) === parseInt(value)) {
-            option.classList.add('active');
+    // Critères et descriptions (mêmes données que précédemment)
+    const criteriaDescriptions = {
+        'delivery_compliance': {
+            0: 'Non conforme',
+            1: 'Non conforme',
+            2: 'Conformité : 25% par rapport au besoin exprimé',
+            3: 'Conformité : 25% par rapport au besoin exprimé',
+            4: 'Conformité : 25% par rapport au besoin exprimé',
+            5: 'Conformité : 50% par rapport au besoin exprimé',
+            6: 'Conformité : 50% par rapport au besoin exprimé',
+            7: 'Conforme au besoin',
+            8: 'Conforme au besoin',
+            9: 'Conforme au besoin',
+            10: 'Supérieure / Meilleur que le besoin exprimé par MTN CI mais au même coût'
+        },
+        'delivery_timeline': {
+            0: 'Aucune livraison effectuée',
+            1: 'Aucune livraison effectuée',
+            2: 'Retard dans la livraison sans le notifier à MTN CI',
+            3: 'Retard dans la livraison sans le notifier à MTN CI',
+            4: 'Retard négocié avec MTN CI et non respect du nouveau planning avec explication donné à MTN',
+            5: 'Retard négocié avec MTN CI et non respect du nouveau planning avec explication donné à MTN',
+            6: 'Retard négocié avec MTN CI et non respect du nouveau planning avec explication donné à MTN',
+            7: 'Respect des délais',
+            8: 'Respect des délais',
+            9: 'Respect des délais',
+            10: 'En avance sur le délai de livraison prévue'
+        },
+        'advising_capability': {
+            0: 'Conseil inexistant',
+            1: 'Conseil inexistant',
+            2: 'Sur demande de MTN CI - Conseil donné mais pas utile',
+            3: 'Sur demande de MTN CI - Conseil donné mais pas utile',
+            4: 'Sur demande de MTN CI - Conseil donné utile mais incomplet',
+            5: 'Sur demande de MTN CI - Conseil donné utile mais incomplet',
+            6: 'Sur demande de MTN CI - Conseil donné utile mais incomplet',
+            7: 'Capacité à conseiller répond à nos attentes',
+            8: 'Capacité à conseiller répond à nos attentes',
+            9: 'Capacité à conseiller répond à nos attentes',
+            10: 'Transfert de compétence & formation régulière du client'
+        },
+        'after_sales_qos': {
+            0: 'SAV inexistant',
+            1: 'SAV inexistant',
+            2: 'Pas adapté à nos attentes',
+            3: 'Pas adapté à nos attentes',
+            4: 'Adapté à 50% à nos attentes sans respecter les délais',
+            5: 'Adapté à 50% à nos attentes sans respecter les délais',
+            6: 'Adapté à 50% à nos attentes sans respecter les délais',
+            7: '100% des requêtes et des plaintes résolues dans les délais',
+            8: '100% des requêtes et des plaintes résolues dans les délais',
+            9: '100% des requêtes et des plaintes résolues dans les délais',
+            10: 'Anticipation des problèmes / Aucun incident n\'est à signaler'
+        },
+        'vendor_relationship': {
+            0: 'Aucun contact',
+            1: 'Aucun contact',
+            2: 'Injoignable en dehors des visites / événements / pendant l\'exécution d\'une commande',
+            3: 'Injoignable en dehors des visites / événements / pendant l\'exécution d\'une commande',
+            4: 'Joignable après 2 ou 3 jours de relance, rappels …',
+            5: 'Joignable après 2 ou 3 jours de relance, rappels …',
+            6: 'Joignable après 2 ou 3 jours de relance, rappels …',
+            7: 'Bon contact / Prestataire réactif',
+            8: 'Bon contact / Prestataire réactif',
+            9: 'Bon contact / Prestataire réactif',
+            10: 'Bon contact / Prestataire très réactif'
         }
-    });
-    
-    // Mettre à jour la description
-    updateDescription(criteria, value);
-}
+    };
 
-// Fonction pour calculer et afficher les scores
-function updateScoreSummary() {
-    const criteria = ['delivery_compliance', 'delivery_timeline', 'advising_capability', 'after_sales_qos', 'vendor_relationship'];
-    let totalScore = 0;
-    let completedCriteria = 0;
-    let hasZeroScore = false;
-    
-    criteria.forEach(criteriaName => {
-        const slider = document.querySelector(`[name="${criteriaName}"]`);
-        const value = parseInt(slider.value);
-        
-        if (!isNaN(value) && value > 0) {
-            totalScore += value;
-            completedCriteria++;
-        } else if (value === 0) {
-            hasZeroScore = true;
-            completedCriteria++; // 0 est une note valide
-        }
-    });
-    
-    const vendorRating = completedCriteria > 0 ? (totalScore / completedCriteria) : 0;
-    const completionRate = (completedCriteria / criteria.length) * 100;
-    const totalScorePercentage = (totalScore / 50) * 100;
-    const ratingPercentage = (vendorRating / 10) * 100;
-    
-    // Mettre à jour les éléments UI
-    document.getElementById('totalScore').textContent = totalScore;
-    document.getElementById('vendorRating').textContent = vendorRating.toFixed(1);
-    document.getElementById('completionRate').textContent = `${completionRate.toFixed(0)}%`;
-    document.getElementById('completedCriteria').textContent = `${completedCriteria}/5 criteria`;
-    
-    document.getElementById('totalScoreFill').style.width = `${totalScorePercentage}%`;
-    document.getElementById('ratingFill').style.width = `${ratingPercentage}%`;
-    document.getElementById('completionFillBar').style.width = `${completionRate}%`;
-    document.getElementById('completionFill').style.width = `${completionRate}%`;
-    document.getElementById('completionText').textContent = `${completionRate.toFixed(0)}% Complete`;
-    
-    // Mettre à jour le badge du score total
-    const totalScoreBadge = document.getElementById('totalScoreBadge');
-    if (totalScore >= 40) {
-        totalScoreBadge.className = 'score-badge badge-excellent';
-        totalScoreBadge.textContent = 'Excellent';
-    } else if (totalScore >= 30) {
-        totalScoreBadge.className = 'score-badge badge-good';
-        totalScoreBadge.textContent = 'Good';
-    } else if (totalScore >= 20) {
-        totalScoreBadge.className = 'score-badge badge-average';
-        totalScoreBadge.textContent = 'Average';
-    } else {
-        totalScoreBadge.className = 'score-badge badge-poor';
-        totalScoreBadge.textContent = 'Needs Improvement';
-    }
-    
-    // Mettre à jour les étoiles
-    const stars = document.querySelectorAll('.rating-stars span');
-    const starRating = Math.round(vendorRating / 2); // Convertir 0-10 à 0-5 étoiles
-    stars.forEach((star, index) => {
-        if (index < starRating) {
-            star.textContent = '★';
-            star.style.color = 'var(--spectrum-yellow)';
+    // Fonction pour mettre à jour la description
+    function updateDescription(criteria, score) {
+        const descElement = document.getElementById(`desc_${criteria}`);
+        if (score === '' || score === null || score === '0') {
+            descElement.textContent = 'Select a score to see detailed description';
         } else {
-            star.textContent = '☆';
-            star.style.color = 'var(--spectrum-gray-200)';
+            const description = criteriaDescriptions[criteria][parseInt(score)];
+            descElement.textContent = description || `Score: ${score}`;
         }
-    });
-    
-    return completedCriteria === criteria.length;
-}
+    }
 
-// Initialisation
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialiser les sliders
-    const sliders = document.querySelectorAll('.score-slider');
-    sliders.forEach(slider => {
-        const criteria = slider.name;
-        const initialValue = slider.value;
-        
-        // Mettre à jour l'affichage initial
-        updateScoreValue(criteria, initialValue);
-        updateDescription(criteria, initialValue);
-        
-        // Événement de changement sur le slider
-        slider.addEventListener('input', function() {
-            updateScoreValue(criteria, this.value);
-            updateScoreSummary();
+    // Fonction pour mettre à jour le score visuel
+    function updateScoreValue(criteria, value) {
+        const scoreElement = document.getElementById(`score_${criteria}`);
+        const slider = document.querySelector(`[name="${criteria}"]`);
+        const options = document.querySelectorAll(`.score-option[data-criteria="${criteria}"]`);
+
+        scoreElement.textContent = value;
+        slider.value = value;
+
+        // Mettre à jour les options actives
+        options.forEach(option => {
+            option.classList.remove('active');
+            if (parseInt(option.dataset.value) === parseInt(value)) {
+                option.classList.add('active');
+            }
         });
-    });
-    
-    // Initialiser les boutons d'options
-    const scoreOptions = document.querySelectorAll('.score-option');
-    scoreOptions.forEach(option => {
-        option.addEventListener('click', function() {
-            const criteria = this.dataset.criteria;
-            const value = this.dataset.value;
-            updateScoreValue(criteria, value);
-            updateScoreSummary();
+
+        // Mettre à jour la description
+        updateDescription(criteria, value);
+    }
+
+    // Fonction pour calculer et afficher les scores
+    function updateScoreSummary() {
+        const criteria = ['delivery_compliance', 'delivery_timeline', 'advising_capability', 'after_sales_qos', 'vendor_relationship'];
+        let totalScore = 0;
+        let completedCriteria = 0;
+        let hasZeroScore = false;
+
+        criteria.forEach(criteriaName => {
+            const slider = document.querySelector(`[name="${criteriaName}"]`);
+            const value = parseInt(slider.value);
+
+            if (!isNaN(value) && value > 0) {
+                totalScore += value;
+                completedCriteria++;
+            } else if (value === 0) {
+                hasZeroScore = true;
+                completedCriteria++; // 0 est une note valide
+            }
         });
-    });
-    
-    // Initialiser le résumé
-    updateScoreSummary();
-    
-    // Validation du formulaire
-    document.getElementById('evaluationForm').addEventListener('submit', function(e) {
-        const allComplete = updateScoreSummary();
-        
-        if (!allComplete) {
-            e.preventDefault();
-            const validationMessage = document.getElementById('validationMessage');
-            validationMessage.classList.add('show');
-            validationMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            
-            // Masquer le message après 5 secondes
-            setTimeout(() => {
-                validationMessage.classList.remove('show');
-            }, 5000);
+
+        const vendorRating = completedCriteria > 0 ? (totalScore / completedCriteria) : 0;
+        const completionRate = (completedCriteria / criteria.length) * 100;
+        const totalScorePercentage = (totalScore / 50) * 100;
+        const ratingPercentage = (vendorRating / 10) * 100;
+
+        // Mettre à jour les éléments UI
+        document.getElementById('totalScore').textContent = totalScore;
+        document.getElementById('vendorRating').textContent = vendorRating.toFixed(1);
+        document.getElementById('completionRate').textContent = `${completionRate.toFixed(0)}%`;
+        document.getElementById('completedCriteria').textContent = `${completedCriteria}/5 criteria`;
+
+        document.getElementById('totalScoreFill').style.width = `${totalScorePercentage}%`;
+        document.getElementById('ratingFill').style.width = `${ratingPercentage}%`;
+        document.getElementById('completionFillBar').style.width = `${completionRate}%`;
+        document.getElementById('completionFill').style.width = `${completionRate}%`;
+        document.getElementById('completionText').textContent = `${completionRate.toFixed(0)}% Complete`;
+
+        // Mettre à jour le badge du score total
+        const totalScoreBadge = document.getElementById('totalScoreBadge');
+        if (totalScore >= 40) {
+            totalScoreBadge.className = 'score-badge badge-excellent';
+            totalScoreBadge.textContent = 'Excellent';
+        } else if (totalScore >= 30) {
+            totalScoreBadge.className = 'score-badge badge-good';
+            totalScoreBadge.textContent = 'Good';
+        } else if (totalScore >= 20) {
+            totalScoreBadge.className = 'score-badge badge-average';
+            totalScoreBadge.textContent = 'Average';
+        } else {
+            totalScoreBadge.className = 'score-badge badge-poor';
+            totalScoreBadge.textContent = 'Needs Improvement';
         }
+
+        // Mettre à jour les étoiles
+        const stars = document.querySelectorAll('.rating-stars span');
+        const starRating = Math.round(vendorRating / 2); // Convertir 0-10 à 0-5 étoiles
+        stars.forEach((star, index) => {
+            if (index < starRating) {
+                star.textContent = '★';
+                star.style.color = 'var(--spectrum-yellow)';
+            } else {
+                star.textContent = '☆';
+                star.style.color = 'var(--spectrum-gray-200)';
+            }
+        });
+
+        return completedCriteria === criteria.length;
+    }
+
+    // Initialisation
+    document.addEventListener('DOMContentLoaded', function () {
+        // Initialiser les sliders
+        const sliders = document.querySelectorAll('.score-slider');
+        sliders.forEach(slider => {
+            const criteria = slider.name;
+            const initialValue = slider.value;
+
+            // Mettre à jour l'affichage initial
+            updateScoreValue(criteria, initialValue);
+            updateDescription(criteria, initialValue);
+
+            // Événement de changement sur le slider
+            slider.addEventListener('input', function () {
+                updateScoreValue(criteria, this.value);
+                updateScoreSummary();
+            });
+        });
+
+        // Initialiser les boutons d'options
+        const scoreOptions = document.querySelectorAll('.score-option');
+        scoreOptions.forEach(option => {
+            option.addEventListener('click', function () {
+                const criteria = this.dataset.criteria;
+                const value = this.dataset.value;
+                updateScoreValue(criteria, value);
+                updateScoreSummary();
+            });
+        });
+
+        // Initialiser le résumé
+        updateScoreSummary();
+
+        // Validation du formulaire
+        document.getElementById('evaluationForm').addEventListener('submit', function (e) {
+            const allComplete = updateScoreSummary();
+
+            if (!allComplete) {
+                e.preventDefault();
+                const validationMessage = document.getElementById('validationMessage');
+                validationMessage.classList.add('show');
+                validationMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                // Masquer le message après 5 secondes
+                setTimeout(() => {
+                    validationMessage.classList.remove('show');
+                }, 5000);
+            }
+        });
+
+        // Masquer le message de validation en cliquant dessus
+        document.getElementById('validationMessage').addEventListener('click', function () {
+            this.classList.remove('show');
+        });
     });
-    
-    // Masquer le message de validation en cliquant dessus
-    document.getElementById('validationMessage').addEventListener('click', function() {
-        this.classList.remove('show');
-    });
-});
 </script>
 {% endblock %}

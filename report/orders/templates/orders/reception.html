@@ -31,29 +31,9 @@
         align-items: center;
         justify-content: center;
         padding: 20px;
-    }
-
-    /* Carte principale */
-    .search-card {
-        background: var(--mtn-white);
-        border-radius: var(--border-radius);
-        padding: 40px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-        width: 100%;
-        max-width: 600px;
-        position: relative;
-        overflow: visible;
-        border: 1px solid rgba(0, 0, 0, 0.08);
-    }
-
-    .search-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 4px;
-        background: linear-gradient(90deg, var(--mtn-black) 0%, var(--mtn-yellow) 100%);
+        margin-left: 260px; /* Espace pour la sidebar */
+        width: calc(100% - 260px); /* Largeur ajustée */
+        box-sizing: border-box;
     }
 
     /* En-tête */
@@ -77,14 +57,10 @@
     }
 
     .search-title {
-        font-size: 24px;
-        font-weight: 700;
-        color: var(--mtn-black);
         margin-bottom: 8px;
     }
 
     .search-subtitle {
-        font-size: 16px;
         color: #666;
         max-width: 400px;
         margin: 0 auto;
@@ -186,16 +162,6 @@
         gap: 8px;
     }
 
-    .po-cpu {
-        background: var(--mtn-black);
-        color: var(--mtn-white);
-        padding: 2px 8px;
-        border-radius: 4px;
-        font-size: 11px;
-        font-weight: 600;
-        letter-spacing: 0.5px;
-    }
-
     .po-supplier {
         font-size: 13px;
         color: #666;
@@ -206,43 +172,80 @@
         white-space: nowrap;
     }
 
-    /* Message d'information */
-    .info-message {
-        text-align: center;
-        margin-top: 24px;
-        padding: 12px 20px;
-        background: rgba(255, 204, 0, 0.05);
-        border-radius: 8px;
-        border-left: 3px solid var(--mtn-yellow);
-    }
-
-    .info-message p {
-        margin: 0;
-        color: #666;
-        font-size: 14px;
-        line-height: 1.5;
-    }
-
-    .info-message strong {
-        color: var(--mtn-black);
-    }
-
-    /* Responsive */
-    @media (max-width: 640px) {
+    /* ============================================
+       RESPONSIVE - Support tous écrans
+       ============================================ */
+    
+    /* Tablettes (max 1024px) */
+    @media (max-width: 1024px) {
         .minimal-container {
-            padding: 16px;
+            margin-left: 0 !important;
+            width: 100% !important;
+            padding-top: 70px; /* Espace pour le bouton menu mobile */
         }
         
-        .search-card {
-            padding: 24px;
+        .spectrum-Card {
+            max-width: 90% !important;
+        }
+        
+        .spectrum-Card-body {
+            padding: 30px !important;
+        }
+    }
+    
+    /* Mobiles (max 768px) */
+    @media (max-width: 768px) {
+        .minimal-container {
+            padding: 16px;
+            margin-left: 0 !important;
+            width: 100% !important;
+        }
+        
+        .spectrum-Card {
+            max-width: 100% !important;
+            border-radius: 12px;
+        }
+        
+        .spectrum-Card-body {
+            padding: 24px !important;
         }
         
         .search-title {
-            font-size: 20px;
+            font-size: 1.25rem !important;
         }
         
         .search-subtitle {
+            font-size: 0.9rem;
+        }
+        
+        .logo-container {
+            padding: 10px;
+        }
+        
+        .mtn-logo {
+            width: 50px;
+        }
+        
+        .select2-container--bootstrap-5 .select2-selection {
+            min-height: 48px;
+            padding: 10px;
+        }
+        
+        .po-option {
+            padding: 10px 12px;
+        }
+        
+        .po-icon {
+            width: 36px;
+            height: 36px;
+        }
+        
+        .po-number {
             font-size: 14px;
+        }
+        
+        .po-supplier {
+            font-size: 12px;
         }
     }
 
@@ -257,47 +260,48 @@
             transform: translateY(0);
         }
     }
-
-    .search-card {
-        animation: fadeIn 0.3s ease;
-    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="minimal-container">
-    <div class="search-card">
-        <!-- En-tête -->
-        <div class="search-header">
-            <div class="logo-container">
-                <img src="{% static 'logo_mtn.jpeg' %}" alt="MTN Logo" class="mtn-logo">
+    <div class="spectrum-Card" style="width: 100%; max-width: 600px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15); animation: fadeIn 0.3s ease;">
+        <div class="spectrum-Card-body" style="padding: 40px;">
+            <!-- En-tête -->
+            <div class="search-header">
+                <div class="logo-container">
+                    <img src="{% static 'logo_mtn.jpeg' %}" alt="MTN Logo" class="mtn-logo">
+                </div>
+                <h1 class="search-title spectrum-Heading spectrum-Heading--sizeL">Purchase Order Search</h1>
+                <p class="search-subtitle spectrum-Body spectrum-Body--sizeM">
+                    Select a purchase order to register deliveries or view details. 
+                    You can search by PO number, supplier name, or service code.
+                </p>
             </div>
-            <h1 class="search-title spectrum-Heading spectrum-Heading--sizeL">Purchase Order Search</h1>
-            <p class="search-subtitle spectrum-Body spectrum-Body--sizeM">
-                Select a purchase order to register deliveries or view details. 
-                You can search by PO number, supplier name, or service code.
-            </p>
-        </div>
 
-        <!-- Select2 Dropdown -->
-        <select id="po-select" class="form-select">
-            <option></option> <!-- Option vide pour placeholder -->
-            {% for bon in numeros_bons %}
-                <option value="{{ bon.numero }}" 
-                        data-fichier-id="{{ bon.fichier_id }}"
-                        data-cpu="{{ bon.cpu }}"
-                        data-supplier="{{ bon.supplier }}">
-                    {{ bon.numero }}
-                </option>
-            {% endfor %}
-        </select>
+            <!-- Select2 Dropdown -->
+            <select id="po-select" class="form-select">
+                <option></option> <!-- Option vide pour placeholder -->
+                {% for bon in numeros_bons %}
+                    <option value="{{ bon.numero }}" 
+                            data-fichier-id="{{ bon.fichier_id }}"
+                            data-cpu="{{ bon.cpu }}"
+                            data-supplier="{{ bon.supplier }}">
+                        {{ bon.numero }}
+                    </option>
+                {% endfor %}
+            </select>
 
-        <!-- Message d'information -->
-        <div class="info-message">
-            <p class="spectrum-Body spectrum-Body--sizeS">
-                <strong>Tip:</strong> Start typing to filter results. Use ↑ ↓ arrows to navigate, 
-                ↵ Enter to select, or ESC to close.
-            </p>
+            <!-- Message d'information -->
+            <div class="spectrum-InlineAlert spectrum-InlineAlert--info spectrum-InlineAlert--sizeS" style="margin-top: 24px;">
+                <div class="spectrum-InlineAlert-header">
+                    Tip:
+                </div>
+                <div class="spectrum-InlineAlert-content">
+                    Start typing to filter results. Use ↑ ↓ arrows to navigate, 
+                    ↵ Enter to select, or ESC to close.
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -344,7 +348,7 @@
                     <div class="po-content">
                         <div class="po-number">
                             ${poNumber}
-                            ${cpu ? `<span class="po-cpu">${cpu}</span>` : ''}
+                            ${cpu ? `<span class="spectrum-Badge spectrum-Badge--sizeS spectrum-Badge--neutral">${cpu}</span>` : ''}
                         </div>
                         <span class="po-supplier">${supplier}</span>
                     </div>

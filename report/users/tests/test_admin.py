@@ -35,14 +35,15 @@ def test_admin_save_model_sends_activation_email():
     # Nouvel utilisateur (change=False)
     obj = User(email='admin-new@example.com', first_name='Admin', last_name='Created', is_active=False)
 
-    with patch('users.admin.send_mail') as mocked_send:
+    with patch('users.admin.CELERY_AVAILABLE', False), \
+         patch('users.admin.UserAdmin.send_activation_email') as mocked_send:
         user_admin.save_model(request, obj, form=None, change=False)
 
         # L'utilisateur doit être sauvegardé avec un token et un mot de passe temporaire générés
         obj.refresh_from_db()
         assert obj.activation_token  # non vide
         assert obj.temporary_password  # hash stocké (non vide)
-        # send_mail doit être appelé une fois
+        # send_activation_email doit être appelé une fois
         assert mocked_send.call_count == 1
 
         

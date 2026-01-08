@@ -36,8 +36,9 @@ class TestMSRNAPI(TestCase):
             retention_cause='Test retention cause'
         )
 
+    @patch('orders.msrn_api.CELERY_AVAILABLE', False)
     def test_generate_msrn_report_success(self):
-        """Test la génération d'un rapport MSRN avec succès"""
+        """Test la génération d'un rapport MSRN avec succès (mode synchrone)"""
         data = {
             'retention_rate': '5.0',
             'retention_cause': 'Test retention cause'
@@ -308,9 +309,10 @@ class TestMSRNAPIUncovered(TestCase):
         response_data = json.loads(response.content)
         self.assertTrue(response_data['success'])  # Utilise les valeurs par défaut
 
+    @patch('orders.msrn_api.CELERY_AVAILABLE', False)
     @patch('orders.msrn_api.generate_msrn_report')
     def test_generate_msrn_report_pdf_generation_error(self, mock_generate):
-        """Test generate_msrn_report_api avec erreur de génération PDF"""
+        """Test generate_msrn_report_api avec erreur de génération PDF (mode synchrone)"""
         mock_generate.side_effect = Exception("PDF generation failed")
         
         data = {
@@ -328,9 +330,10 @@ class TestMSRNAPIUncovered(TestCase):
         response_data = json.loads(response.content)
         self.assertFalse(response_data['success'])
 
+    @patch('orders.msrn_api.CELERY_AVAILABLE', False)
     @patch('orders.msrn_api.send_msrn_notification')
     def test_generate_msrn_report_email_success(self, mock_send):
-        """Test generate_msrn_report_api avec envoi d'email réussi"""
+        """Test generate_msrn_report_api avec envoi d'email réussi (mode synchrone)"""
         mock_send.return_value = True
         
         data = {
@@ -347,9 +350,10 @@ class TestMSRNAPIUncovered(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(mock_send.called)
 
+    @patch('orders.msrn_api.CELERY_AVAILABLE', False)
     @patch('orders.msrn_api.send_msrn_notification')
     def test_generate_msrn_report_email_failure(self, mock_send):
-        """Test generate_msrn_report_api avec échec d'envoi d'email"""
+        """Test generate_msrn_report_api avec échec d'envoi d'email (mode synchrone)"""
         mock_send.side_effect = Exception("Email failed")
         
         data = {
@@ -608,10 +612,11 @@ class TestMSRNAPIUncoveredLines(TestCase):
             unit_price=Decimal('50')
         )
 
+    @patch('orders.msrn_api.CELERY_AVAILABLE', False)
     @patch('orders.msrn_api.send_msrn_notification')
     @patch('orders.msrn_api.generate_msrn_report')
     def test_generate_msrn_report_email_success_false(self, mock_generate, mock_send):
-        """Test ligne 176 - email_sent=False"""
+        """Test ligne 176 - email_sent=False (mode synchrone)"""
         mock_generate.return_value = BytesIO(b"fake pdf")
         mock_send.return_value = False  # Email non envoyé
         
@@ -630,10 +635,11 @@ class TestMSRNAPIUncoveredLines(TestCase):
         self.assertTrue(mock_send.called)
         # Vérifier que le logger warning est appelé (ligne 176)
 
+    @patch('orders.msrn_api.CELERY_AVAILABLE', False)
     @patch('orders.msrn_api.send_msrn_notification')
     @patch('orders.msrn_api.generate_msrn_report')
     def test_generate_msrn_report_email_success_true(self, mock_generate, mock_send):
-        """Test ligne 179 - email_sent=True"""
+        """Test ligne 179 - email_sent=True (mode synchrone)"""
         mock_generate.return_value = BytesIO(b"fake pdf")
         mock_send.return_value = True  # Email envoyé
         

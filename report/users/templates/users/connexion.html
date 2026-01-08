@@ -9,43 +9,40 @@
     <div class="spectrum-Form-item">
         <label for="email" class="auth-label spectrum-Form-itemLabel spectrum-FieldLabel">
             <svg class="auth-label-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path fill="currentColor" d="M3 5h18a2 2 0 0 1 2 2v0 10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zm0 3.236v8.764h18V8.236l-8.59 6.22a3 3 0 0 1-3.82 0L3 8.236zm1.53-3.236l7.94 5.75a1 1 0 0 0 1.06 0L21.47 5H4.53z"/>
+                <path fill="currentColor"
+                    d="M3 5h18a2 2 0 0 1 2 2v0 10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zm0 3.236v8.764h18V8.236l-8.59 6.22a3 3 0 0 1-3.82 0L3 8.236zm1.53-3.236l7.94 5.75a1 1 0 0 0 1.06 0L21.47 5H4.53z" />
             </svg>
             Adresse email
         </label>
         <div class="spectrum-Form-itemField">
-            <input 
-                type="email" 
-                class="auth-input spectrum-Textfield"
-                id="email" 
-                name="email" 
-                placeholder="votre.email@mtn.ci"
-                required
-                autofocus
-            >
+            <input type="email" class="auth-input spectrum-Textfield" id="email" name="email"
+                placeholder="votre.email@mtn.ci" required autofocus>
         </div>
     </div>
     <div class="spectrum-Form-item">
         <label for="password" class="auth-label spectrum-Form-itemLabel spectrum-FieldLabel">
             <svg class="auth-label-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path fill="currentColor" d="M12 1a7 7 0 0 1 7 7v3h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h1V8a7 7 0 0 1 7-7zm0 4a3 3 0 0 0-3 3v3h6V8a3 3 0 0 0-3-3z"/>
+                <path fill="currentColor"
+                    d="M12 1a7 7 0 0 1 7 7v3h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h1V8a7 7 0 0 1 7-7zm0 4a3 3 0 0 0-3 3v3h6V8a3 3 0 0 0-3-3z" />
             </svg>
             Mot de passe
         </label>
         <div class="spectrum-Form-itemField input-with-action">
-            <input 
-                type="password" 
-                class="auth-input spectrum-Textfield"
-                id="password" 
-                name="password" 
-                placeholder="Votre mot de passe"
-                required
-            >
-            <button type="button" id="togglePassword" class="spectrum-Button spectrum-Button--sizeS" aria-label="Voir le mot de passe">
+            <input type="password" class="auth-input spectrum-Textfield" id="password" name="password"
+                placeholder="Votre mot de passe" required>
+            <button type="button" id="togglePassword" class="spectrum-Button spectrum-Button--sizeS"
+                aria-label="Voir le mot de passe">
                 <svg class="auth-toggle-icon" viewBox="0 0 24 24" aria-hidden="true">
-                    <path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12a4.5 4.5 0 1 1 0-9a4.5 4.5 0 0 1 0 9z"/>
+                    <path fill="currentColor"
+                        d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12a4.5 4.5 0 1 1 0-9a4.5 4.5 0 0 1 0 9z" />
                 </svg>
             </button>
+        </div>
+        <div class="text-right mt-2">
+            <a href="{% url 'users:password_reset' %}"
+                class="spectrum-Link spectrum-Link--quiet text-sm text-blue-600 hover:underline">
+                Mot de passe oublié ?
+            </a>
         </div>
     </div>
     <div class="spectrum-Form-item">
@@ -57,7 +54,7 @@
     <button type="submit" class="auth-submit spectrum-Button spectrum-Button--sizeM mt-4" id="submitBtn" disabled>
         <span class="spectrum-Button-label">Se connecter</span>
     </button>
-    </form>
+</form>
 <div class="text-center mt-4">
     <p class="text-gray-500 text-sm">
         Si vous n'avez pas encore activé votre compte, regardez votre boîte mail.
@@ -68,16 +65,16 @@
 <script>
     if (window.history && window.history.pushState) {
         window.history.pushState('forward', null, window.location.href);
-        window.onpopstate = function() {
+        window.onpopstate = function () {
             window.history.pushState('forward', null, window.location.href);
         };
     }
-    (function() {
+    (function () {
         const btn = document.getElementById('togglePassword');
         const input = document.getElementById('password');
         const EYE = '<svg class="auth-toggle-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5zm0 12a4.5 4.5 0 1 1 0-9a4.5 4.5 0 0 1 0 9z"/></svg>';
         const EYE_OFF = '<svg class="auth-toggle-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M2 12c1.73-4.39 6-7.5 11-7.5c2.31 0 4.48.6 6.37 1.67l1.46-1.46l1.41 1.41l-19 19l-1.41-1.41l3.1-3.1C3.5 18.29 2.42 15.27 2 12zm7.28-.86l3.58 3.58A4.5 4.5 0 0 0 9.28 11.14zM12 17.5c1.03 0 2-.2 2.9-.56l-2.64-2.64A4.48 4.48 0 0 1 12 17.5z"/></svg>';
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', function () {
             const show = input.type === 'password';
             input.type = show ? 'text' : 'password';
             btn.setAttribute('aria-label', show ? 'Cacher le mot de passe' : 'Voir le mot de passe');

@@ -37,10 +37,6 @@
 .period-btn.active { background: var(--soft-yellow-bg); border-color: var(--soft-yellow); color: var(--soft-black); }
 .loading-spinner { display: none; justify-content: center; align-items: center; padding: 12px; }
 .row.g-4 > [class*='col-'] .card { border-radius: 12px; box-shadow: var(--card-shadow); }
-.hover-zoom:hover { transform: translateY(-2px); transition: transform .2s ease; }
-.icon-shape { width: 44px; height: 44px; display:flex; align-items:center; justify-content:center; background: var(--soft-yellow-bg); color: var(--soft-black); }
-.text-yellow { color: #B8860B; }
-.bg-soft-yellow { background: var(--soft-yellow-bg); }
 .chart-container { padding: 4px; }
 .section-divider { margin-top: 24px; margin-bottom: 8px; }
 .divider-line { border: 0; height: 1px; background: #eaeaea; }
@@ -202,110 +198,6 @@
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 1.5rem;
     margin-bottom: 1.5rem;
-}
-
-.stat-card {
-    background: #f9fafb;
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    padding: 1.5rem;
-}
-
-.stat-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-}
-
-.stat-card-title {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--soft-black);
-    margin: 0;
-}
-
-.stat-card-badge {
-    background: var(--soft-yellow-bg);
-    color: #b45309;
-    padding: 0.25rem 0.75rem;
-    border-radius: 9999px;
-    font-size: 0.75rem;
-    font-weight: 500;
-}
-
-.stat-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
-
-.stat-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.stat-label {
-    color: #6b7280;
-    font-size: 0.875rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.stat-value {
-    font-weight: 600;
-    color: var(--soft-black);
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-}
-
-.currency {
-    font-size: 0.875rem;
-    color: #6b7280;
-    font-weight: normal;
-}
-
-/* Progress Bar */
-.progress-container {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex: 1;
-}
-
-.progress-bar {
-    flex: 1;
-    height: 8px;
-    background: #e5e7eb;
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-.progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--success-color), #34d399);
-    border-radius: 4px;
-    transition: width 0.3s ease;
-}
-
-.progress-labels {
-    min-width: 3rem;
-    text-align: right;
-}
-
-.progress-value {
-    color: var(--soft-black);
-    font-size: 0.875rem;
-    font-weight: 600;
-}
-
-.stat-item-progress {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
 }
 
 /* Tables */
@@ -472,8 +364,8 @@
 
 .details-table {
     table-layout: auto;
-    width: auto;
-    min-width: 1400px;
+    width: 100%;
+    min-width: 800px;
 }
 
 .details-table th,
@@ -511,7 +403,106 @@
     }
 }
 
-/* Responsive */
+/* ============================================
+   RESPONSIVE - Support tous écrans
+   ============================================ */
+
+/* Petits laptops (1024px - 1366px) */
+@media (max-width: 1366px) {
+    .container-fluid {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+    
+    .analytics-dashboard {
+        padding: 12px;
+    }
+    
+    .stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+    }
+    
+    .modern-modal-content {
+        max-width: 95%;
+    }
+    
+    .details-table {
+        min-width: 700px;
+    }
+    
+    .table-container {
+        max-height: 45vh;
+    }
+    
+    .btn-group .period-btn {
+        padding: 6px 10px;
+        font-size: 0.85rem;
+    }
+    
+    .row.g-4 > [class*='col-xl-3'] {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+}
+
+/* Tablettes (max 1024px) */
+@media (max-width: 1024px) {
+    .analytics-dashboard {
+        padding: 10px;
+    }
+    
+    .dashboard-title {
+        font-size: 1.25rem !important;
+    }
+    
+    .btn-group {
+        flex-wrap: wrap;
+    }
+    
+    .btn-group .period-btn {
+        flex: 1 1 45%;
+        margin-bottom: 0.5rem;
+    }
+    
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+    }
+    
+    .modern-modal-content {
+        max-width: 98%;
+    }
+    
+    .details-table {
+        min-width: 600px;
+    }
+    
+    .table-container {
+        max-height: 40vh;
+    }
+    
+    .row.g-4 > [class*='col-'] {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+    
+    .heatmap-controls {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .heatmap-data-type {
+        width: 100%;
+    }
+    
+    #heatmap-chart {
+        height: 280px;
+    }
+}
+
+/* Mobiles (max 768px) */
 @media (max-width: 768px) {
     .modern-modal-dialog {
         padding: 0;
@@ -534,7 +525,9 @@
     }
     
     .tab-btn {
-        min-width: 120px;
+        min-width: 100px;
+        font-size: 0.75rem;
+        padding: 0.5rem;
     }
     
     .modal-header-main {
@@ -545,6 +538,57 @@
     
     .modal-header-actions {
         justify-content: space-between;
+    }
+    
+    .container-fluid {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+    
+    .analytics-dashboard {
+        padding: 8px;
+        border-radius: 8px;
+    }
+    
+    .dashboard-title {
+        font-size: 1.1rem !important;
+    }
+    
+    .btn-group .period-btn {
+        flex: 1 1 100%;
+        padding: 8px;
+        font-size: 0.8rem;
+    }
+    
+    .details-table {
+        min-width: 600px;
+        font-size: 0.75rem;
+    }
+    
+    .details-table th,
+    .details-table td {
+        padding: 6px !important;
+    }
+    
+    .table-container {
+        max-height: 35vh;
+    }
+    
+    .row.g-4 > [class*='col-'] {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+    
+    .page-header h2 {
+        font-size: 1.1rem !important;
+    }
+    
+    #heatmap-chart {
+        height: 220px;
+    }
+    
+    .heatmap-title {
+        font-size: 1rem;
     }
 }
 
@@ -617,20 +661,18 @@
         <div class="row g-4 mb-4 justify-content-center">
             <!-- Carte 1: Nombre de bons avec réception -->
             <div class="col-md-6 col-lg-4">
-                <div class="card h-100 border-0 shadow-sm hover-zoom">
-                    <div class="card-body">
-                        <div class="d-flex align-items-center mb-3">
-                            <div class="icon-shape icon-lg bg-soft-yellow text-yellow rounded-3 me-3">
-                                <i class="fas fa-file-invoice fs-4"></i>
+                <div class="spectrum-Card" style="width: 100%; height: 100%; background: #fff;">
+                    <div class="spectrum-Card-body" style="padding: 24px;">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="icon-shape icon-lg bg-soft-yellow text-yellow rounded-3 mb-3">
+                                <i class="fas fa-file-invoice fa-lg"></i>
                             </div>
-                            <h3 class="mb-0 fs-5 fw-semibold text-uppercase">Bons avec réception</h3>
+                            <span class="spectrum-Badge spectrum-Badge--sizeS spectrum-Badge--positive">Actif</span>
                         </div>
-                        <div class="d-flex align-items-baseline">
-                            <h2 class="mb-0 fw-bold" id="bons-avec-reception">0</h2>
-                            <span class="ms-2 text-muted small">bons</span>
-                        </div>
-                        <p class="text-muted small mt-2 mb-0">
-                            Bons de commande ayant au moins une réception
+                        <h3 class="spectrum-Heading spectrum-Heading--sizeXXL spectrum-Heading--heavy mb-1" id="bons-avec-reception">0</h3>
+                        <div class="spectrum-Detail spectrum-Detail--sizeM text-uppercase text-muted mb-3">Bons avec réception</div>
+                        <p class="spectrum-Body spectrum-Body--sizeS text-muted m-0">
+                            Bons de commande ayant au moins une réception enregistrée dans le système.
                         </p>
                     </div>
                 </div>
@@ -638,20 +680,18 @@
             
             <!-- Carte 2: Total des bons de commande -->
             <div class="col-md-6 col-lg-4">
-                <div class="card h-100 border-0 shadow-sm hover-zoom">
-                    <div class="card-body">
-                        <div class="d-flex align-items-center mb-3">
-                            <div class="icon-shape icon-lg bg-soft-yellow text-yellow rounded-3 me-3">
-                                <i class="fas fa-clipboard-list fs-4"></i>
+                <div class="spectrum-Card" style="width: 100%; height: 100%; background: #fff;">
+                    <div class="spectrum-Card-body" style="padding: 24px;">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="icon-shape icon-lg bg-soft-blue text-blue rounded-3 mb-3">
+                                <i class="fas fa-clipboard-list fa-lg"></i>
                             </div>
-                            <h3 class="mb-0 fs-5 fw-semibold text-uppercase">Total des bons</h3>
+                            <span class="spectrum-Badge spectrum-Badge--sizeS spectrum-Badge--neutral">Global</span>
                         </div>
-                        <div class="d-flex align-items-baseline">
-                            <h2 class="mb-0 fw-bold" id="total-bons">0</h2>
-                            <span class="ms-2 text-muted small">enregistrés</span>
-                        </div>
-                        <p class="text-muted small mt-2 mb-0">
-                            Tous les bons de commande dans le système
+                        <h3 class="spectrum-Heading spectrum-Heading--sizeXXL spectrum-Heading--heavy mb-1" id="total-bons">0</h3>
+                        <div class="spectrum-Detail spectrum-Detail--sizeM text-uppercase text-muted mb-3">Total des bons</div>
+                        <p class="spectrum-Body spectrum-Body--sizeS text-muted m-0">
+                            Totalité des bons de commande importés et disponibles pour consultation.
                         </p>
                     </div>
                 </div>
@@ -659,20 +699,15 @@
             
             <!-- Graphique: Diagramme circulaire -->
             <div class="col-12 col-lg-4">
-                <div class="card h-100 border-0 shadow-sm">
-                    <div class="card-header bg-white border-0 py-3">
-                        <h5 class="card-title mb-0 d-flex align-items-center spectrum-Heading spectrum-Heading--sizeS">
-                            <i class="fas fa-chart-pie text-yellow me-2"></i>
-                            Répartition des bons de commande
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container" style="position: relative; height: 300px;">
+                <div class="spectrum-Card" style="width: 100%; height: 100%; background: #fff;">
+                    <div class="spectrum-Card-body d-flex flex-column" style="padding: 24px; height: 100%;">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="fas fa-chart-pie text-warning me-2"></i>
+                            <h5 class="spectrum-Heading spectrum-Heading--sizeXS text-uppercase text-muted m-0">Répartition</h5>
+                        </div>
+                        <div class="chart-container flex-grow-1" style="position: relative; min-height: 200px;">
                             <canvas id="pie-chart"></canvas>
                         </div>
-                    </div>
-                    <div class="card-footer bg-transparent border-0 py-2">
-                        <small class="text-muted">Répartition des bons selon leur statut de réception</small>
                     </div>
                 </div>
             </div>
@@ -680,22 +715,25 @@
     </div>
     
     <!-- Séparateur simple -->
-    <div class="section-divider">
-        <hr class="divider-line">
-    </div>
+    <div class="section-divider"></div>
     
-    <h4 class="page-header mt-5 spectrum-Heading spectrum-Heading--sizeM">
-        <i class="fas fa-search mr-2"></i> Delivery Report 
-    </h4>
+    <div class="d-flex align-items-center justify-content-between mt-5 mb-4">
+        <h4 class="page-header m-0">
+            <i class="fas fa-search mr-2"></i> Delivery Report 
+        </h4>
+        <div class="text-muted small">
+            <i class="fas fa-info-circle me-1"></i> Sélectionnez un bon pour voir les détails
+        </div>
+    </div>
     
     <!-- Filtre unique : liste déroulante des bons de commande -->
     <div class="row mb-4">
-        <div class="col-md-4">
+        <div class="col-md-5">
             <div class="form-group">
-                <label for="bon-select" class="spectrum-FieldLabel">
-                    <strong>Select a Purchase Order</strong>
+                <label for="bon-select" class="spectrum-FieldLabel mb-2">
+                    Select a Purchase Order
                 </label>
-                <select id="bon-select" class="form-control select2">
+                <select id="bon-select" class="form-control select2" style="width: 100%;">
                     <option value="">All delivery orders</option>
                 </select>
             </div>
@@ -704,15 +742,19 @@
     
     <!-- Indicateur de chargement -->
     <div id="loading-spinner" class="loading-spinner">
-        <div class="spinner-border text-mtn-yellow" role="status">
+        <div class="spinner-border text-warning" role="status">
             <span class="sr-only">Chargement...</span>
         </div>
     </div>
     
     <!-- Message si aucun résultat -->
-    <div id="no-results" class="spectrum-InlineAlert spectrum-InlineAlert--info" style="display: none;">
-        <div class="spectrum-InlineAlert-content">
-            <i class="fas fa-info-circle me-2"></i> No results found.
+    <div id="no-results" class="alert alert-info border-0 shadow-sm rounded-3" style="display: none; background-color: var(--spectrum-gray-50);">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-info-circle me-3 fs-4 text-primary"></i>
+            <div>
+                <strong>No results found</strong><br>
+                Try adjusting your search filters or selecting a different PO.
+            </div>
         </div>
     </div>
     
@@ -796,69 +838,61 @@
                              aria-labelledby="summary-tab" tabindex="0">
                         <div class="stats-grid">
                             <!-- Carte Informations de commande -->
-                            <div class="stat-card">
-                                <div class="stat-card-header">
-                                    <h3 class="stat-card-title">Order Information</h3>
-                                    <div class="stat-card-badge" id="order-status-badge">Active</div>
-                                </div>
-                                <div class="stat-list">
-                                    <div class="stat-item">
-                                        <span class="stat-label">
-                                            Ordered Quantity
-                                        </span>
-                                        <span class="stat-value" id="modal-total-amount">--</span>
+                            <div class="spectrum-Card" style="width: 100%; background: #f9fafb;">
+                                <div class="spectrum-Card-body" style="padding: 20px;">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h3 class="spectrum-Heading spectrum-Heading--sizeXS my-0">Order Information</h3>
+                                        <span class="spectrum-Badge spectrum-Badge--sizeS spectrum-Badge--positive" id="order-status-badge">Active</span>
                                     </div>
-                                    <div class="stat-item">
-                                        <span class="stat-label">
-                                            Quantity Delivered
-                                        </span>
-                                        <span class="stat-value" id="modal-amount-received">--</span>
-                                    </div>
-                                    <div class="stat-item">
-                                        <span class="stat-label">
-                                            PO Amount
-                                        </span>
-                                        <span class="stat-value">
-                                            <span id="modal-po-amount">--</span>
-                                            <span class="currency" id="modal-currency">USD</span>
-                                        </span>
-                                    </div>
-                                    <div class="stat-item">
-                                        <span class="stat-label">
-                                            Line
-                                        </span>
-                                        <span class="stat-value" id="modal-line">--</span>
+                                    <div class="d-flex flex-column gap-3">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="spectrum-Body spectrum-Body--sizeS text-muted">Ordered Quantity</span>
+                                            <span class="spectrum-Body spectrum-Body--sizeS fw-bold" id="modal-total-amount">--</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="spectrum-Body spectrum-Body--sizeS text-muted">Quantity Delivered</span>
+                                            <span class="spectrum-Body spectrum-Body--sizeS fw-bold" id="modal-amount-received">--</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="spectrum-Body spectrum-Body--sizeS text-muted">PO Amount</span>
+                                            <span class="spectrum-Body spectrum-Body--sizeS fw-bold">
+                                                <span id="modal-po-amount">--</span>
+                                                <span class="text-muted fw-normal ms-1" id="modal-currency">USD</span>
+                                            </span>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="spectrum-Body spectrum-Body--sizeS text-muted">Line</span>
+                                            <span class="spectrum-Body spectrum-Body--sizeS fw-bold" id="modal-line">--</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
                             <!-- Carte Statut de livraison -->
-                            <div class="stat-card">
-                                <div class="stat-card-header">
-                                    <h3 class="stat-card-title">Delivery Status</h3>
-                                    <div class="stat-card-progress" id="delivery-progress">
-                                        <span id="modal-progress-rate">0</span>%
+                            <div class="spectrum-Card" style="width: 100%; background: #f9fafb;">
+                                <div class="spectrum-Card-body" style="padding: 20px;">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h3 class="spectrum-Heading spectrum-Heading--sizeXS my-0">Delivery Status</h3>
+                                        <div class="d-flex align-items-center">
+                                            <span class="spectrum-Heading spectrum-Heading--sizeL me-1" id="modal-progress-rate">0</span>
+                                            <span class="spectrum-Body spectrum-Body--sizeS text-muted">%</span>
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="stat-list">
-                                    <div class="stat-item">
-                                        <span class="stat-label">
-                                            Amount Delivered
-                                        </span>
-                                        <span class="stat-value">
-                                            <span id="modal-received-amount">--</span>
-                                            <span class="currency" id="modal-currency-2">USD</span>
-                                        </span>
-                                    </div>
-                                    <div class="stat-item stat-item-progress">
-                                        <span class="stat-label">Delivery Rate</span>
-                                        <div class="progress-container">
-                                            <div class="progress-bar" role="progressbar" aria-valuenow="0" 
-                                                 aria-valuemin="0" aria-valuemax="100">
-                                                <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+                                    <div class="d-flex flex-column gap-3">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="spectrum-Body spectrum-Body--sizeS text-muted">Amount Delivered</span>
+                                            <span class="spectrum-Body spectrum-Body--sizeS fw-bold">
+                                                <span id="modal-received-amount">--</span>
+                                                <span class="text-muted fw-normal ms-1" id="modal-currency-2">USD</span>
+                                            </span>
+                                        </div>
+                                        <div class="d-flex flex-column gap-2">
+                                            <div class="d-flex justify-content-between">
+                                                <span class="spectrum-Body spectrum-Body--sizeS text-muted">Delivery Rate</span>
+                                                <span class="spectrum-Body spectrum-Body--sizeS fw-bold" id="modal-progress-rate-text">0%</span>
                                             </div>
-                                            <div class="progress-labels">
-                                                <span class="progress-value" id="modal-progress-rate-text">0%</span>
+                                            <div class="spectrum-ProgressBar spectrum-ProgressBar--sizeS" style="width: 100%; height: 6px; background: #e1e1e1; border-radius: 3px; overflow: hidden;">
+                                                <div class="spectrum-ProgressBar-fill" id="progress-fill" style="width: 0%; height: 100%; background: #10b981; transition: width 0.3s ease;"></div>
                                             </div>
                                         </div>
                                     </div>
@@ -1145,8 +1179,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const badge = document.getElementById('order-status-badge');
         if (badge) {
             const status = log.status || 'Active';
-            badge.textContent = status;
-            badge.style.background = getStatusColor(status);
+            updateBadgeStatus(badge, status);
         }
     }
     
@@ -1219,14 +1252,37 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function getStatusColor(status) {
-        const colors = {
-            'Active': '#dcfce7',
-            'Completed': '#dbeafe',
-            'Pending': '#fef3c7',
-            'Cancelled': '#f3f4f6'
-        };
-        return colors[status] || '#f3f4f6';
+    function updateBadgeStatus(element, status) {
+        // Remove all semantic variants
+        element.classList.remove(
+            'spectrum-Badge--positive',
+            'spectrum-Badge--negative',
+            'spectrum-Badge--info',
+            'spectrum-Badge--neutral',
+            'spectrum-Badge--yellow'
+        );
+        
+        // Remove inline background style if any (legacy cleanup)
+        element.style.background = '';
+        
+        element.textContent = status;
+
+        switch (status) {
+            case 'Active':
+                element.classList.add('spectrum-Badge--positive');
+                break;
+            case 'Completed':
+                element.classList.add('spectrum-Badge--positive');
+                break;
+            case 'Pending':
+                element.classList.add('spectrum-Badge--yellow');
+                break;
+            case 'Cancelled':
+                element.classList.add('spectrum-Badge--negative');
+                break;
+            default:
+                element.classList.add('spectrum-Badge--neutral');
+        }
     }
 
     // Initialiser Select2

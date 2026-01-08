@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rappel de Signature MSRN</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #1F5C99;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            color: #1F5C99;
+            margin: 0;
+            font-size: 24px;
+        }
+        .alert-box {
+            background-color: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .alert-box .count {
+            font-size: 36px;
+            font-weight: bold;
+            color: #856404;
+        }
+        .alert-box .label {
+            color: #856404;
+            font-size: 14px;
+        }
+        .greeting {
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+        .message {
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th {
+            background-color: #1F5C99;
+            color: white;
+            padding: 12px 8px;
+            text-align: left;
+            font-size: 13px;
+        }
+        td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #ddd;
+            font-size: 13px;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        tr:hover {
+            background-color: #e8f4fc;
+        }
+        .deadline {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+        }
+        .cta-button {
+            display: inline-block;
+            background-color: #1F5C99;
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        .cta-button:hover {
+            background-color: #164a7a;
+        }
+        .signature {
+            margin-top: 20px;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⏰ Rappel de Signature MSRN</h1>
+        </div>
+        
+        <p class="greeting">Bonjour <strong>{{ signatory_name }}</strong>,</p>
+        
+        <div class="alert-box">
+            <div class="count">{{ count }}</div>
+            <div class="label">rapport(s) MSRN en attente de votre signature</div>
+        </div>
+        
+        <p class="message">
+            Les rapports suivants sont en attente de votre signature depuis plus de <strong>48 heures</strong>.
+            Merci de bien vouloir les traiter dans les meilleurs délais.
+        </p>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>N° PO</th>
+                    <th>N° MSRN</th>
+                    <th>Rôle</th>
+                    <th>Date limite</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for report in pending_reports %}
+                <tr>
+                    <td><strong>{{ report.po_number }}</strong></td>
+                    <td>{{ report.report_number }}</td>
+                    <td>{{ report.signatory_role }}</td>
+                    <td class="deadline">{{ report.deadline|date:"d/m/Y H:i" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <div style="text-align: center;">
+            <a href="{{ site_url }}/admin/orders/msrnsignaturetracking/" class="cta-button">
+                Accéder aux signatures
+            </a>
+        </div>
+        
+        <p class="signature">
+            Cordialement,<br>
+            <strong>L'équipe MSRN</strong>
+        </p>
+        
+        <div class="footer">
+            <p>
+                Ceci est un email automatique généré par le système MSRN.<br>
+                Merci de ne pas répondre à ce message.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

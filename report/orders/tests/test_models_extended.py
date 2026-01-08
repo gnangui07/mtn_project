@@ -550,6 +550,9 @@ class TestFichierImporteExtended(TestCase):
             utilisateur=self.user
         )
         
+        # Nettoyer les lignes auto-créées avant de créer les nôtres
+        fichier.lignes.all().delete()
+        
         # Créer quelques lignes
         LigneFichier.objects.create(
             fichier=fichier,
@@ -571,10 +574,16 @@ class TestFichierImporteExtended(TestCase):
 
     def test_extraire_et_enregistrer_bons_commande_with_data(self):
         """Test extraire_et_enregistrer_bons_commande avec données"""
+        # Nettoyer les bons existants pour isolation du test
+        NumeroBonCommande.objects.filter(numero__in=['PO001', 'PO002']).delete()
+        
         fichier = FichierImporte.objects.create(
             fichier='test.csv',
             utilisateur=self.user
         )
+        
+        # Nettoyer les lignes auto-créées avant de créer les nôtres
+        fichier.lignes.all().delete()
         
         # Créer des lignes avec différents orders
         LigneFichier.objects.create(
@@ -599,8 +608,8 @@ class TestFichierImporteExtended(TestCase):
         # Appeler la méthode
         fichier.extraire_et_enregistrer_bons_commande()
         
-        # Vérifier que les bons ont été créés
-        bons = NumeroBonCommande.objects.filter(fichiers=fichier)
+        # Vérifier que les bons ont été créés (filtrer par numéro pour éviter les faux positifs)
+        bons = NumeroBonCommande.objects.filter(fichiers=fichier, numero__in=['PO001', 'PO002'])
         self.assertEqual(bons.count(), 2)
         
         # Vérifier le CPU nettoyé

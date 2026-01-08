@@ -12,6 +12,69 @@ logger = logging.getLogger(__name__)
 
 
 @shared_task
+def send_signature_reminder_task(signature_id: int):
+    """
+    Tâche pour envoyer un rappel de signature à UN signataire spécifique.
+    
+    Cette tâche est programmée automatiquement 48h après la création d'une signature.
+    Elle vérifie si le statut est toujours 'pending' avant d'envoyer l'email.
+    
+    - Si status='pending' → Envoie l'email
+    - Si status='signed' → Ne fait rien (déjà signé)
+    """
+    from .models import MSRNSignatureTracking
+    from .emails import find_user_email_by_name, send_signature_reminder
+    
+    try:
+        sig = MSRNSignatureTracking.objects.select_related(
+            'msrn_report', 'msrn_report__bon_commande'
+        ).get(pk=signature_id)
+        
+        # Si déjà signé, ne rien faire
+        if sig.status == 'signed':
+            logger.info(f"Signature {signature_id} déjà signée, pas d'email envoyé")
+            return {'status': 'already_signed', 'signature_id': signature_id}
+        
+        # EXCLUSION: Ne pas envoyer de rappel pour ces rôles (exclu par specs)
+        if sig.signatory_role in ['senior_technical_lead', 'vendor']:
+            logger.info(f"Rappel ignoré pour le rôle {sig.signatory_role} (signature {signature_id})")
+            return {'status': 'excluded_role', 'signature_id': signature_id, 'role': sig.signatory_role}
+        
+        # Trouver l'email du signataire
+        email = find_user_email_by_name(sig.signatory_name)
+        
+        if not email:
+            logger.warning(f"Email non trouvé pour {sig.signatory_name} (signature {signature_id})")
+            return {'status': 'no_email', 'signature_id': signature_id, 'name': sig.signatory_name}
+        
+        # Préparer les données du rapport
+        pending_report = {
+            'msrn_report': sig.msrn_report,
+            'po_number': sig.msrn_report.bon_commande.numero if sig.msrn_report.bon_commande else 'N/A',
+            'report_number': sig.msrn_report.report_number,
+            'created_at': sig.msrn_report.created_at,
+            'deadline': sig.msrn_report.created_at + __import__('datetime').timedelta(hours=48),
+            'signatory_role': sig.get_signatory_role_display(),
+        }
+        
+        # Envoyer l'email
+        success = send_signature_reminder(sig.signatory_name, email, [pending_report])
+        
+        if success:
+            logger.info(f"Rappel envoyé à {sig.signatory_name} ({email}) pour signature {signature_id}")
+            return {'status': 'sent', 'signature_id': signature_id, 'email': email}
+        else:
+            return {'status': 'failed', 'signature_id': signature_id}
+            
+    except MSRNSignatureTracking.DoesNotExist:
+        logger.warning(f"Signature {signature_id} non trouvée")
+        return {'status': 'not_found', 'signature_id': signature_id}
+    except Exception as exc:
+        logger.exception(f"Erreur envoi rappel signature {signature_id}: {exc}")
+        raise exc
+
+
+@shared_task
 def invalidate_bon_cache(bon_id: int):
     """Invalide les caches liés à un bon de commande."""
     try:

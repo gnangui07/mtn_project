@@ -371,6 +371,14 @@
     color: var(--mtn-yellow) !important;
 }
 
+.bg-soft-blue {
+    background-color: rgba(59, 130, 246, 0.15) !important;
+}
+
+.text-blue {
+    color: #3b82f6 !important;
+}
+
 .bg-yellow {
     background-color: var(--mtn-yellow) !important;
 }

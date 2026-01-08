@@ -166,6 +166,241 @@
         border: 1px solid #ddd !important;
         border-radius: 4px !important;
     }
+    
+    /* ============================================
+       RESPONSIVE - Support tous écrans
+       ============================================ */
+    
+    /* Petits laptops (1024px - 1366px) */
+    @media (max-width: 1366px) {
+        .supplier-info-card {
+            padding: 25px;
+        }
+        
+        .stats-card {
+            padding: 20px;
+            min-width: 150px !important;
+        }
+        
+        .stats-card h2.display-3 {
+            font-size: 2.5rem !important;
+        }
+        
+        .top-list, .worst-list {
+            max-height: 500px;
+        }
+        
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+    }
+    
+    /* Tablettes (max 1024px) */
+    @media (max-width: 1024px) {
+        .d-flex.justify-content-between.align-items-center {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 1rem;
+        }
+        
+        .d-flex.justify-content-between.align-items-center > div {
+            width: 100%;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        
+        .d-flex.justify-content-between.align-items-center .btn {
+            flex: 1;
+            min-width: 90px;
+        }
+        
+        h1 {
+            font-size: 1.5rem !important;
+        }
+        
+        .supplier-info-card {
+            padding: 20px;
+        }
+        
+        .supplier-info-card h2 {
+            font-size: 1.25rem !important;
+        }
+        
+        .supplier-info-card .col-md-4,
+        .supplier-info-card .col-md-8 {
+            text-align: center !important;
+        }
+        
+        .supplier-info-card .text-end {
+            text-align: center !important;
+            margin-top: 1rem;
+        }
+        
+        .rank-badge {
+            width: 60px;
+            height: 60px;
+            font-size: 1.5rem;
+        }
+        
+        .stats-card {
+            padding: 15px;
+            min-width: auto !important;
+        }
+        
+        .stats-card h2.display-3 {
+            font-size: 2rem !important;
+        }
+        
+        .col-lg-6 {
+            margin-bottom: 1.5rem;
+        }
+        
+        .top-list, .worst-list {
+            max-height: 400px;
+        }
+        
+        .list-item {
+            padding: 12px;
+        }
+        
+        .list-item:hover {
+            transform: translateX(4px) scale(1.01);
+        }
+    }
+    
+    /* Mobiles (max 768px) */
+    @media (max-width: 768px) {
+        .container-fluid {
+            padding-left: 0.75rem !important;
+            padding-right: 0.75rem !important;
+        }
+        
+        h1 {
+            font-size: 1.25rem !important;
+        }
+        
+        h1 i {
+            font-size: 1rem !important;
+            margin-right: 0.5rem !important;
+        }
+        
+        .btn {
+            padding: 0.5rem 0.75rem !important;
+            font-size: 0.8rem !important;
+        }
+        
+        .supplier-info-card {
+            padding: 15px;
+            border-radius: 12px;
+        }
+        
+        .supplier-info-card h2 {
+            font-size: 1.1rem !important;
+        }
+        
+        .supplier-info-card .row.mb-4.pb-4 {
+            flex-direction: column;
+        }
+        
+        .supplier-info-card .col-md-4 .p-3 {
+            padding: 0.75rem !important;
+            margin-bottom: 0.5rem;
+        }
+        
+        .supplier-info-card .col-md-4 h3 {
+            font-size: 1.25rem !important;
+        }
+        
+        .supplier-info-card .col-md-4 p {
+            font-size: 0.75rem !important;
+        }
+        
+        .stats-card {
+            padding: 12px;
+        }
+        
+        .stats-card h2.display-3 {
+            font-size: 1.75rem !important;
+        }
+        
+        .stats-card p {
+            font-size: 0.75rem !important;
+        }
+        
+        .card {
+            margin-bottom: 1rem;
+        }
+        
+        .card-header {
+            padding: 0.75rem !important;
+        }
+        
+        .card-header h5 {
+            font-size: 0.9rem !important;
+        }
+        
+        .card-body {
+            padding: 0.75rem !important;
+        }
+        
+        .top-list, .worst-list {
+            max-height: 300px;
+        }
+        
+        .list-item {
+            padding: 10px;
+            margin-bottom: 8px;
+        }
+        
+        .list-item h6 {
+            font-size: 0.85rem !important;
+        }
+        
+        .list-item small {
+            font-size: 0.7rem !important;
+        }
+        
+        .table {
+            font-size: 0.75rem !important;
+        }
+        
+        .table th, .table td {
+            padding: 0.5rem !important;
+        }
+        
+        .progress {
+            height: 8px;
+        }
+        
+        /* Colonnes en pleine largeur sur mobile */
+        .col-md-2, .col-md-4, .col-md-8, .col-md-10 {
+            flex: 0 0 100%;
+            max-width: 100%;
+        }
+    }
+    
+    /* Très petits écrans (max 480px) */
+    @media (max-width: 480px) {
+        h1 {
+            font-size: 1.1rem !important;
+        }
+        
+        .supplier-info-card h4 {
+            font-size: 0.9rem !important;
+        }
+        
+        .d-flex.justify-content-between.mb-2 span {
+            font-size: 0.8rem !important;
+        }
+        
+        .rank-badge {
+            width: 50px;
+            height: 50px;
+            font-size: 1.25rem;
+        }
+    }
 </style>
 <!-- Select2 CSS -->
 <link href="{% static 'css/vendor/select2.min.css' %}" rel="stylesheet" />
@@ -192,7 +427,7 @@
             <div class="row mb-5">
                 <div class="col-12">
                     <div class="text-center mb-4">
-                        <div class="stats-card d-inline-block" style="min-width: 300px;">
+                        <div class="stats-card d-inline-block" style="min-width: 250px;">
                             <h2 class="display-3 fw-bold mb-2">{{ total_suppliers }}</h2>
                             <p class="mb-0 fw-semibold text-uppercase">Suppliers Evaluated</p>
                         </div>

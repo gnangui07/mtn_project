@@ -11,6 +11,7 @@ class TestTargetRateLogic(TestCase):
         self.client = Client()
         self.user = User.objects.create_user(email='test@example.com', password='password')
         self.user.is_active = True
+        self.user.is_superuser = True  # Superuser pour avoir accès à toutes les fonctionnalités
         self.user.save()
         self.client.force_login(self.user)
         

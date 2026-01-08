@@ -57,13 +57,15 @@ class TestCompensationLetterAPI:
         assert 'Bon de commande non trouvé' in data['error']
 
     @pytest.mark.django_db
+    @patch('orders.compensation_letter_api.CELERY_AVAILABLE', False)
+    @patch('orders.compensation_letter_api.CompensationLetterLog')
     @patch('orders.compensation_letter_api.get_object_or_404')
     @patch('orders.compensation_letter_api.collect_penalty_context')
     @patch('orders.compensation_letter_api.generate_compensation_letter')
     @patch('orders.compensation_letter_api.threading.Thread')
     def test_successful_pdf_generation(
         self, mock_thread, mock_generate_pdf, mock_collect_context, 
-        mock_get_object, mock_request
+        mock_get_object, mock_log_model, mock_request
     ):
         """Test la génération réussie du PDF"""
         # Setup mocks
@@ -76,8 +78,14 @@ class TestCompensationLetterAPI:
             'supplier': 'Test Supplier'
         }
         
+        # Mock CompensationLetterLog
+        mock_log_entry = Mock()
+        mock_log_entry.id = 1
+        mock_log_model.objects.create.return_value = mock_log_entry
+        
         mock_pdf_buffer = Mock()
         mock_pdf_buffer.read.return_value = b'%PDF-1.4 fake pdf content'
+        mock_pdf_buffer.getvalue.return_value = b'%PDF-1.4 fake pdf content'
         mock_generate_pdf.return_value = mock_pdf_buffer
         
         mock_thread_instance = Mock()
@@ -90,7 +98,7 @@ class TestCompensationLetterAPI:
         assert isinstance(response, HttpResponse)
         assert response.status_code == 200
         assert response['content-type'] == 'application/pdf'
-        assert 'Lettre_Compensation_TEST123.pdf' in response['content-disposition']
+        assert 'CompensationLetter-TEST123-1.pdf' in response['content-disposition']
         assert b'%PDF-1.4 fake pdf content' in response.content
 
         # Verify mocks were called
@@ -117,14 +125,26 @@ class TestCompensationLetterAPI:
         assert 'Erreur lors de la génération' in data['error']
 
     @pytest.mark.django_db
+    @patch('orders.compensation_letter_api.CELERY_AVAILABLE', False)
+    @patch('orders.compensation_letter_api.CompensationLetterLog')
     @patch('orders.compensation_letter_api.get_object_or_404')
     @patch('orders.compensation_letter_api.collect_penalty_context')
     @patch('orders.compensation_letter_api.generate_compensation_letter')
-    def test_email_sent_async(self, mock_generate_pdf, mock_collect_context, mock_get_object, mock_request):
-        """Test que l'email est envoyé de façon asynchrone"""
-        mock_get_object.return_value = Mock()
+    def test_email_sent_async(self, mock_generate_pdf, mock_collect_context, mock_get_object, mock_log_model, mock_request):
+        """Test que l'email est envoyé de façon asynchrone (mode synchrone)"""
+        bon_commande = Mock()
+        bon_commande.numero = 'TEST123'
+        mock_get_object.return_value = bon_commande
         mock_collect_context.return_value = {}
+        
+        # Mock CompensationLetterLog
+        mock_log_entry = Mock()
+        mock_log_entry.id = 1
+        mock_log_model.objects.create.return_value = mock_log_entry
+        
         mock_pdf_buffer = Mock()
+        mock_pdf_buffer.read.return_value = b'%PDF-1.4 fake pdf content'
+        mock_pdf_buffer.getvalue.return_value = b'%PDF-1.4 fake pdf content'
         mock_generate_pdf.return_value = mock_pdf_buffer
 
         with patch('orders.compensation_letter_api.send_penalty_notification') as mock_send_email:
@@ -151,14 +171,27 @@ class TestCompensationLetterAPI:
                     # Should not return method not allowed
                     assert not isinstance(response, JsonResponse) or response.status_code != 405
 
+    @pytest.mark.django_db
+    @patch('orders.compensation_letter_api.CELERY_AVAILABLE', False)
+    @patch('orders.compensation_letter_api.CompensationLetterLog')
     @patch('orders.compensation_letter_api.get_object_or_404')
     @patch('orders.compensation_letter_api.collect_penalty_context')
     @patch('orders.compensation_letter_api.generate_compensation_letter')
-    def test_user_email_in_context(self, mock_generate_pdf, mock_collect_context, mock_get_object, mock_request):
-        """Test que l'email utilisateur est passé au générateur PDF"""
-        mock_get_object.return_value = Mock()
+    def test_user_email_in_context(self, mock_generate_pdf, mock_collect_context, mock_get_object, mock_log_model, mock_request):
+        """Test que l'email utilisateur est passé au générateur PDF (mode synchrone)"""
+        bon_commande = Mock()
+        bon_commande.numero = 'TEST123'
+        mock_get_object.return_value = bon_commande
         mock_collect_context.return_value = {}
+        
+        # Mock CompensationLetterLog
+        mock_log_entry = Mock()
+        mock_log_entry.id = 1
+        mock_log_model.objects.create.return_value = mock_log_entry
+        
         mock_pdf_buffer = Mock()
+        mock_pdf_buffer.read.return_value = b'%PDF-1.4 fake pdf content'
+        mock_pdf_buffer.getvalue.return_value = b'%PDF-1.4 fake pdf content'
         mock_generate_pdf.return_value = mock_pdf_buffer
 
         mock_request.user.email = 'test@example.com'
@@ -167,5 +200,6 @@ class TestCompensationLetterAPI:
             generate_compensation_letter_api(mock_request, 1)
             
             # Verify user email was passed to PDF generator
+            mock_generate_pdf.assert_called_once()
             call_kwargs = mock_generate_pdf.call_args[1]
             assert call_kwargs['user_email'] == 'test@example.com'

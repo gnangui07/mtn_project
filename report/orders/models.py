@@ -727,15 +727,17 @@ class NumeroBonCommande(models.Model):
         return total
 
     def save(self, *args, **kwargs):
-        # Validation du taux de rétention
+        # Validation du taux de rétention requise par les tests
+        if self.retention_rate is None:
+            raise TypeError("retention_rate cannot be None")
         if self.retention_rate < 0 or self.retention_rate > 10:
-            raise ValidationError("Le taux de rétention doit être entre 0 et 10%")
+            from django.core.exceptions import ValidationError
+            raise ValidationError("retention_rate must be between 0 and 10")
             
-        # Sauvegarder d'abord l'instance
         super().save(*args, **kwargs)
         
-        # Recalculer toutes les réceptions après sauvegarde
-        from django.db.models import Value, DecimalField
+        # 3) Recalculer toutes les réceptions après sauvegarde
+        from django.db.models import Value, DecimalField, F
         # Construire le facteur (1 - retention_rate/100) en Decimal pour éviter les erreurs de type
         factor = Value(1, output_field=DecimalField()) - (Value(self.retention_rate, output_field=DecimalField()) / Value(100, output_field=DecimalField()))
 
@@ -1523,7 +1525,7 @@ class MSRNReport(models.Model):
     Modèle pour stocker les rapports MSRN (Material Shipping and Receiving Note) générés
     """
     report_number = models.CharField(
-        max_length=10, 
+        max_length=20, 
         unique=True, 
         verbose_name="Report Number"
     )
@@ -1618,6 +1620,13 @@ class MSRNReport(models.Model):
         verbose_name="Snapshot - Montant payable",
         help_text="Montant payable au moment de la création du rapport"
     )
+    currency_snapshot = models.CharField(
+        max_length=10,
+        null=True,
+        blank=True,
+        verbose_name="Snapshot - Devise",
+        help_text="Devise du bon de commande au moment de la création du rapport"
+    )
     receptions_data_snapshot = models.JSONField(
         null=True,
         blank=True,
@@ -1637,6 +1646,83 @@ class MSRNReport(models.Model):
         verbose_name="Utilisateur"
     )
     
+    # ===== CHAMPS POUR LE SUIVI ET FILTRAGE =====
+    supplier_snapshot = models.CharField(
+        max_length=500,
+        null=True,
+        blank=True,
+        verbose_name="Fournisseur",
+        help_text="Nom du fournisseur au moment de la création",
+        db_index=True
+    )
+    cpu_snapshot = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        verbose_name="CPU",
+        help_text="CPU au moment de la création",
+        db_index=True
+    )
+    project_manager_snapshot = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        verbose_name="Project Manager",
+        help_text="Nom du Project Manager",
+        db_index=True
+    )
+    project_coordinator_snapshot = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        verbose_name="Project Coordinator"
+    )
+    senior_pm_snapshot = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        verbose_name="Senior PM"
+    )
+    senior_technical_lead_snapshot = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        verbose_name="Senior Technical Lead"
+    )
+    manager_portfolio_snapshot = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        verbose_name="Manager Portfolio"
+    )
+    gm_epmo_snapshot = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        verbose_name="GM EPMO"
+    )
+    vendor_snapshot = models.CharField(
+        max_length=500,
+        null=True,
+        blank=True,
+        verbose_name="Vendor (Supplier)"
+    )
+    
+    # Statut global du workflow de signature
+    WORKFLOW_STATUS = [
+        ('draft', 'Brouillon'),
+        ('in_progress', 'En cours de signature'),
+        ('completed', 'Toutes signatures obtenues'),
+        ('cancelled', 'Annulé'),
+    ]
+    workflow_status = models.CharField(
+        max_length=20,
+        choices=WORKFLOW_STATUS,
+        default='draft',
+        verbose_name="Statut du workflow",
+        db_index=True
+    )
+    
     class Meta:
         verbose_name = "Rapport MSRN"
         verbose_name_plural = "Rapports MSRN"
@@ -1645,15 +1731,16 @@ class MSRNReport(models.Model):
     def save(self, *args, **kwargs):
         # Si le report_number n'est pas défini, on le génère
         if not self.report_number:
-            # Générer un numéro au format MSRN250353 (MSRN + année + séquence)
-            from datetime import datetime
+            # =========================================================================
+            # NOUVELLE LOGIQUE TEMPORAIRE POUR 2025 (Backlog)
+            # =========================================================================
             from django.db import transaction
             
-            current_year = datetime.now().year
-            year_suffix = str(current_year)[-2:]  # Prendre les 2 derniers chiffres de l'année
+            # Utiliser fixement "25" pour les 2 chiffres de l'année (2025)
+            year_suffix = "25"
+            year_prefix = f"MSRN{year_suffix}"
             
             # CRITIQUE: Utiliser select_for_update() pour éviter les race conditions
-            year_prefix = f"MSRN{year_suffix}"
             with transaction.atomic():
                 latest_report = MSRNReport.objects.filter(
                     report_number__startswith=year_prefix
@@ -1662,46 +1749,81 @@ class MSRNReport(models.Model):
             if latest_report:
                 # Extraire le numéro séquentiel du rapport le plus récent
                 latest_number = latest_report.report_number
-                sequence_part = latest_number[6:]  # Prendre les 4 derniers chiffres après "MSRN25"
+                sequence_part = latest_number[6:]  # Prendre tout ce qui vient après "MSRN25"
+                next_sequence = int(sequence_part) + 1
+
+                # Rattrapage 2025: Si le numéro est inférieur à 6501, on force le saut à 6501
+                if next_sequence < 6501:
+                    next_sequence = 6501
+            else:
+                # Premier rapport forcé de l'année 25 (démarre à 6501)
+                next_sequence = 6501
+            
+            # Formater le numéro séquentiel sur au moins 5 chiffres
+            sequence_formatted = f"{next_sequence:05d}"
+            self.report_number = f"{year_prefix}{sequence_formatted}"
+
+            """
+            # =========================================================================
+            # ANCIENNE LOGIQUE (À RÉACTIVER APRÈS LE RATTRAPAGE 2025)
+            # =========================================================================
+            from datetime import datetime
+            from django.db import transaction
+            
+            current_year = datetime.now().year
+            year_suffix = str(current_year)[-2:]  # Prendre les 2 derniers chiffres de l'année
+            year_prefix = f"MSRN{year_suffix}"
+            
+            with transaction.atomic():
+                latest_report = MSRNReport.objects.filter(
+                    report_number__startswith=year_prefix
+                ).select_for_update().only('report_number').order_by('-report_number').first()
+            
+            if latest_report:
+                latest_number = latest_report.report_number
+                sequence_part = latest_number[6:]
                 next_sequence = int(sequence_part) + 1
             else:
-                # Premier rapport de l'année
                 next_sequence = 1
             
-            # Formater le numéro séquentiel sur 4 chiffres
             sequence_formatted = f"{next_sequence:04d}"
             self.report_number = f"{year_prefix}{sequence_formatted}"
+            # =========================================================================
+            """
             
             # Capturer les snapshots au moment de la création du rapport
+            from decimal import Decimal
             self.montant_total_snapshot = self.bon_commande.montant_total() or Decimal('0')
             self.montant_recu_snapshot = self.bon_commande.montant_recu() or Decimal('0')
-            self.progress_rate_snapshot = Decimal(self.bon_commande.taux_avancement())
+            self.progress_rate_snapshot = Decimal(str(self.bon_commande.taux_avancement() or '0'))
             self.retention_rate_snapshot = self.retention_rate or Decimal('0')
             self.retention_amount_snapshot = self.retention_amount or Decimal('0')
             self.payable_amount_snapshot = self.payable_amount or Decimal('0')
             
-            # OPTIMISATION: Capturer Payment Terms (2 requêtes optimisées avec .only())
+            # Capturer la devise
+            if hasattr(self.bon_commande, 'get_currency'):
+                self.currency_snapshot = self.bon_commande.get_currency() or 'XOF'
+            else:
+                self.currency_snapshot = 'XOF'
+                
+            # Capturer les Payment Terms
             if not self.payment_terms_snapshot:
                 from .models import Reception, LigneFichier
                 try:
-                    # Récupérer une réception avec son business_id uniquement (1 requête)
                     reception = Reception.objects.filter(
                         bon_commande=self.bon_commande
                     ).only('business_id').first()
                     
                     if reception and reception.business_id:
-                        # Chercher la ligne correspondante via business_id (1 requête)
                         ligne = LigneFichier.objects.filter(
                             business_id=reception.business_id
                         ).only('contenu').first()
-                        
                         if ligne and ligne.contenu:
                             contenu = ligne.contenu
-                            # Chercher 'Payment Terms' avec ou sans espace à la fin
                             payment_key = None
-                            if 'Payment Terms ' in contenu:  # Avec espace (clé réelle dans les données)
+                            if 'Payment Terms ' in contenu:
                                 payment_key = 'Payment Terms '
-                            elif 'Payment Terms' in contenu:  # Sans espace (fallback)
+                            elif 'Payment Terms' in contenu:
                                 payment_key = 'Payment Terms'
                             
                             if payment_key and contenu[payment_key]:
@@ -1710,6 +1832,37 @@ class MSRNReport(models.Model):
                                     self.payment_terms_snapshot = val
                 except Exception:
                     pass
+
+            # =========================================================================
+            # CAPTURE DES SNAPSHOTS SIGNATAIRES ET INFO (MANQUANT)
+            # =========================================================================
+            if not self.supplier_snapshot:
+                self.supplier_snapshot = self.bon_commande.get_supplier()
+            
+            if not self.cpu_snapshot:
+                self.cpu_snapshot = self.bon_commande.get_cpu()
+                
+            if not self.project_manager_snapshot:
+                self.project_manager_snapshot = self.bon_commande.get_project_manager()
+                
+            if not self.project_coordinator_snapshot:
+                self.project_coordinator_snapshot = self.bon_commande.get_project_coordinator()
+                
+            if not self.senior_pm_snapshot:
+                self.senior_pm_snapshot = self.bon_commande.get_senior_pm()
+                
+            if not self.senior_technical_lead_snapshot:
+                self.senior_technical_lead_snapshot = self.bon_commande.get_senior_technical_lead()
+                
+            if not self.manager_portfolio_snapshot:
+                self.manager_portfolio_snapshot = self.bon_commande.get_manager_portfolio()
+                
+            if not self.gm_epmo_snapshot:
+                self.gm_epmo_snapshot = self.bon_commande.get_gm_epmo()
+
+            if not self.vendor_snapshot:
+                self.vendor_snapshot = self.bon_commande.get_supplier()
+            # =========================================================================
             
             # Optimisation: Capturer le snapshot des données des réceptions si pas déjà défini
             if not self.receptions_data_snapshot:
@@ -1802,7 +1955,56 @@ class MSRNReport(models.Model):
                 
                 self.receptions_data_snapshot = receptions_snapshot
         
+        is_new = self._state.adding
         super().save(*args, **kwargs)
+
+        # 3) Création automatique des lignes de signature (Seulement à la création OU si aucune signature n'existe)
+        # Cela permet de rattraper les signatures manquantes pour les rapports existants
+        from .models import MSRNSignatureTracking
+        has_signatures = MSRNSignatureTracking.objects.filter(msrn_report=self).exists()
+        
+        if is_new or not has_signatures:
+            # Construire la liste des signataires selon le CPU du rapport
+            # Logique synchronisée avec reports.py pour éviter l'incohérence Admin/PDF
+            cpu = self.cpu_snapshot or ""
+            
+            signatories = []
+            
+            # Ordre strict défini dans reports.py :
+            # 1. Project Coordinator
+            signatories.append(('project_coordinator', self.project_coordinator_snapshot))
+            # 2. Project Manager
+            signatories.append(('project_manager', self.project_manager_snapshot))
+            
+            # 3. Senior PM (Exclu pour FAC)
+            if cpu != 'FAC':
+                signatories.append(('senior_pm', self.senior_pm_snapshot))
+                
+            # 4. Manager Portfolio
+            signatories.append(('manager_portfolio', self.manager_portfolio_snapshot))
+            # 5. GM EPMO
+            signatories.append(('gm_epmo', self.gm_epmo_snapshot))
+            
+            # 6. Senior Technical Lead (Uniquement pour ITS)
+            if cpu == 'ITS':
+                signatories.append(('senior_technical_lead', self.senior_technical_lead_snapshot))
+                
+            # 7. Vendor
+            signatories.append(('vendor', self.vendor_snapshot))
+            
+            # Créer les entrées de signature
+            for i, (role, name) in enumerate(signatories, 1):
+                # On crée l'entrée si un nom est présent (même N/A est filtré)
+                if name and str(name).lower() not in ['n/a', 'na', 'none', '', ' ', 'none']:
+                    MSRNSignatureTracking.objects.get_or_create(
+                        msrn_report=self,
+                        signatory_role=role,
+                        defaults={
+                            'signatory_name': name,
+                            'order': i,
+                            'status': 'pending'
+                        }
+                    )
     
     def __str__(self):
         return f"MSRN-{self.report_number} for {self.bon_commande.numero}"
@@ -2180,14 +2382,21 @@ class VendorEvaluation(models.Model):
 
     def save(self, *args, **kwargs):
         """Calcule automatiquement la moyenne avant la sauvegarde"""
-        scores = [
+        raw_scores = [
             self.delivery_compliance,
             self.delivery_timeline,
             self.advising_capability,
             self.after_sales_qos,
             self.vendor_relationship
         ]
-        self.vendor_final_rating = Decimal(str(sum(scores) / len(scores))) if scores else Decimal('0.00')
+        # Filtrer les scores None pour éviter les erreurs de type
+        scores = [s for s in raw_scores if s is not None]
+        
+        if scores:
+            self.vendor_final_rating = Decimal(str(sum(scores) / len(scores)))
+        else:
+            self.vendor_final_rating = Decimal('0.00')
+            
         super().save(*args, **kwargs)
 
     def get_criteria_description(self, criteria_name, score):
@@ -2198,10 +2407,131 @@ class VendorEvaluation(models.Model):
 
     def get_total_score(self):
         """Calcule le score total sur 50"""
-        return (
-            self.delivery_compliance +
-            self.delivery_timeline +
-            self.advising_capability +
-            self.after_sales_qos +
+        scores = [
+            self.delivery_compliance,
+            self.delivery_timeline,
+            self.advising_capability,
+            self.after_sales_qos,
             self.vendor_relationship
+        ]
+        return sum(s or 0 for s in scores)
+
+
+class MSRNSignatureTracking(models.Model):
+    """
+    Modèle simplifié pour le suivi des signatures sur les rapports MSRN.
+    Le superuser entre uniquement la date de signature, le statut se met à jour automatiquement.
+    """
+    
+    # Choix des rôles de signataires
+    SIGNATORY_ROLES = [
+        ('project_manager', 'Project Manager'),
+        ('project_coordinator', 'Project Coordinator'),
+        ('senior_pm', 'Senior PM'),
+        ('senior_technical_lead', 'Senior Technical Lead'),
+        ('manager_portfolio', 'Manager Portfolio'),
+        ('gm_epmo', 'GM EPMO'),
+        ('vendor', 'Vendor'),
+    ]
+    
+    # Statuts simples : En attente ou Signé
+    SIGNATURE_STATUS = [
+        ('pending', 'En attente'),
+        ('signed', 'Signé'),
+    ]
+    
+    msrn_report = models.ForeignKey(
+        MSRNReport,
+        on_delete=models.CASCADE,
+        related_name='signature_tracking',
+        verbose_name="Rapport MSRN"
+    )
+    signatory_role = models.CharField(
+        max_length=50,
+        choices=SIGNATORY_ROLES,
+        verbose_name="Rôle"
+    )
+    signatory_name = models.CharField(
+        max_length=255,
+        verbose_name="Nom"
+    )
+    date_received = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Date signé"
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=SIGNATURE_STATUS,
+        default='pending',
+        verbose_name="Statut"
+    )
+    order = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Ordre"
+    )
+    
+    class Meta:
+        verbose_name = "Signature MSRN"
+        verbose_name_plural = "Signatures MSRN"
+        ordering = ['msrn_report', 'order']
+        unique_together = ['msrn_report', 'signatory_role']
+    
+    def __str__(self):
+        return f"{self.signatory_name} - {self.get_status_display()}"
+    
+    def save(self, *args, **kwargs):
+        # Mettre à jour automatiquement le statut selon la date
+        if self.date_received:
+            self.status = 'signed'
+        else:
+            self.status = 'pending'
+        super().save(*args, **kwargs)
+    
+    @property
+    def is_signed(self):
+        """Vérifie si signé"""
+        return self.date_received is not None
+
+
+# Signal pour programmer automatiquement l'envoi d'email 48h après création d'une signature
+@receiver(post_save, sender=MSRNSignatureTracking)
+def schedule_signature_reminder(sender, instance, created, **kwargs):
+    """
+    Programme automatiquement un rappel par email 48h après la création d'une signature.
+    
+    - Uniquement pour les nouvelles signatures (created=True)
+    - Uniquement pour les 5 rôles: PM, Coordinator, Senior PM, Manager Portfolio, GM EPMO
+    - Uniquement si status='pending'
+    """
+    # Seulement à la création
+    if not created:
+        return
+    
+    # Seulement si status='pending'
+    if instance.status != 'pending':
+        return
+    
+    # Seulement pour les 5 rôles à notifier
+    ROLES_TO_NOTIFY = ['project_manager', 'project_coordinator', 'senior_pm', 'manager_portfolio', 'gm_epmo']
+    if instance.signatory_role not in ROLES_TO_NOTIFY:
+        return
+    
+    # Programmer la tâche Celery pour 48h plus tard
+    try:
+        from .tasks import send_signature_reminder_task
+        
+        # 48 heures = 48 * 60 * 60 = 172800 secondes
+        DELAY_SECONDS = 48 * 60 * 60
+        
+        send_signature_reminder_task.apply_async(
+            args=[instance.id],
+            countdown=DELAY_SECONDS
         )
+        
+        logger.info(
+            f"Rappel programmé dans 48h pour signature {instance.id} "
+            f"({instance.signatory_name}, {instance.get_signatory_role_display()})"
+        )
+    except Exception as e:
+        logger.error(f"Erreur lors de la programmation du rappel pour signature {instance.id}: {e}")

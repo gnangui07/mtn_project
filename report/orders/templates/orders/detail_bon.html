@@ -7,7 +7,6 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'orders/css/detail_bon.css' %}">
-<link rel="stylesheet" href="{% static 'orders/css/detail_bon_spectrum.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -434,7 +433,77 @@
 <!-- Overlay pour le panel latéral -->
 <div id="sidebarOverlay" class="position-fixed top-0 start-0" style="width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.5); z-index: 1040; display: none;"></div>
 
+<!-- Indicateur de scroll horizontal pour mobile -->
+<div id="scrollIndicator" class="scroll-indicator" style="display: none;">
+    <i class="fas fa-arrows-left-right"></i>
+    <span>Swipe to scroll</span>
+</div>
+
+<style>
+.scroll-indicator {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--spectrum-blue, #2680eb);
+    color: white;
+    padding: 10px 16px;
+    border-radius: 25px;
+    font-size: 13px;
+    font-weight: 600;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: bounceHorizontal 2s infinite;
+    opacity: 0.95;
+}
+
+@keyframes bounceHorizontal {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(-8px); }
+}
+
+.scroll-indicator i {
+    font-size: 16px;
+}
+</style>
+
 <script>
+    // Gestion de l'indicateur de scroll pour mobile
+    document.addEventListener('DOMContentLoaded', function() {
+        const scrollIndicator = document.getElementById('scrollIndicator');
+        let hideTimeout;
+        
+        function checkScreenSize() {
+            if (window.innerWidth <= 768) {
+                // Afficher l'indicateur pendant 5 secondes
+                scrollIndicator.style.display = 'flex';
+                
+                // Masquer après 5 secondes
+                clearTimeout(hideTimeout);
+                hideTimeout = setTimeout(() => {
+                    scrollIndicator.style.display = 'none';
+                }, 5000);
+            } else {
+                scrollIndicator.style.display = 'none';
+            }
+        }
+        
+        // Vérifier au chargement
+        checkScreenSize();
+        
+        // Vérifier au redimensionnement
+        window.addEventListener('resize', checkScreenSize);
+        
+        // Masquer lors du scroll
+        window.addEventListener('scroll', () => {
+            if (window.innerWidth <= 768) {
+                scrollIndicator.style.display = 'none';
+            }
+        });
+    });
+    
     // Gestion des onglets
     document.addEventListener('DOMContentLoaded', function() {
         const tabs = document.querySelectorAll('.spectrum-tab');
@@ -484,7 +553,7 @@
     const retentionRate = "{{ retention_rate|default:'0' }}";
     const retentionCause = "{{ retention_cause|default:'N/A' }}";
     // Sécurité : Indicateur de privilèges
-    const isSuperUser = {{ user.is_superuser|yesno:"true,false" }};
+    var isSuperUser = "{{ user.is_superuser }}" === "True";
 </script>
 
 <script src="{% static 'orders/js/detail_bon.js' %}"></script>

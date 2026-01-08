@@ -34,6 +34,146 @@ except ImportError:
 
 
 # ============================================================================
+# UTILS D'EXPORT
+# ============================================================================
+
+def normalize_header(header: str) -> str:
+    """Normalise un en-tête: strip -> lower -> remplace espaces/_/- par _ -> retire accents -> compresse underscores"""
+    import re
+    import unicodedata
+    if not header:
+        return ""
+    # Convertir en minuscules et retirer les espaces en début/fin
+    header = str(header).strip().lower()
+    # Retirer les accents
+    header = ''.join(c for c in unicodedata.normalize('NFD', header)
+                  if unicodedata.category(c) != 'Mn')
+    # Remplacer les espaces, tirets et underscores existants par un seul underscore
+    header = re.sub(r'[\s\-_]+', '_', header)
+    # Supprimer les caractères non alphanumériques (sauf underscore)
+    header = re.sub(r'[^\w_]', '', header)
+    # Supprimer les underscores au début ou à la fin
+    header = header.strip('_')
+    return header
+
+def get_value_tolerant(contenu: dict, exact_candidates=None, tokens=None):
+    """Retourne la valeur pour une clé en acceptant des variantes d'en-têtes.
+    - exact_candidates: liste de libellés candidats (str) comparés après normalisation
+    - tokens: liste de mots qui doivent tous être présents dans l'en-tête normalisé
+    Gestionne notamment: espaces de fin/début, doubles espaces, underscores, casse.
+    """
+    if not contenu:
+        return None
+    
+    # Construire un mapping normalisé -> (clé originale, valeur)
+    normalized = {normalize_header(k): (k, v) for k, v in contenu.items() if k}
+
+    # 1) Essais exacts (après normalisation)
+    if exact_candidates:
+        for cand in exact_candidates:
+            nk = normalize_header(cand)
+            if nk in normalized:
+                val = normalized[nk][1]
+                return val if val not in (None, '') else None
+
+    # 2) Recherche par tokens (tous présents dans la clé normalisée)
+    if tokens:
+        needed = [normalize_header(t) for t in tokens]
+        for nk, (_ok, val) in normalized.items():
+            if all(t in nk for t in needed):
+                return val if val not in (None, '') else None
+    return None
+
+def find_order_key(contenu: dict):
+    # 1) Cas exact 'Order'
+    if 'Order' in contenu:
+        return 'Order'
+    # 2) Recherche tolérante (espaces/underscores/accents)
+    for k in contenu.keys():
+        if not k:
+            continue
+        norm = normalize_header(k)
+        if 'order' in norm or 'commande' in norm or 'bon' in norm or norm == 'bc':
+            return k
+    return None
+
+def _make_export_payload(bon_id):
+    """
+    Fonction utilitaire pour construire le payload d'export à partir d'un bon de commande.
+    Récupère les lignes de fichier associées et les informations de réception.
+    """
+    from .models import NumeroBonCommande, LigneFichier, Reception
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        bon = NumeroBonCommande.objects.get(id=bon_id)
+        fichier = bon.fichiers.first() # Prend le premier fichier associé
+        if not fichier:
+            return []
+
+        lignes = LigneFichier.objects.filter(fichier=fichier).order_by('numero_ligne')
+        receptions = Reception.objects.filter(bon_commande=bon).order_by('business_id')
+
+        # Créer des dictionnaires pour un accès rapide
+        receptions_dict = {r.business_id: r for r in receptions}
+        
+        payload = []
+        for ligne in lignes:
+            contenu = ligne.contenu or {}
+            business_id = ligne.business_id
+            
+            # Récupérer les infos de réception si disponibles
+            reception_info = receptions_dict.get(business_id)
+            
+            def format_decimal(val):
+                if val is None: return None
+                try:
+                    return f"{Decimal(str(val)):.2f}"
+                except:
+                    return str(val)
+
+            item_data = {
+                'business_id': business_id,
+                'order': contenu.get('Order'),
+                'line': contenu.get('Line'),
+                'item': contenu.get('Item'),
+                'schedule': contenu.get('Schedule'),
+                'ordered_quantity': format_decimal(reception_info.ordered_quantity) if reception_info and reception_info.ordered_quantity is not None else contenu.get('Ordered Quantity'),
+                'quantity_delivered': format_decimal(reception_info.quantity_delivered) if reception_info and reception_info.quantity_delivered is not None else contenu.get('Quantity Delivered'),
+                'received_quantity': format_decimal(reception_info.received_quantity) if reception_info and reception_info.received_quantity is not None else contenu.get('Received Quantity'),
+                'quantity_not_delivered': format_decimal(reception_info.quantity_not_delivered) if reception_info and reception_info.quantity_not_delivered is not None else contenu.get('Quantity Not Delivered'),
+                'unit_price': format_decimal(reception_info.unit_price) if reception_info and reception_info.unit_price is not None else contenu.get('Price'),
+                'amount_delivered': format_decimal(reception_info.amount_delivered) if reception_info and reception_info.amount_delivered is not None else contenu.get('Amount Delivered'),
+                'currency': contenu.get('Currency'),
+                'price': contenu.get('Price'), # Garder le prix original du fichier
+                'description': contenu.get('Description'),
+                'project_number': contenu.get('Project Number'),
+                'cpu': contenu.get('CPU'),
+                'sponsor': contenu.get('Sponsor'),
+                'project_manager': contenu.get('Project Manager'),
+                'order_description': contenu.get('Order Description'),
+                'asset_type': contenu.get('ASSET TYPE'),
+                'pip_end_date': contenu.get('PIP END DATE'),
+                'revised_end_date': contenu.get('REVISED END DATE'),
+                'actual_end_date': contenu.get('ACTUAL END DATE'),
+                'line_type': contenu.get('Line Type'),
+                'code_ifs': contenu.get('Code - IFS'),
+                # Retrait des champs inexistants sur Reception
+                'irb_id': str(reception_info.id) if reception_info else None,
+            }
+            payload.append(item_data)
+            
+        return payload
+
+    except NumeroBonCommande.DoesNotExist:
+        return []
+    except Exception as e:
+        # Log the error for debugging
+        logger.error(f"Error in _make_export_payload for bon_id {bon_id}: {e}")
+        return []
+
+# ============================================================================
 # EXPORTS EXCEL
 # ============================================================================
 
@@ -110,19 +250,6 @@ def export_po_progress_monitoring(request):
         # Étape 1: Créer un cache pour les premières occurrences de chaque bon de commande en une seule passe globale
         orders_needed = {bon.numero for bon in bons_commande}
 
-        def find_order_key(contenu: dict):
-            # 1) Cas exact 'Order'
-            if 'Order' in contenu:
-                return 'Order'
-            # 2) Recherche tolérante (espaces/underscores/accents)
-            for k in contenu.keys():
-                if not k:
-                    continue
-                norm = ' '.join(str(k).strip().lower().replace('_', ' ').split())
-                if 'order' in norm or 'commande' in norm or 'bon' in norm or norm == 'bc':
-                    return k
-            return None
-
         # Lister tous les fichiers associés, triés par date d'importation
         all_files = []
         for bon in bons_commande:
@@ -150,35 +277,6 @@ def export_po_progress_monitoring(request):
                 break
 
         # Étape 2: Préparation des données pour le DataFrame
-        # Helper: récupérer une valeur par normalisation tolérante des en-têtes
-        def get_value_tolerant(contenu: dict, exact_candidates=None, tokens=None):
-            """Retourne la valeur pour une clé en acceptant des variantes d'en-têtes.
-            - exact_candidates: liste de libellés candidats (str) comparés après normalisation
-            - tokens: liste de mots qui doivent tous être présents dans l'en-tête normalisé
-            Gestionne notamment: espaces de fin/début, doubles espaces, underscores, casse.
-            """
-            if not contenu:
-                return None
-            def norm(s: str):
-                # strip -> lower -> remplace _ et - par espace -> compresse espaces -> retire espaces fin/début
-                return ' '.join(str(s).strip().lower().replace('_', ' ').replace('-', ' ').split())
-            # Construire un mapping normalisé -> (clé originale, valeur)
-            normalized = {norm(k): (k, v) for k, v in contenu.items() if k}
-
-            # 1) Essais exacts (après normalisation)
-            if exact_candidates:
-                for cand in exact_candidates:
-                    nk = norm(cand)
-                    if nk in normalized:
-                        return normalized[nk][1]
-
-            # 2) Recherche par tokens (tous présents dans la clé normalisée)
-            if tokens:
-                needed = [norm(t) for t in tokens]
-                for nk, (_ok, v) in normalized.items():
-                    if all(t in nk for t in needed):
-                        return v
-            return None
         data = []
         for bon in bons_commande:
             # Récupérer la première occurrence de ce bon de commande
@@ -842,6 +940,26 @@ def export_vendor_evaluations(request):
     from datetime import datetime
     from decimal import Decimal
     
+    # Gestion du mode asynchrone
+    if request.GET.get('async') == '1' and CELERY_AVAILABLE:
+        try:
+            task = export_vendor_evaluations_task.delay(
+                user_id=request.user.id,
+                filters=request.GET.dict()
+            )
+            # Enregistrer la tâche pour l'utilisateur (optionnel, selon votre système de polling)
+            if 'register_user_task' in globals() or 'register_user_task' in locals() or globals().get('register_user_task'):
+                register_user_task(request.user, task.id, "Export Évaluations Fournisseurs")
+            
+            return JsonResponse({
+                'success': True,
+                'async': True,
+                'task_id': task.id
+            })
+        except Exception as e:
+            logger.error(f"Erreur lors du lancement de l'export asynchrone: {e}")
+            # Fallback sur le mode synchrone si Celery échoue
+    
     # Helper: fonction pour trouver la clé 'Order' de manière tolérante
     def find_order_key(contenu: dict):
         if 'Order' in contenu:
@@ -1167,11 +1285,10 @@ def export_vendor_evaluations(request):
         output.getvalue(),
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
-    filename = f"Vendor_Evaluations_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filename = f"vendor_evaluations_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     
     return response
-
 
 @login_required
 def export_vendor_ranking(request):
@@ -1842,3 +1959,119 @@ def export_bon_excel(request, bon_id):
     
     return response
 
+
+def export_msrn_selection_to_excel(queryset):
+    """
+    Export des rapports MSRN sélectionnés pour l'admin,
+    avec détails des signatures (nom + statut emoji).
+    """
+    import io
+    from datetime import datetime
+    from django.http import HttpResponse
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "MSRN Reports"
+    
+    # Styles
+    header_font = Font(bold=True, color="yellow")
+    header_fill = PatternFill(start_color="000000", end_color="000000", fill_type="solid")
+    center_align = Alignment(horizontal="center", vertical="center")
+    thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), 
+                         top=Side(style='thin'), bottom=Side(style='thin'))
+    
+    # En-têtes
+    headers = [
+        "Report Number", "PO Number", "Supplier", "Company", "Montant Reçu", 
+        "Currency", "Retention %", "Progress %", "CPU",
+        "Project Manager", "Coordinator", "Senior PM", "Senior Technical Lead",
+        "Manager Portfolio", "GM EPMO", "Vendor", "Created At"
+    ]
+    
+    for col_num, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_num, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = center_align
+        cell.border = thin_border
+
+    # Mapping rôle -> nom affichage pour les signatures
+    role_map = {
+        'project_manager': 'Project Manager',
+        'project_coordinator': 'Coordinator',
+        'senior_pm': 'Senior PM',
+        'senior_technical_lead': 'Senior Technical Lead',
+        'manager_portfolio': 'Manager Portfolio',
+        'gm_epmo': 'GM EPMO',
+        'vendor': 'Vendor'
+    }
+
+    # Données
+    # Utilisation de select_related pour le bon_commande et prefetch_related pour les signatures
+    for row_num, report in enumerate(queryset.select_related('bon_commande').prefetch_related('signature_tracking'), 2):
+        # Initialiser les signatures avec '-'
+        sigs_status = {v: '-' for v in role_map.values()}
+        for sig in report.signature_tracking.all():
+            if sig.signatory_role in role_map:
+                display_role = role_map[sig.signatory_role]
+                emoji = "✅" if sig.date_received else "⏳"
+                sigs_status[display_role] = f"{sig.signatory_name} {emoji}"
+                
+        data = [
+            report.report_number,
+            report.bon_commande.numero if report.bon_commande else '-',
+            report.supplier_snapshot or '-',
+            'MTN',
+            float(report.montant_recu_snapshot or 0),
+            report.currency_snapshot or 'XOF',
+            float(report.retention_rate or 0),
+            float(report.progress_rate_snapshot or 0),
+            report.cpu_snapshot or '-',
+            sigs_status['Project Manager'],
+            sigs_status['Coordinator'],
+            sigs_status['Senior PM'],
+            sigs_status['Senior Technical Lead'],
+            sigs_status['Manager Portfolio'],
+            sigs_status['GM EPMO'],
+            sigs_status['Vendor'],
+            report.created_at.strftime('%Y-%m-%d %H:%M') if report.created_at else '-',
+        ]
+        
+        for col_num, value in enumerate(data, 1):
+            cell = ws.cell(row=row_num, column=col_num, value=value)
+            cell.border = thin_border
+            cell.alignment = Alignment(vertical="center")
+            
+            # Format pour les montants
+            if col_num == 5:  # Montant Reçu
+                cell.number_format = '#,##0'
+            elif col_num in (7, 8):  # Taux
+                cell.number_format = '0.00'
+    
+    # Ajuster la largeur des colonnes (17 colonnes totales)
+    column_widths = [15, 15, 25, 10, 18, 8, 15, 15, 12, 25, 25, 25, 25, 25, 25, 25, 18]
+    for col_num, width in enumerate(column_widths, 1):
+        ws.column_dimensions[get_column_letter(col_num)].width = width
+    
+    # Figer la première ligne
+    ws.freeze_panes = 'A2'
+    
+    # Créer le buffer de retour
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    # Créer la réponse HTTP
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f"MSRN_Reports_Selection_{timestamp}.xlsx"
+    
+    response = HttpResponse(
+        output.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    return response

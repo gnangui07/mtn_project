@@ -16,21 +16,26 @@ import openpyxl
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 from openpyxl.utils import get_column_letter
 import os
-from decimal import Decimal
 from datetime import datetime
-from .models import NumeroBonCommande, Reception, FichierImporte, LigneFichier, MSRNReport
+import pandas as pd
+from django.conf import settings
 
 from .models import (
-    FichierImporte, LigneFichier, NumeroBonCommande, Reception, ActivityLog, MSRNReport
+    NumeroBonCommande, Reception, FichierImporte, LigneFichier, MSRNReport,
+    import_or_update_fichier
 )
 from .forms import UploadFichierForm
 from . import reports
-from django.contrib.auth.decorators import login_required
-from django.conf import settings
-import pandas as pd
-from .models import FichierImporte, LigneFichier, NumeroBonCommande, Reception, import_or_update_fichier, MSRNReport
-from .forms import UploadFichierForm
-from django.db.models import Q, F, Count
+
+# Import Celery task avec fallback
+try:
+    from .tasks import import_fichier_task
+    from .task_status_api import register_user_task
+    CELERY_IMPORT_AVAILABLE = True
+except ImportError:
+    import_fichier_task = None
+    register_user_task = None
+    CELERY_IMPORT_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -364,13 +369,8 @@ def import_fichier(request):
     - POST async → JsonResponse avec task_id pour polling.
     - POST sync → redirection `orders:details_bon`.
     """
-    # Import Celery task avec fallback
-    try:
-        from .tasks import import_fichier_task
-        from .task_status_api import register_user_task
-        CELERY_IMPORT_AVAILABLE = True
-    except ImportError:
-        CELERY_IMPORT_AVAILABLE = False
+    global CELERY_IMPORT_AVAILABLE, import_fichier_task, register_user_task
+    
     
     if request.method == 'POST':
         form = UploadFichierForm(request.POST, request.FILES)

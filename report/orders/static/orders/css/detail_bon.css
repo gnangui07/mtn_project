@@ -484,6 +484,13 @@ body {
     box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
     outline: none;
 }
+
+/* Style pour les cellules en attente de validation (pré-enregistrement) */
+.quantity-delivered-input.pending-change {
+    background-color: #fff3cd !important;
+    border-color: #ffc107 !important;
+    box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25);
+}
   
 /* Coloration de la colonne Quantity Delivered pour la mettre en évidence */
 .quantity-delivered-header {
@@ -554,9 +561,17 @@ body {
 .page-header-content {
     position: relative;
     z-index: 2;
-    max-width: 1400px;
+    max-width: 100%;
     margin: 0 auto;
     padding: 0 2rem;
+    box-sizing: border-box;
+}
+
+/* Flex container du header - doit wrapper sur petits écrans ou sidebar ouvert */
+.header-main .d-flex.justify-content-between,
+.page-header-content .d-flex.justify-content-between {
+    flex-wrap: wrap;
+    gap: 1rem;
 }
 
 .spectrum-breadcrumb {
@@ -602,16 +617,18 @@ body {
 
 .header-action-buttons {
     display: flex;
-    gap: 1rem;
+    gap: 0.75rem;
     align-items: center;
+    flex-wrap: wrap;
 }
 
 /* Métriques */
 .spectrum-metric-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
     margin-top: 2rem;
+    width: 100%;
 }
 
 .spectrum-metric {
@@ -897,8 +914,10 @@ body {
 .filter-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 1rem;
 }
 
 .filter-header h4 {
@@ -910,6 +929,7 @@ body {
     display: flex;
     gap: 0.5rem;
     align-items: center;
+    flex-wrap: wrap;
 }
 
 .spectrum-filter-btn {
@@ -1036,3 +1056,97 @@ body {
         text-align: center;
     }
 }
+
+/* ========================================================================
+   OVERRIDE DES RÈGLES GLOBALES DE BASE.HTML POUR LE TABLEAU #result_list
+   ======================================================================== */
+
+/* CRITIQUE : Isoler le conteneur du tableau pour qu'il ne force pas l'élargissement de toute la page */
+.spectrum-table-container {
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.spectrum-table-container .data-container {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    max-width: 100%;
+}
+
+/* Le tableau peut être plus large que son conteneur */
+#result_list {
+    table-layout: auto !important;
+    width: max-content !important;
+    min-width: 100%;
+}
+
+/* Annule le word-wrap forcé et empêche le retour à la ligne */
+#result_list th,
+#result_list td {
+    word-wrap: normal !important;
+    overflow-wrap: normal !important;
+    white-space: nowrap;
+    min-width: 100px !important;
+}
+
+/* Colonnes spécifiques avec texte long (description, content) */
+#result_list .field-longtext {
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    min-width: 300px !important;
+    max-width: 500px !important;
+}
+
+/* Colonnes numériques alignées à droite avec police monospace */
+#result_list .quantity-delivered-cell,
+#result_list .quantity-not-delivered,
+#result_list .amount-delivered,
+#result_list .amount-not-delivered,
+#result_list .amount-payable,
+#result_list .ordered-quantity {
+    text-align: right !important;
+    font-family: 'Courier New', monospace;
+    white-space: nowrap !important;
+}
+
+/* Input de quantité livrée */
+#result_list .quantity-delivered-input {
+    text-align: right !important;
+    font-family: 'Courier New', monospace;
+    white-space: nowrap !important;
+}
+
+/* Largeurs minimales pour colonnes importantes */
+#result_list th[class*="quantity"],
+#result_list td[class*="quantity"] {
+    min-width: 120px !important;
+}
+
+#result_list th[class*="amount"],
+#result_list td[class*="amount"] {
+    min-width: 150px !important;
+}
+
+/* Colonnes de case à cocher et numéro de ligne */
+#result_list th:first-child,
+#result_list td:first-child {
+    min-width: 40px !important;
+    max-width: 40px !important;
+    width: 40px !important;
+}
+
+#result_list th:nth-child(2),
+#result_list td:nth-child(2) {
+    min-width: 60px !important;
+    max-width: 80px !important;
+}
+
+/* ============================================
+   RESPONSIVE SPÉCIFIQUE - Page detail_bon uniquement
+   ============================================
+   Note: Les styles responsive globaux sont dans responsive-global.css
+   Ce fichier ne contient que les ajustements spécifiques à cette page
+   ============================================ */

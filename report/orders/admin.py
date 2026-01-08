@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.contrib import messages
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
-from .models import FichierImporte, MSRNReport, NumeroBonCommande, LigneFichier
+from .models import FichierImporte, MSRNReport, NumeroBonCommande, LigneFichier, MSRNSignatureTracking
 
 # Try to import Celery tasks and helpers
 try:
@@ -265,7 +265,7 @@ class FichierImporteAdmin(admin.ModelAdmin):
                 padding: 6px 10px;
                 margin-bottom: 6px;
                 border: 1px solid #ccc;
-                font-family: 'Segoe UI', Arial, sans-serif;
+                font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
                 font-size: 13px;
                 color: #333;
             }
@@ -400,15 +400,337 @@ class FichierImporteAdmin(admin.ModelAdmin):
 
 
     
+class MSRNSignatureTrackingInline(admin.TabularInline):
+    """
+    Inline simplifié pour les signatures.
+    Le superuser entre uniquement la date de signature.
+    """
+    model = MSRNSignatureTracking
+    extra = 0
+    min_num = 0
+    can_delete = False
+    
+    fields = ('signatory_role', 'signatory_name', 'date_received', 'status')
+    readonly_fields = ('signatory_role', 'signatory_name', 'status')
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).order_by('order')
+
+
+class CPUFilter(admin.SimpleListFilter):
+    """Filtre personnalisé par CPU"""
+    title = 'CPU'
+    parameter_name = 'cpu'
+    
+    def lookups(self, request, model_admin):
+        cpus = MSRNReport.objects.exclude(
+            cpu_snapshot__isnull=True
+        ).exclude(
+            cpu_snapshot=''
+        ).values_list('cpu_snapshot', flat=True).distinct().order_by('cpu_snapshot')
+        return [(cpu, cpu) for cpu in cpus if cpu]
+    
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(cpu_snapshot=self.value())
+        return queryset
+
+
+class ProjectManagerFilter(admin.SimpleListFilter):
+    """Filtre personnalisé par Project Manager"""
+    title = 'Project Manager'
+    parameter_name = 'pm'
+    
+    def lookups(self, request, model_admin):
+        pms = MSRNReport.objects.exclude(
+            project_manager_snapshot__isnull=True
+        ).exclude(
+            project_manager_snapshot=''
+        ).values_list('project_manager_snapshot', flat=True).distinct().order_by('project_manager_snapshot')
+        return [(pm, pm) for pm in pms if pm]
+    
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(project_manager_snapshot=self.value())
+        return queryset
+
+
 @admin.register(MSRNReport)
 class MSRNReportAdmin(admin.ModelAdmin):
-    list_display = ('report_number', 'bon_commande', 'user', 'created_at', 'download_pdf')
-    readonly_fields = ('download_pdf',)
-    search_fields = ('report_number', 'bon_commande__numero', 'user__username')
-    list_filter = ('created_at',)
+    """
+    Admin amélioré pour le suivi des MSRN avec:
+    - Affichage du supplier, taux d'avancement
+    - Chaque signataire en colonne avec nom + date réception
+    - Filtres par CPU et Project Manager
+    """
+    
+    list_display = (
+        'report_number', 
+        'bon_commande', 
+        'supplier_display',
+        'company_display',
+        'montant_recu_display',
+        'currency_display',
+        'retention_rate_display',
+        'progress_rate_display',
+        'cpu_display',
+        'pm_column',
+        'coordinator_column',
+        'senior_pm_column',
+        'manager_portfolio_column',
+        'gm_epmo_column',
+        'senior_tech_lead_column',
+        'vendor_column',
+        'created_at', 
+        'download_pdf',
+        'edit_signatures_link',
+    )
+    
+    list_filter = (
+        'created_at',
+        'workflow_status',
+        CPUFilter,
+        ProjectManagerFilter,
+    )
+    
+    search_fields = (
+        'report_number', 
+        'bon_commande__numero', 
+        'user',
+        'supplier_snapshot',
+        'cpu_snapshot',
+        'project_manager_snapshot',
+    )
+    
+    readonly_fields = (
+        'report_number',
+        'bon_commande',
+        'created_at',
+        'download_pdf',
+        'montant_total_snapshot',
+        'montant_recu_snapshot',
+        'progress_rate_snapshot',
+    )
+    
+    inlines = [MSRNSignatureTrackingInline]
+    list_per_page = 25
+    date_hierarchy = 'created_at'
+    actions = ['export_to_excel']
+    
+    @admin.action(description="📥 Exporter les MSRN sélectionnés en Excel")
+    def export_to_excel(self, request, queryset):
+        """
+        Exporte les rapports MSRN sélectionnés vers un fichier Excel professionnel.
+        Appelle la fonction centralisée dans views_export.py.
+        """
+        from .views_export import export_msrn_selection_to_excel
+        try:
+            return export_msrn_selection_to_excel(queryset)
+        except Exception as e:
+            self.message_user(request, f"❌ Erreur lors de l'export Excel : {str(e)}", level='error')
+            from django.shortcuts import redirect
+            return None
+    
+    def _get_signatory_column(self, obj, role):
+        """Génère le contenu d'une colonne signataire en se basant sur le tracking"""
+        try:
+            # Source de vérité : la table de suivi des signatures
+            sig = obj.signature_tracking.filter(signatory_role=role).first()
+        except Exception:
+            sig = None
+            
+        # Si aucune entrée de signature n'existe pour ce rôle sur ce rapport, 
+        # c'est que ce n'est pas un signataire requis pour ce CPU.
+        if not sig:
+            return mark_safe('<span style="color: #999;">-</span>')
+        
+        name = sig.signatory_name
+        
+        if sig.date_received:
+            date_signed = sig.date_received.strftime('%d/%m/%Y')
+            return format_html(
+                '<div style="font-size: 11px; line-height: 1.4;">'
+                '<strong>{}</strong><br>'
+                '<span style="color: #28a745;">✅ Signé: {}</span>'
+                '</div>',
+                name, date_signed
+            )
+        else:
+            return format_html(
+                '<div style="font-size: 11px; line-height: 1.4;">'
+                '<strong>{}</strong><br>'
+                '<span style="color: #ffc107;">⏳ En attente</span>'
+                '</div>',
+                name
+            )
+    
+    def pm_column(self, obj):
+        return self._get_signatory_column(obj, 'project_manager')
+    pm_column.short_description = 'Project Manager'
+    
+    def coordinator_column(self, obj):
+        return self._get_signatory_column(obj, 'project_coordinator')
+    coordinator_column.short_description = 'Coordinator'
+    
+    def senior_pm_column(self, obj):
+        return self._get_signatory_column(obj, 'senior_pm')
+    senior_pm_column.short_description = 'Senior PM'
+    
+    def manager_portfolio_column(self, obj):
+        return self._get_signatory_column(obj, 'manager_portfolio')
+    manager_portfolio_column.short_description = 'Manager Portfolio'
+    
+    def gm_epmo_column(self, obj):
+        return self._get_signatory_column(obj, 'gm_epmo')
+    gm_epmo_column.short_description = 'GM EPMO'
 
+    def senior_tech_lead_column(self, obj):
+        return self._get_signatory_column(obj, 'senior_technical_lead')
+    senior_tech_lead_column.short_description = 'Snr Tech Lead'
+
+    def vendor_column(self, obj):
+        return self._get_signatory_column(obj, 'vendor')
+    vendor_column.short_description = 'Vendor'
+    
+    def supplier_display(self, obj):
+        return obj.supplier_snapshot or '-'
+    supplier_display.short_description = 'Fournisseur'
+    supplier_display.admin_order_field = 'supplier_snapshot'
+    
+    def progress_rate_display(self, obj):
+        rate = obj.progress_rate_snapshot or 0
+        try:
+            rate_value = float(rate) if rate else 0
+        except (ValueError, TypeError):
+            rate_value = 0
+        
+        if rate_value >= 100:
+            color = '#28a745'
+        elif rate_value >= 50:
+            color = '#ffc107'
+        else:
+            color = '#dc3545'
+        
+        return format_html(
+            '<span style="color: {}; font-weight: bold;">{}%</span>',
+            color, rate
+        )
+    progress_rate_display.short_description = 'Taux'
+    
+    def cpu_display(self, obj):
+        return obj.cpu_snapshot or '-'
+    cpu_display.short_description = 'CPU'
+    
+    def company_display(self, obj):
+        """Affiche la company (toujours MTN)"""
+        return 'MTN'
+    company_display.short_description = 'Company'
+    
+    def montant_recu_display(self, obj):
+        """Affiche le montant reçu avec formatage localisé"""
+        montant = obj.montant_recu_snapshot or 0
+        try:
+            # On formate d'abord en string pour être sûr, puis on passe à format_html
+            formatted_montant = "{:,.0f}".format(float(montant)).replace(',', ' ')
+            return format_html(
+                '<span style="font-weight: 500;">{}</span>',
+                formatted_montant
+            )
+        except (ValueError, TypeError):
+            return '-'
+    montant_recu_display.short_description = 'Montant Reçu'
+    montant_recu_display.admin_order_field = 'montant_recu_snapshot'
+    
+    def currency_display(self, obj):
+        """Affiche la devise (snapshot)"""
+        return obj.currency_snapshot or 'XOF'
+    currency_display.short_description = 'Devise'
+    
+    def retention_rate_display(self, obj):
+        """Affiche le taux de rétention (snapshot) avec formatage"""
+        rate = obj.retention_rate_snapshot or 0
+        try:
+            rate_value = float(rate) if rate else 0
+        except (ValueError, TypeError):
+            rate_value = 0
+        
+        if rate_value > 0:
+            return format_html(
+                '<span style="color: #dc3545; font-weight: bold;">{}%</span>',
+                rate_value
+            )
+        return mark_safe('<span style="color: #28a745;">0%</span>')
+    retention_rate_display.short_description = 'Taux Rétention'
+    
     def download_pdf(self, obj):
         if obj.pdf_file:
-            return format_html('<a href="{}" target="_blank">Télécharger</a>', obj.pdf_file.url)
-        return "Aucun fichier"
-    download_pdf.short_description = "Fichier PDF"
+            return format_html(
+                '<a href="{}" target="_blank" style="background: #1F5C99; color: white; padding: 4px 8px; border-radius: 4px; text-decoration: none; font-size: 11px;">📄 PDF</a>', 
+                obj.pdf_file.url
+            )
+        return mark_safe('<span style="color: #999;">-</span>')
+    download_pdf.short_description = "PDF"
+    
+    def edit_signatures_link(self, obj):
+        from django.urls import reverse
+        url = reverse('admin:orders_msrnsignaturetracking_changelist') + f'?msrn_report__id__exact={obj.id}'
+        return format_html(
+            '<a href="{}" style="background: #28a745; color: white; padding: 4px 8px; border-radius: 4px; text-decoration: none; font-size: 11px;">✏️ Signatures</a>',
+            url
+        )
+    edit_signatures_link.short_description = "Actions"
+
+
+@admin.register(MSRNSignatureTracking)
+class MSRNSignatureTrackingAdmin(admin.ModelAdmin):
+    """
+    Admin simplifié pour les signatures MSRN.
+    Le superuser entre uniquement la date de signature.
+    """
+    
+    list_display = (
+        'msrn_report_link',
+        'supplier_display',
+        'signatory_role',
+        'signatory_name',
+        'date_received',
+        'status_display',
+    )
+    
+    list_editable = ('date_received',)
+    
+    list_filter = (
+        'status',
+        'signatory_role',
+        'msrn_report__supplier_snapshot',
+    )
+    
+    search_fields = (
+        'msrn_report__report_number',
+        'msrn_report__supplier_snapshot',
+        'signatory_name',
+    )
+    
+    list_per_page = 50
+    ordering = ['-msrn_report__created_at', 'order']
+    
+    def msrn_report_link(self, obj):
+        from django.urls import reverse
+        url = reverse('admin:orders_msrnreport_change', args=[obj.msrn_report.id])
+        return format_html(
+            '<a href="{}" style="font-weight: bold;">{}</a>',
+            url, obj.msrn_report.report_number
+        )
+    msrn_report_link.short_description = 'MSRN'
+    msrn_report_link.admin_order_field = 'msrn_report__report_number'
+    
+    def supplier_display(self, obj):
+        return obj.msrn_report.supplier_snapshot or '-'
+    supplier_display.short_description = 'Fournisseur'
+    
+    def status_display(self, obj):
+        if obj.status == 'signed':
+            return mark_safe('<span style="color: #28a745; font-weight: bold;">✅ Signé</span>')
+        else:
+            return mark_safe('<span style="color: #ffc107;">⏳ En attente</span>')
+    status_display.short_description = 'Statut'

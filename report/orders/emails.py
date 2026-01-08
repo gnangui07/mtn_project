@@ -290,3 +290,164 @@ def send_test_email(recipient_email):
     except Exception as e:
         logger.error(f"Erreur lors de l'envoi de l'email de test: {str(e)}", exc_info=True)
         return False
+
+
+def find_user_email_by_name(signatory_name):
+    """
+    Trouve l'email d'un utilisateur à partir de son nom complet.
+    
+    Logique:
+    - Cherche une correspondance entre signatory_name et first_name + last_name
+    - Essaie plusieurs combinaisons (exact, partiel, inversé, initiales)
+    - Gère les cas comme "JEAN-MARC KONIN" = "KONIN JM" (prénom=JM, nom=KONIN)
+    
+    Entrées:
+    - signatory_name: Nom du signataire (ex: "Jean DUPONT" ou "DUPONT Jean")
+    
+    Sorties:
+    - str: email trouvé ou None si pas de correspondance
+    """
+    if not signatory_name:
+        return None
+    
+    # Normaliser le nom (majuscules, remplacer tirets par espaces, sans espaces multiples)
+    name_normalized = ' '.join(signatory_name.strip().upper().replace('-', ' ').split())
+    name_parts = name_normalized.split()
+    
+    # Rechercher tous les utilisateurs actifs avec un email
+    users = User.objects.filter(
+        is_active=True,
+        email__isnull=False
+    ).exclude(email='')
+    
+    for user in users:
+        # Construire le nom complet de l'utilisateur (avec tirets remplacés)
+        first_name = user.first_name.strip().upper().replace('-', ' ') if user.first_name else ''
+        last_name = user.last_name.strip().upper().replace('-', ' ') if user.last_name else ''
+        
+        user_full_name = f"{first_name} {last_name}".strip()
+        user_full_name_reversed = f"{last_name} {first_name}".strip()
+        
+        # 1. Correspondance exacte
+        if name_normalized == user_full_name or name_normalized == user_full_name_reversed:
+            return user.email
+        
+        # 2. Correspondance partielle (le nom du signataire contient prénom ET nom)
+        if first_name and last_name:
+            if first_name in name_normalized and last_name in name_normalized:
+                return user.email
+        
+        # 3. Le prénom de l'utilisateur est des initiales (ex: "JM") 
+        #    et le signataire a un prénom composé (ex: "JEAN MARC KONIN")
+        if first_name and last_name and len(first_name) <= 3 and first_name.isalpha():
+            # Le prénom de l'utilisateur pourrait être des initiales
+            user_initials = first_name  # Ex: "JM"
+            
+            # Vérifier si le nom de famille est dans le signataire
+            if last_name in name_normalized:
+                # Chercher les parties du nom du signataire qui pourraient correspondre aux initiales
+                # Ex: "JEAN MARC KONIN" -> initiales de "JEAN MARC" = "JM"
+                for i in range(len(name_parts)):
+                    # Prendre les parties sauf le nom de famille
+                    remaining_parts = [p for p in name_parts if p != last_name]
+                    if remaining_parts:
+                        # Calculer les initiales des parties restantes
+                        signatory_initials = ''.join([p[0] for p in remaining_parts if p])
+                        if signatory_initials == user_initials:
+                            return user.email
+        
+        # 4. Correspondance inverse: l'utilisateur a un prénom composé, le signataire a des initiales
+        if first_name and last_name:
+            first_name_parts = first_name.split()
+            if len(first_name_parts) > 1:
+                # Extraire les initiales du prénom composé
+                initials = ''.join([p[0] for p in first_name_parts if p])
+                if last_name in name_normalized and initials in name_normalized:
+                    return user.email
+    
+    # Aucune correspondance trouvée
+    logger.warning(f"Aucun utilisateur trouvé pour le signataire: {signatory_name}")
+    return None
+
+
+def send_signature_reminder(signatory_name, signatory_email, pending_reports):
+    """
+    Envoie un email de rappel à un signataire avec ses PO en attente.
+    Les superusers sont mis en copie (CC).
+    
+    Entrées:
+    - signatory_name: Nom du signataire
+    - signatory_email: Email du signataire
+    - pending_reports: Liste des rapports en attente
+    
+    Sorties:
+    - bool: True si envoyé avec succès
+    """
+    if not signatory_email or not pending_reports:
+        return False
+    
+    try:
+        # Récupérer les emails des superusers pour CC
+        superuser_emails = list(
+            User.objects.filter(is_superuser=True, is_active=True)
+            .exclude(email='')
+            .values_list('email', flat=True)
+        )
+        
+        # Préparer le contexte pour le template
+        context = {
+            'signatory_name': signatory_name,
+            'pending_reports': pending_reports,
+            'count': len(pending_reports),
+            'site_url': getattr(settings, 'SITE_URL', 'http://localhost:8000'),
+        }
+        
+        # Générer le contenu HTML
+        try:
+            html_content = render_to_string('orders/emails/signature_reminder.html', context)
+        except Exception:
+            html_content = None
+        
+        # Générer le contenu texte (fallback)
+        po_list = '\n'.join([
+            f"  - {r['po_number']} (MSRN: {r['report_number']}, Date limite: {r['deadline'].strftime('%d/%m/%Y %H:%M')})"
+            for r in pending_reports
+        ])
+        
+        text_content = f"""
+Bonjour {signatory_name},
+
+Vous avez {len(pending_reports)} rapport(s) MSRN en attente de votre signature depuis plus de 48h:
+
+{po_list}
+
+Merci de bien vouloir signer ces rapports dans les meilleurs délais.
+
+Cordialement,
+L'équipe MSRN
+
+---
+Ceci est un email automatique. Merci de ne pas y répondre.
+        """
+        
+        # Créer et envoyer l'email avec CC aux superusers
+        email = EmailMultiAlternatives(
+            subject=f'Rappel - {len(pending_reports)} signature(s) MSRN en attente',
+            body=text_content,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[signatory_email],
+            cc=superuser_emails if superuser_emails else None,
+        )
+        
+        if html_content:
+            email.attach_alternative(html_content, "text/html")
+        
+        email.send(fail_silently=False)
+        
+        cc_info = f", CC: {', '.join(superuser_emails)}" if superuser_emails else ""
+        logger.info(f"Rappel de signature envoyé à {signatory_name} ({signatory_email}){cc_info} pour {len(pending_reports)} rapport(s)")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Erreur lors de l'envoi du rappel à {signatory_name}: {str(e)}", exc_info=True)
+        return False

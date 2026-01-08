@@ -43,10 +43,43 @@
 .msrn-archive .filters-actions .spectrum-Button { font-size: 0.875rem; padding: 0.375rem 0.75rem; border-radius: 0.375rem; transition: all 0.15s ease-in-out; }
 .msrn-archive .filters-actions .spectrum-Button:hover { background-color: #0d6efd; color: #fff; transform: translateY(-1px); box-shadow: 0 0.25rem 0.5rem rgba(0,0,0,0.15); }
 
+/* ============================================
+   RESPONSIVE - Support tous écrans
+   ============================================ */
+
+/* Petits laptops (1024px - 1366px) */
+@media (max-width: 1366px) {
+    .msrn-archive { max-width: 100%; padding: 0.75rem; }
+    .msrn-archive .filters-card { padding: 0.75rem; }
+    .msrn-archive .spectrum-Table-cell { padding: 0.5rem; font-size: 0.875rem; }
+    .msrn-archive .actions-col .btn-group { flex-wrap: wrap; gap: 0.25rem; }
+    .msrn-archive .actions-col .spectrum-Button { margin-right: 0; margin-bottom: 0.25rem; }
+}
+
+/* Tablettes (max 1024px) */
+@media (max-width: 1024px) {
+    .msrn-archive .filters-card .row { flex-direction: column; }
+    .msrn-archive .filters-card .col-sm-4,
+    .msrn-archive .filters-card .col-sm-3,
+    .msrn-archive .filters-card .col-sm-2 { width: 100%; margin-bottom: 0.5rem; }
+    .msrn-archive .filters-actions { justify-content: stretch !important; }
+    .msrn-archive .filters-actions .spectrum-Button { flex: 1; }
+    .msrn-archive .spectrum-Table-headCell { padding: 0.5rem; font-size: 0.8rem; }
+    .msrn-archive .spectrum-Table-cell { padding: 0.5rem; font-size: 0.85rem; }
+    .msrn-archive .actions-col .btn-group { flex-direction: column; width: 100%; }
+    .msrn-archive .actions-col .spectrum-Button { width: 100%; margin-bottom: 0.25rem; font-size: 0.75rem; }
+}
+
+/* Mobiles (max 768px) */
 @media (max-width: 768px) {
-    .msrn-archive .table-responsive { font-size: 0.9rem; }
+    .msrn-archive { padding: 0.5rem; }
+    .msrn-archive h2 { font-size: 1.25rem; }
+    .msrn-archive .table-responsive { font-size: 0.85rem; overflow-x: auto; }
+    .msrn-archive .spectrum-Table { min-width: 700px; }
     .msrn-archive .download-msrn { font-size: 0.75rem; padding: 0.25rem 0.5rem; }
     .msrn-archive .spectrum-Textfield, .msrn-archive .form-select { font-size: 0.9rem; }
+    .msrn-archive .pagination { flex-wrap: wrap; }
+    .msrn-archive .page-link { padding: 0.375rem 0.5rem; font-size: 0.85rem; }
 }
 
 .msrn-archive .spectrum-Table-body .spectrum-Table-row { animation: fadeIn 0.3s ease-in-out; }

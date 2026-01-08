@@ -31,22 +31,33 @@ class TestFichierImporteAdmin(TestCase):
 
     def test_save_model_captures_user(self):
         """Test que l'utilisateur est capturé automatiquement lors de la sauvegarde"""
+        from unittest.mock import MagicMock
         request = MockRequest(user=self.user)
         obj = FichierImporte(fichier='new_file.csv')
         
-        self.admin.save_model(request, obj, None, False)
+        # Créer un mock de formulaire avec cleaned_data
+        mock_form = MagicMock()
+        mock_form.cleaned_data = {'async_import': False}
+        
+        self.admin.save_model(request, obj, mock_form, False)
         
         self.assertEqual(obj.utilisateur, self.user)
 
     def test_save_model_existing_object(self):
         """Test que l'utilisateur n'est pas modifié pour un objet existant"""
+        from unittest.mock import MagicMock
         request = MockRequest(user=self.user)
         new_user = User.objects.create_user('new@example.com', 'pass123')
         self.fichier.utilisateur = new_user
         # Éviter les doublons: nettoyer les lignes avant la sauvegarde via l'admin
         self.fichier.lignes.all().delete()
+        
+        # Créer un mock de formulaire avec cleaned_data
+        mock_form = MagicMock()
+        mock_form.cleaned_data = {'async_import': False}
+        
         # Sauvegarder via l'admin (change=True) sans appel direct à save() pour éviter double création
-        self.admin.save_model(request, self.fichier, None, True)
+        self.admin.save_model(request, self.fichier, mock_form, True)
         
         self.assertEqual(self.fichier.utilisateur, new_user)
 
@@ -144,28 +155,70 @@ class TestMSRNReportAdmin(TestCase):
 
     def test_list_display(self):
         """Test les colonnes affichées dans la liste"""
-        expected = ('report_number', 'bon_commande', 'user', 'created_at', 'download_pdf')
+        expected = (
+            'report_number', 
+            'bon_commande', 
+            'supplier_display',
+            'company_display',
+            'montant_recu_display',
+            'currency_display',
+            'retention_rate_display',
+            'progress_rate_display',
+            'cpu_display',
+            'pm_column',
+            'coordinator_column',
+            'senior_pm_column',
+            'manager_portfolio_column',
+            'gm_epmo_column',
+            'created_at', 
+            'download_pdf',
+            'edit_signatures_link',
+        )
         self.assertEqual(self.admin.list_display, expected)
 
     def test_readonly_fields(self):
         """Test les champs en lecture seule"""
-        self.assertEqual(self.admin.readonly_fields, ('download_pdf',))
+        expected = (
+            'report_number',
+            'bon_commande',
+            'created_at',
+            'download_pdf',
+            'montant_total_snapshot',
+            'montant_recu_snapshot',
+            'progress_rate_snapshot',
+        )
+        self.assertEqual(self.admin.readonly_fields, expected)
 
     def test_search_fields(self):
         """Test les champs de recherche"""
-        expected = ('report_number', 'bon_commande__numero', 'user__username')
+        expected = (
+            'report_number', 
+            'bon_commande__numero', 
+            'user',
+            'supplier_snapshot',
+            'cpu_snapshot',
+            'project_manager_snapshot',
+        )
         self.assertEqual(self.admin.search_fields, expected)
 
     def test_list_filter(self):
         """Test les filtres disponibles"""
-        self.assertEqual(self.admin.list_filter, ('created_at',))
+        from orders.admin import CPUFilter, ProjectManagerFilter
+        expected = (
+            'created_at',
+            'workflow_status',
+            CPUFilter,
+            ProjectManagerFilter,
+        )
+        self.assertEqual(self.admin.list_filter, expected)
 
     def test_download_pdf_with_file(self):
         """Test le lien de téléchargement avec fichier"""
         # Dans un vrai scénario, on aurait un fichier PDF
         result = self.admin.download_pdf(self.msrn_report)
-        self.assertEqual(result, "Aucun fichier")
+        # Sans fichier PDF, retourne un tiret stylé
+        self.assertIn('-', result)
 
     def test_download_pdf_short_description(self):
         """Test la description courte du champ download_pdf"""
-        self.assertEqual(self.admin.download_pdf.short_description, "Fichier PDF")
+        self.assertEqual(self.admin.download_pdf.short_description, "PDF")

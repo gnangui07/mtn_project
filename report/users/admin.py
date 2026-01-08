@@ -149,19 +149,26 @@ class UserAdmin(admin.ModelAdmin):
     # Champs non modifiables dans l'admin (lecture seule)
     readonly_fields = ['date_joined', 'last_login', 'activation_token', 'token_created_at', 'temporary_password']
     
+    # Actions disponibles dans l'admin
+    actions = ['resend_activation_token']
+    
     def activation_status(self, obj):
         """Affiche le statut d'activation sous forme d'icône colorée.
 
         - Vert: compte activé (`is_active=True`).
         - Orange: en attente (token généré mais pas encore activé).
-        - Rouge: non activé (pas de token).
+        - Rouge: token expiré (plus de 48h).
+        - Gris: non activé (pas de token).
         """
         if obj.is_active:
             return mark_safe('<span style="color: green;">✓ Activé</span>')
         elif obj.activation_token:
-            return mark_safe('<span style="color: orange;">⏳ En attente</span>')
+            if obj.is_token_valid():
+                return mark_safe('<span style="color: orange;">⏳ En attente</span>')
+            else:
+                return mark_safe('<span style="color: red;">⚠️ Expiré</span>')
         else:
-            return mark_safe('<span style="color: red;">✗ Non activé</span>')
+            return mark_safe('<span style="color: gray;">✗ Non activé</span>')
     activation_status.short_description = 'Statut'
     
     def save_model(self, request, obj, form, change):
@@ -253,6 +260,7 @@ class UserAdmin(admin.ModelAdmin):
                     .header {{ background-color: #FFCC00; padding: 20px; text-align: center; }}
                     .content {{ background-color: #f9f9f9; padding: 30px; border-radius: 5px; }}
                     .credentials {{ background-color: #fff; padding: 15px; border-left: 4px solid #FFCC00; margin: 20px 0; }}
+                    .requirements {{ background-color: #e9ecef; padding: 15px; margin: 20px 0; border-radius: 5px; }}
                     .button {{ display: inline-block; padding: 12px 30px; background-color: #FFCC00; color: #000; text-decoration: none; border-radius: 5px; font-weight: bold; }}
                     .footer {{ text-align: center; margin-top: 20px; font-size: 12px; color: #666; }}
                 </style>
@@ -273,6 +281,17 @@ class UserAdmin(admin.ModelAdmin):
                             <p>🔑 <strong>Mot de passe temporaire :</strong> {temp_password}</p>
                         </div>
                         
+                        <div class="requirements">
+                            <p><strong>🔐 Nouvelle politique de sécurité pour votre mot de passe :</strong></p>
+                            <ul>
+                                <li>✅ Au moins 12 caractères</li>
+                                <li>✅ Au moins une lettre majuscule</li>
+                                <li>✅ Au moins une lettre minuscule</li>
+                                <li>✅ Au moins un chiffre</li>
+                                <li>✅ Au moins un caractère spécial (* @ ! - _ /)</li>
+                            </ul>
+                        </div>
+                        
                         <p>Pour activer votre compte, veuillez cliquer sur le bouton ci-dessous :</p>
                         
                         <p style="text-align: center; margin: 30px 0;">
@@ -287,7 +306,7 @@ class UserAdmin(admin.ModelAdmin):
                         <p><strong>⚠️ Important :</strong></p>
                         <ul>
                             <li>Ce lien est valide pendant 48 heures</li>
-                            <li>Vous devrez créer un nouveau mot de passe sécurisé lors de l'activation</li>
+                            <li>Vous devrez créer un nouveau mot de passe sécurisé selon les exigences ci-dessus</li>
                             <li>Ne partagez jamais vos identifiants</li>
                         </ul>
                     </div>
@@ -333,3 +352,74 @@ class UserAdmin(admin.ModelAdmin):
             # Log l'erreur mais ne bloque pas la création
             print(f"Erreur lors de l'envoi de l'email : {str(e)}")
             # En production, utiliser un logger approprié
+    
+    def resend_activation_token(self, request, queryset):
+        """Action admin pour renvoyer le token d'activation aux utilisateurs sélectionnés.
+        
+        Cette action permet de :
+        - Régénérer un nouveau token d'activation pour les comptes non activés
+        - Renvoyer l'email d'activation avec les nouveaux identifiants
+        - Gérer les cas d'erreur (compte déjà activé, erreur d'envoi email)
+        """
+        success_count = 0
+        error_count = 0
+        already_active_count = 0
+        
+        # Déterminer l'URL du site dynamiquement
+        scheme = request.scheme
+        host = request.get_host()
+        site_url = f"{scheme}://{host}"
+        
+        for user in queryset:
+            try:
+                # Vérifier si le compte est déjà activé
+                if user.is_active:
+                    already_active_count += 1
+                    continue
+                
+                # Générer un nouveau mot de passe temporaire et token
+                temp_password = user.generate_temporary_password()
+                user.generate_activation_token()
+                user.save()
+                
+                # Envoyer l'email d'activation
+                if CELERY_AVAILABLE:
+                    try:
+                        # Envoi asynchrone via Celery
+                        send_activation_email_task.delay(user.id, temp_password, site_url=site_url)
+                        success_count += 1
+                    except Exception:
+                        # Fallback: envoi synchrone si Celery échoue
+                        self.send_activation_email(user, temp_password, request, site_url)
+                        success_count += 1
+                else:
+                    # Envoi synchrone (Celery non disponible)
+                    self.send_activation_email(user, temp_password, request, site_url)
+                    success_count += 1
+                    
+            except Exception as e:
+                error_count += 1
+                print(f"Erreur lors du renvoi du token pour {user.email}: {str(e)}")
+        
+        # Messages de retour à l'administrateur
+        messages_list = []
+        
+        if success_count > 0:
+            messages_list.append(f"{success_count} token(s) d'activation renvoyé(s) avec succès")
+        
+        if already_active_count > 0:
+            messages_list.append(f"{already_active_count} compte(s) déjà activé(s) (ignoré(s))")
+        
+        if error_count > 0:
+            messages_list.append(f"{error_count} erreur(s) lors de l'envoi")
+        
+        if messages_list:
+            message = " | ".join(messages_list)
+            if error_count > 0:
+                self.message_user(request, message, level='warning')
+            else:
+                self.message_user(request, message, level='success')
+        else:
+            self.message_user(request, "Aucune action effectuée", level='info')
+    
+    resend_activation_token.short_description = "Renvoyer le token d'activation"

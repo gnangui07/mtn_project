@@ -1,6 +1,7 @@
 # tests/test_penalty_api.py
 import json
 from decimal import Decimal
+from unittest.mock import patch
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
@@ -30,15 +31,17 @@ class TestPenaltyAPI(TestCase):
             quotite_realisee=Decimal('100.00')
         )
 
+    @patch('orders.penalty_api.CELERY_AVAILABLE', False)
     def test_generate_penalty_report_get_success(self):
-        """Test la génération de rapport de pénalité avec GET"""
+        """Test la génération de rapport de pénalité avec GET (mode synchrone)"""
         response = self.client.get(reverse('orders:generate_penalty_report_api', args=[self.bon_commande.id]))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/pdf')
         self.assertIn('PenaltySheet', response['Content-Disposition'])
 
+    @patch('orders.penalty_api.CELERY_AVAILABLE', False)
     def test_generate_penalty_report_post_success(self):
-        """Test la génération de rapport de pénalité avec POST et observation"""
+        """Test la génération de rapport de pénalité avec POST et observation (mode synchrone)"""
         data = {
             'observation': 'Test observation text'
         }
@@ -52,8 +55,9 @@ class TestPenaltyAPI(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/pdf')
 
+    @patch('orders.penalty_api.CELERY_AVAILABLE', False)
     def test_generate_penalty_report_post_form_data(self):
-        """Test la génération avec données de formulaire"""
+        """Test la génération avec données de formulaire (mode synchrone)"""
         data = {
             'observation': 'Test observation text'
         }

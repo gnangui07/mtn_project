@@ -21,6 +21,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Global unload flag for this page
     let isPageUnloading = false;
     let activeTaskController = null;
+    
+    // Map pour stocker les modifications en attente (pré-enregistrement)
+    const pendingChanges = new Map();
 
     window.addEventListener('beforeunload', () => {
         isPageUnloading = true;
@@ -1654,22 +1657,66 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Gestionnaire d'événements pour les champs Quantity Delivered
     quantityDeliveredInputs.forEach(input => {
-        // Stocker la valeur originale et précédente au focus
+        
+        // Fonction utilitaire pour obtenir la valeur originale de manière robuste
+        function getOriginalValue(inputElement) {
+            // Priorité: data-original-value > data-current-total > 0
+            let val = inputElement.getAttribute('data-original-value');
+            if (val !== null && val !== '' && !isNaN(parseFloat(val))) {
+                return parseFloat(val);
+            }
+            val = inputElement.getAttribute('data-current-total');
+            if (val !== null && val !== '' && !isNaN(parseFloat(val))) {
+                return parseFloat(val);
+            }
+            return 0;
+        }
+        
+        // Fonction pour mettre à jour visuellement Quantity Not Delivered
+        function updateQuantityNotDeliveredDisplay(row, orderedQuantity, currentTotal, increment) {
+            const quantityNotDeliveredElement = document.querySelector(`.quantity-not-delivered[data-row="${row}"]`);
+            if (quantityNotDeliveredElement) {
+                const newTotal = currentTotal + increment;
+                const notDelivered = Math.max(0, orderedQuantity - newTotal);
+                quantityNotDeliveredElement.textContent = notDelivered.toString();
+                applyQuantityNotDeliveredColor(quantityNotDeliveredElement, notDelivered);
+            }
+        }
+        
+        // Fonction pour restaurer Quantity Not Delivered à sa valeur originale
+        function restoreQuantityNotDeliveredDisplay(row, orderedQuantity, currentTotal) {
+            const quantityNotDeliveredElement = document.querySelector(`.quantity-not-delivered[data-row="${row}"]`);
+            if (quantityNotDeliveredElement) {
+                const notDelivered = Math.max(0, orderedQuantity - currentTotal);
+                quantityNotDeliveredElement.textContent = notDelivered.toString();
+                applyQuantityNotDeliveredColor(quantityNotDeliveredElement, notDelivered);
+            }
+        }
+        
+        // Stocker la valeur originale au focus
         input.addEventListener('focus', function() {
-            this.setAttribute('data-original-value', this.value);
-            this.setAttribute('data-previous-value', this.value || '0');
+            const currentValue = this.value.trim();
+            // Stocker le total actuel livré (avant modification)
+            if (currentValue !== '' && !isNaN(parseFloat(currentValue))) {
+                this.setAttribute('data-original-value', currentValue);
+                this.setAttribute('data-current-total', currentValue);
+            } else {
+                // Si vide, utiliser data-current-total existant ou 0
+                const existingTotal = this.getAttribute('data-current-total') || '0';
+                this.setAttribute('data-original-value', existingTotal);
+            }
+            // Stocker la valeur de l'input avant modification pour restauration
+            this.setAttribute('data-input-before-edit', currentValue);
         });
         
         // Validation pendant la saisie
         input.addEventListener('input', function() {
-            // Autoriser les chiffres, un point décimal, et le signe moins au début
-            // Supprimer tous les caractères non autorisés sauf - au début
             let value = this.value;
             
             // Permettre le signe moins seulement au début
             const hasMinusAtStart = value.startsWith('-');
             
-            // Supprimer tous les caractères non numériques sauf le point et le minus au début
+            // Supprimer tous les caractères non numériques sauf le point et le minus
             value = value.replace(/[^0-9.-]/g, '');
             
             // S'assurer que le minus n'apparaît qu'au début
@@ -1686,169 +1733,246 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             this.value = value;
-        });
-        
-        // Gestion de la touche Entrée
-        input.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                e.stopPropagation(); // Empêche la propagation de l'événement
-                this.blur(); // Déclenche le blur qui va appeler la validation
-                return false; // Empêche tout autre comportement par défaut
-            }
-        });
-        
-        // Gestion de la perte de focus du champ
-        input.addEventListener('blur', async function() {
-            // Toujours exécuter la logique de sauvegarde même si la valeur n'a pas changé
+            
+            // Mise à jour visuelle en temps réel de Quantity Not Delivered
             const row = this.getAttribute('data-row');
             const orderedQuantityElement = document.querySelector(`.ordered-quantity[data-row="${row}"]`);
             const orderedQuantity = parseFloat(orderedQuantityElement?.textContent || this.getAttribute('data-ordered') || '0');
+            const currentTotal = getOriginalValue(this);
+            const increment = value === '' || isNaN(parseFloat(value)) ? 0 : parseFloat(value);
             
-            // Récupérer la valeur actuelle de quantity delivered
-            const currentQuantityDelivered = parseFloat(this.getAttribute('data-original-value') || '0');            
+            updateQuantityNotDeliveredDisplay(row, orderedQuantity, currentTotal, increment);
+        });
+        
+        // Gestion de la perte de focus - stocke en mémoire (pré-enregistrement)
+        input.addEventListener('blur', function() {
+            const row = this.getAttribute('data-row');
+            const orderedQuantityElement = document.querySelector(`.ordered-quantity[data-row="${row}"]`);
+            const orderedQuantity = parseFloat(orderedQuantityElement?.textContent || this.getAttribute('data-ordered') || '0');
+            const currentTotal = getOriginalValue(this);
+            const inputBeforeEdit = this.getAttribute('data-input-before-edit') || currentTotal.toString();
             
-            let newValue = this.value.trim() === '' ? 0 : parseFloat(this.value);
-            
-            // Si la valeur n'est pas un nombre, utiliser 0
-            if (isNaN(newValue)) {
-                newValue = 0;
+            let increment = this.value.trim() === '' ? 0 : parseFloat(this.value);
+            if (isNaN(increment)) {
+                increment = 0;
             }
             
-            // Utiliser directement la nouvelle valeur saisie
-            const quantityDelivered = newValue;
+            // Si pas d'incrément, restaurer et nettoyer
+            if (increment === 0) {
+                this.value = inputBeforeEdit;
+                pendingChanges.delete(row);
+                this.classList.remove('pending-change');
+                restoreQuantityNotDeliveredDisplay(row, orderedQuantity, currentTotal);
+                return;
+            }
             
-            // Validation intelligente pour les valeurs négatives (correction d'erreurs)
-            if (quantityDelivered < 0) {
-                // Vérifier que la valeur négative ne rend pas le total négatif
-                const currentTotal = parseFloat(this.getAttribute('data-original-value') || '0');
-                const newTotal = currentTotal + quantityDelivered;
-                
+            // Validation pour les valeurs négatives (correction)
+            if (increment < 0) {
+                const newTotal = currentTotal + increment;
                 if (newTotal < 0) {
                     Swal.fire({
                         icon: 'warning',
                         title: 'Correction impossible',
-                        html: `The correction of ${quantityDelivered} would make the total negative.<br>
-                               <strong>Current total:</strong> ${currentTotal}<br>
-                               <strong>New total:</strong> ${newTotal}<br><br>
-                               <em>Tip: To correct an error, enter a negative value equal to the error made.</em>`,
+                        html: `La correction de <strong>${increment}</strong> rendrait le total négatif.<br>
+                               <strong>Total actuel:</strong> ${currentTotal}<br>
+                               <strong>Total après correction:</strong> ${newTotal}`,
                         confirmButtonColor: '#3085d6',
                     });
-                    this.value = this.getAttribute('data-original-value') || '0';
-                    return;
-                }
-                
-                // Demander confirmation pour les valeurs négatives (correction)
-                const confirmResult = await Swal.fire({
-                    title: 'Correction de réception',
-                    html: `
-                        <div style="text-align: left;">
-                            <p><i class="fas fa-exclamation-triangle text-warning"></i> Register negative quantity for delivery reversal.</p>
-                            <p><strong>Line:</strong> ${row}</p>
-                            <p><strong>Actual delivered Quantity:</strong> ${currentTotal}</p>
-                            <p><strong>Reversed quantity:</strong> ${quantityDelivered}</p>
-                            <p><strong>Corrected Delivered Quantity:</strong> ${newTotal}</p>
-                            <hr>
-                            <p class="text-info"><small><i class="fas fa-info-circle"></i> Action will generate system Log for security Purpose .</small></p>
-                        </div>
-                    `,
-                    icon: 'question',
-                    showCancelButton: true,
-                    confirmButtonColor: '#dc3545',
-                    cancelButtonColor: '#6c757d',
-                    confirmButtonText: 'Yes, reverse',
-                    cancelButtonText: 'Close',
-                    allowOutsideClick: false,
-                    allowEscapeKey: false
-                });
-                
-                if (!confirmResult.isConfirmed) {
-                    this.value = this.getAttribute('data-original-value') || '0';
+                    // Restaurer la valeur de l'input et l'affichage
+                    this.value = inputBeforeEdit;
+                    pendingChanges.delete(row);
+                    this.classList.remove('pending-change');
+                    restoreQuantityNotDeliveredDisplay(row, orderedQuantity, currentTotal);
                     return;
                 }
             }
             
-            // Vérifier que la quantité positive ne dépasse pas la commande
-            if (quantityDelivered > 0) {
-                const currentTotal = parseFloat(this.getAttribute('data-original-value') || '0');
-                const newTotal = currentTotal + quantityDelivered;
-                
+            // Validation pour les valeurs positives
+            if (increment > 0) {
+                const newTotal = currentTotal + increment;
                 if (newTotal > orderedQuantity) {
                     Swal.fire({
                         icon: 'warning',
                         title: 'Quantité invalide',
-                        html: `La quantité totale (${newTotal}) dépasserait la quantité commandée (${orderedQuantity}).<br>
+                        html: `Le total (<strong>${newTotal}</strong>) dépasserait la quantité commandée (<strong>${orderedQuantity}</strong>).<br>
                                <strong>Total actuel:</strong> ${currentTotal}<br>
-                               <strong>Ajout demandé:</strong> ${quantityDelivered}<br>
-                               <strong>Maximum possible:</strong> ${orderedQuantity - currentTotal}`,
+                               <strong>Ajout demandé:</strong> ${increment}<br>
+                               <strong>Maximum possible:</strong> ${Math.max(0, orderedQuantity - currentTotal)}`,
                         confirmButtonColor: '#3085d6',
                     });
-                    this.value = this.getAttribute('data-original-value') || '0';
-                    const quantityNotDeliveredElement = document.querySelector(`.quantity-not-delivered[data-row="${row}"]`);
-                    if (quantityNotDeliveredElement) {
-                        const restoredDelivered = parseFloat(this.getAttribute('data-original-value') || '0') || 0;
-                        const quantityNotDelivered = Math.max(0, orderedQuantity - restoredDelivered);
-                        quantityNotDeliveredElement.textContent = quantityNotDelivered;
-                        applyQuantityNotDeliveredColor(quantityNotDeliveredElement, quantityNotDelivered);
-                    }
+                    // Restaurer la valeur de l'input et l'affichage
+                    this.value = inputBeforeEdit;
+                    pendingChanges.delete(row);
+                    this.classList.remove('pending-change');
+                    restoreQuantityNotDeliveredDisplay(row, orderedQuantity, currentTotal);
                     return;
                 }
             }
             
-            // Toujours demander confirmation, que la valeur ait changé ou non
-            const result = await Swal.fire({
-                title: 'Confirm delivery',
-                html: `
-                    <div style="text-align: left;">
-                        <p>Are you sure you want to register this delivery ?</p>
-                        <p><strong>Line:</strong> ${row}</p>
-                        <p><strong>Ordered Quantity:</strong> ${orderedQuantity}</p>
-                        <p><strong>Incremental Delivered Quantity :</strong> ${quantityDelivered}</p>
-                    </div>
-                `,
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonColor: '#3085d6',
-                cancelButtonColor: '#d33',
-                confirmButtonText: 'Yes, register',
-                cancelButtonText: 'Close',
-                allowOutsideClick: false,
-                allowEscapeKey: false,
-                showLoaderOnConfirm: true
+            // Stocker la modification en attente (pré-enregistrement)
+            pendingChanges.set(row, {
+                row: row,
+                orderedQuantity: orderedQuantity,
+                quantityDelivered: increment,
+                originalValue: currentTotal,
+                inputBeforeEdit: inputBeforeEdit,
+                input: this
             });
-            
-            if (result.isConfirmed) {
-                // Envoyer la mise à jour au serveur
-                try {
-                    // Envoyer la quantité totale - la fonction saveQuantityDeliveredChanges s'occupe de la mise à jour UI
-                    await saveQuantityDeliveredChanges(row, orderedQuantity, quantityDelivered);
-                    
-                } catch (error) {
-                    console.error('Erreur lors de la sauvegarde:', error);
-                    // En cas d'erreur, restaurer la valeur précédente
-                    this.value = this.getAttribute('data-original-value') || '0';
-                }    
-            } else {
-                // Annulation : restaurer la valeur précédente
-                this.value = this.getAttribute('data-original-value') || '0';
-                
-                // Afficher une notification d'annulation
-                Swal.fire({
-                    position: 'top-end',
-                    icon: 'info',
-                    title: 'Operation cancelled',
-                    showConfirmButton: false,
-                    timer: 1500,
-                    toast: true
-                });
-            }
+            this.classList.add('pending-change');
         });
         
-        // Gestion de la touche Entrée
-        input.addEventListener('keydown', function(e) {
+        // Gestion des touches clavier (navigation + confirmation)
+        input.addEventListener('keydown', async function(e) {
+            const allInputs = Array.from(document.querySelectorAll('.quantity-delivered-input'));
+            const currentIndex = allInputs.indexOf(this);
+            
+            // Navigation avec flèches haut/bas
+            if (e.key === 'ArrowDown' || (e.key === 'Tab' && !e.shiftKey)) {
+                e.preventDefault();
+                const nextIndex = currentIndex + 1;
+                if (nextIndex < allInputs.length) {
+                    this.blur();
+                    allInputs[nextIndex].focus();
+                    allInputs[nextIndex].select();
+                }
+                return;
+            }
+            
+            if (e.key === 'ArrowUp' || (e.key === 'Tab' && e.shiftKey)) {
+                e.preventDefault();
+                const prevIndex = currentIndex - 1;
+                if (prevIndex >= 0) {
+                    this.blur();
+                    allInputs[prevIndex].focus();
+                    allInputs[prevIndex].select();
+                }
+                return;
+            }
+            
+            // Touche Escape pour annuler la modification en cours
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                const row = this.getAttribute('data-row');
+                const inputBeforeEdit = this.getAttribute('data-input-before-edit') || '0';
+                this.value = inputBeforeEdit;
+                pendingChanges.delete(row);
+                this.classList.remove('pending-change');
+                
+                // Restaurer Quantity Not Delivered
+                const orderedQuantityElement = document.querySelector(`.ordered-quantity[data-row="${row}"]`);
+                const orderedQuantity = parseFloat(orderedQuantityElement?.textContent || '0');
+                const currentTotal = getOriginalValue(this);
+                restoreQuantityNotDeliveredDisplay(row, orderedQuantity, currentTotal);
+                
+                this.blur();
+                return;
+            }
+            
+            // Touche Entrée - affiche l'alerte de confirmation
             if (e.key === 'Enter') {
                 e.preventDefault();
-                this.blur(); // Déclenche l'événement blur
+                e.stopPropagation();
+                
+                // D'abord, déclencher le blur pour capturer la valeur actuelle
+                this.blur();
+                
+                // Attendre un court instant pour que le blur soit traité
+                await new Promise(resolve => setTimeout(resolve, 50));
+                
+                // Si aucune modification en attente, ne rien faire
+                if (pendingChanges.size === 0) {
+                    return;
+                }
+                
+                // Construire le résumé des modifications
+                let summaryHtml = '<div style="text-align: left; max-height: 300px; overflow-y: auto;">';
+                summaryHtml += `<p><strong>${pendingChanges.size} modification(s) en attente :</strong></p>`;
+                summaryHtml += '<table style="width: 100%; border-collapse: collapse;">';
+                summaryHtml += '<tr style="background: #f5f5f5;"><th style="padding: 5px; border: 1px solid #ddd;">Ligne</th><th style="padding: 5px; border: 1px solid #ddd;">Incrément</th><th style="padding: 5px; border: 1px solid #ddd;">Nouveau Total</th></tr>';
+                
+                pendingChanges.forEach((change, row) => {
+                    const newTotal = change.originalValue + change.quantityDelivered;
+                    const color = change.quantityDelivered < 0 ? '#dc3545' : '#28a745';
+                    summaryHtml += `<tr>
+                        <td style="padding: 5px; border: 1px solid #ddd;">${row}</td>
+                        <td style="padding: 5px; border: 1px solid #ddd; color: ${color}; font-weight: bold;">${change.quantityDelivered > 0 ? '+' : ''}${change.quantityDelivered}</td>
+                        <td style="padding: 5px; border: 1px solid #ddd;">${newTotal}</td>
+                    </tr>`;
+                });
+                summaryHtml += '</table></div>';
+                
+                // Afficher l'alerte de confirmation
+                const result = await Swal.fire({
+                    title: 'Confirmer les réceptions',
+                    html: summaryHtml,
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonColor: '#28a745',
+                    cancelButtonColor: '#dc3545',
+                    confirmButtonText: 'Valider',
+                    cancelButtonText: 'Annuler',
+                    allowOutsideClick: false,
+                    allowEscapeKey: false
+                });
+                
+                if (result.isConfirmed) {
+                    // Sauvegarder toutes les modifications
+                    const savePromises = [];
+                    pendingChanges.forEach((change) => {
+                        savePromises.push(
+                            saveQuantityDeliveredChanges(change.row, change.orderedQuantity, change.quantityDelivered)
+                                .then(() => {
+                                    change.input.classList.remove('pending-change');
+                                })
+                                .catch(error => {
+                                    console.error(`Erreur sauvegarde ligne ${change.row}:`, error);
+                                    // En cas d'erreur, restaurer cette ligne
+                                    change.input.value = change.inputBeforeEdit;
+                                    change.input.classList.remove('pending-change');
+                                    restoreQuantityNotDeliveredDisplay(
+                                        change.row, 
+                                        change.orderedQuantity, 
+                                        change.originalValue
+                                    );
+                                })
+                        );
+                    });
+                    
+                    await Promise.all(savePromises);
+                    pendingChanges.clear();
+                    
+                    Swal.fire({
+                        position: 'top-end',
+                        icon: 'success',
+                        title: 'Réceptions enregistrées',
+                        showConfirmButton: false,
+                        timer: 1500,
+                        toast: true
+                    });
+                } else {
+                    // Annuler - restaurer les valeurs originales
+                    pendingChanges.forEach((change) => {
+                        change.input.value = change.inputBeforeEdit;
+                        change.input.classList.remove('pending-change');
+                        // Restaurer aussi Quantity Not Delivered
+                        restoreQuantityNotDeliveredDisplay(
+                            change.row, 
+                            change.orderedQuantity, 
+                            change.originalValue
+                        );
+                    });
+                    pendingChanges.clear();
+                    
+                    Swal.fire({
+                        position: 'top-end',
+                        icon: 'info',
+                        title: 'Modifications annulées',
+                        showConfirmButton: false,
+                        timer: 1500,
+                        toast: true
+                    });
+                }
+                
                 return false;
             }
         });

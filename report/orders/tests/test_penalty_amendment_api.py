@@ -81,9 +81,10 @@ class TestPenaltyAmendmentAPI(TestCase):
         response_data = json.loads(response.content)
         self.assertFalse(response_data['success'])
 
+    @patch('orders.penalty_amendment_api.CELERY_AVAILABLE', False)
     @patch('orders.penalty_amendment_api.generate_penalty_amendment_report')
     def test_generate_penalty_amendment_report_api_get(self, mock_generate):
-        """Test GET request (lignes 76-82)"""
+        """Test GET request (mode synchrone)"""
         mock_generate.return_value = BytesIO(b"fake pdf content")
         
         response = self.client.get(
@@ -94,9 +95,10 @@ class TestPenaltyAmendmentAPI(TestCase):
         self.assertEqual(response['content-type'], 'application/pdf')
         self.assertIn('inline', response['Content-Disposition'])
 
+    @patch('orders.penalty_amendment_api.CELERY_AVAILABLE', False)
     @patch('orders.penalty_amendment_api.generate_penalty_amendment_report')
     def test_generate_penalty_amendment_report_api_post_json(self, mock_generate):
-        """Test POST avec JSON (lignes 76-82)"""
+        """Test POST avec JSON (mode synchrone)"""
         mock_generate.return_value = BytesIO(b"fake pdf content")
         
         data = {
@@ -115,9 +117,10 @@ class TestPenaltyAmendmentAPI(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['content-type'], 'application/pdf')
 
+    @patch('orders.penalty_amendment_api.CELERY_AVAILABLE', False)
     @patch('orders.penalty_amendment_api.generate_penalty_amendment_report')
     def test_generate_penalty_amendment_report_api_post_form(self, mock_generate):
-        """Test POST avec form data (lignes 76-82)"""
+        """Test POST avec form data (mode synchrone)"""
         mock_generate.return_value = BytesIO(b"fake pdf content")
         
         data = {
@@ -135,9 +138,10 @@ class TestPenaltyAmendmentAPI(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['content-type'], 'application/pdf')
 
+    @patch('orders.penalty_amendment_api.CELERY_AVAILABLE', False)
     @patch('orders.penalty_amendment_api.generate_penalty_amendment_report')
     def test_generate_penalty_amendment_report_api_invalid_json(self, mock_generate):
-        """Test POST avec JSON invalide (lignes 76-82)"""
+        """Test POST avec JSON invalide (mode synchrone)"""
         mock_generate.return_value = BytesIO(b"fake pdf content")
         
         response = self.client.post(
@@ -149,9 +153,10 @@ class TestPenaltyAmendmentAPI(TestCase):
         # Devrait gérer gracieusement le JSON invalide
         self.assertEqual(response.status_code, 200)
 
+    @patch('orders.penalty_amendment_api.CELERY_AVAILABLE', False)
     @patch('orders.penalty_amendment_api.generate_penalty_amendment_report')
     def test_generate_penalty_amendment_report_api_empty_payload(self, mock_generate):
-        """Test avec payload vide (lignes 76-82)"""
+        """Test avec payload vide (mode synchrone)"""
         mock_generate.return_value = BytesIO(b"fake pdf content")
         
         response = self.client.post(
@@ -162,10 +167,11 @@ class TestPenaltyAmendmentAPI(TestCase):
         
         self.assertEqual(response.status_code, 200)
 
+    @patch('orders.penalty_amendment_api.CELERY_AVAILABLE', False)
     @patch('orders.penalty_amendment_api.send_penalty_notification')
     @patch('orders.penalty_amendment_api.generate_penalty_amendment_report')
     def test_generate_penalty_amendment_report_api_email_thread(self, mock_generate, mock_send):
-        """Test le lancement du thread email (lignes 116-117)"""
+        """Test le lancement du thread email (mode synchrone)"""
         mock_generate.return_value = BytesIO(b"fake pdf content")
         
         response = self.client.get(
@@ -176,10 +182,11 @@ class TestPenaltyAmendmentAPI(TestCase):
         # Vérifier que send_penalty_notification est appelé dans un thread
         # Note: Le thread est démarré mais nous ne pouvons pas facilement vérifier son exécution complète
 
+    @patch('orders.penalty_amendment_api.CELERY_AVAILABLE', False)
     @patch('orders.penalty_amendment_api.send_penalty_notification')
     @patch('orders.penalty_amendment_api.generate_penalty_amendment_report')
     def test_generate_penalty_amendment_report_api_email_exception(self, mock_generate, mock_send):
-        """Test exception dans l'envoi d'email (lignes 116-117)"""
+        """Test exception dans l'envoi d'email (mode synchrone)"""
         mock_generate.return_value = BytesIO(b"fake pdf content")
         mock_send.side_effect = Exception("Email failed")
         
@@ -190,9 +197,10 @@ class TestPenaltyAmendmentAPI(TestCase):
         # L'exception dans l'email ne devrait pas affecter la réponse
         self.assertEqual(response.status_code, 200)
 
+    @patch('orders.penalty_amendment_api.CELERY_AVAILABLE', False)
     @patch('orders.penalty_amendment_api.generate_penalty_amendment_report')
     def test_generate_penalty_amendment_report_api_penalty_status_cases(self, mock_generate):
-        """Test différents statuts de pénalité"""
+        """Test différents statuts de pénalité (mode synchrone)"""
         mock_generate.return_value = BytesIO(b"fake pdf content")
         
         status_cases = ['annulee', 'reduite', 'reconduite', 'invalid_status']
@@ -205,9 +213,10 @@ class TestPenaltyAmendmentAPI(TestCase):
             )
             self.assertEqual(response.status_code, 200)
 
+    @patch('orders.penalty_amendment_api.CELERY_AVAILABLE', False)
     @patch('orders.penalty_amendment_api.generate_penalty_amendment_report')
     def test_generate_penalty_amendment_report_api_user_no_email(self, mock_generate):
-        """Test avec un utilisateur sans email - devrait échuer car email est requis"""
+        """Test avec un utilisateur valide (mode synchrone)"""
         mock_generate.return_value = BytesIO(b"fake pdf content")
     
         # Créer un utilisateur VALIDE avec email (comme requis par le modèle)   

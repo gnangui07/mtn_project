@@ -10,7 +10,9 @@ explique:
 """
  
 from django.urls import path
+from django.contrib.auth import views as auth_views
 from . import views
+from . import forms
 
 app_name = 'users'
 
@@ -50,5 +52,43 @@ urlpatterns = [
     #   Réponse: JSON {'status': 'ok'} ou erreur 400
     path('voice-prefs/set/', views.set_voice_prefs, name='set_voice_prefs'),
     
+    # Changement de mot de passe (connecté)
+    # - GET: affiche le formulaire de changement (connecté)
+    # - POST: valide et change le mot de passe (connecté)
+    # Réponse: HTML (GET) / Redirect (POST)
+    path('changement-password/', views.change_password_view, name='change_password'),
+    
     # Activity summary API (deprecated): supprimée car non utilisée
+    
+    # ==========================
+    # PASSWORD RESET
+    # ==========================
+    path('password-reset/', 
+         auth_views.PasswordResetView.as_view(
+             template_name='users/password_reset.html',
+             email_template_name='users/password_reset_email.html',
+             subject_template_name='users/password_reset_subject.txt',
+             success_url='/users/password-reset/done/',
+             form_class=forms.CustomPasswordResetForm
+         ), 
+         name='password_reset'),
+         
+    path('password-reset/done/', 
+         auth_views.PasswordResetDoneView.as_view(
+             template_name='users/password_reset_done.html'
+         ), 
+         name='password_reset_done'),
+         
+    path('password-reset/confirm/<uidb64>/<token>/', 
+         auth_views.PasswordResetConfirmView.as_view(
+             template_name='users/password_reset_confirm.html',
+             success_url='/users/password-reset/complete/'
+         ), 
+         name='password_reset_confirm'),
+         
+    path('password-reset/complete/', 
+         auth_views.PasswordResetCompleteView.as_view(
+             template_name='users/password_reset_complete.html'
+         ), 
+         name='password_reset_complete'),
 ]

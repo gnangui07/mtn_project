@@ -55,6 +55,7 @@ class TestDelayEvaluationAPI:
         assert 'Bon de commande non trouvé' in data['error']
 
     @pytest.mark.django_db
+    @patch('orders.delay_evaluation_api.CELERY_AVAILABLE', False)
     @patch('orders.delay_evaluation_api.NumeroBonCommande.objects.select_related')
     @patch('orders.delay_evaluation_api.collect_delay_evaluation_context')
     @patch('orders.delay_evaluation_api.generate_delay_evaluation_report')
@@ -150,27 +151,39 @@ class TestDelayEvaluationAPI:
                 response = generate_delay_evaluation_report_api(mock_request, 1)
                 assert response.status_code == 200
 
+    @patch('orders.delay_evaluation_api.CELERY_AVAILABLE', False)
     def test_post_method_allowed(self, mock_request):
-        """Test que la méthode POST est autorisée"""
+        """Test que la méthode POST est autorisée (mode synchrone)"""
         mock_request.method = 'POST'
+        mock_request.content_type = 'application/x-www-form-urlencoded'
+        mock_request.POST = {}
         
         with patch('orders.delay_evaluation_api.NumeroBonCommande.objects.select_related') as mock_select_related:
-            mock_select_related.return_value.get.return_value = Mock()
-            with patch('orders.delay_evaluation_api.collect_delay_evaluation_context'):
-                with patch('orders.delay_evaluation_api.generate_delay_evaluation_report'):
-                    response = generate_delay_evaluation_report_api(mock_request, 1)
-                    
-                    # Should not return method not allowed
-                    assert not isinstance(response, JsonResponse) or response.status_code != 405
+            bon_commande = Mock()
+            bon_commande.numero = 'TEST123'
+            mock_select_related.return_value.get.return_value = bon_commande
+            with patch('orders.delay_evaluation_api.collect_delay_evaluation_context', return_value={}):
+                mock_pdf_buffer = Mock()
+                mock_pdf_buffer.getvalue.return_value = b'%PDF-1.4 fake pdf content'
+                with patch('orders.delay_evaluation_api.generate_delay_evaluation_report', return_value=mock_pdf_buffer):
+                    with patch('orders.delay_evaluation_api.threading.Thread'):
+                        response = generate_delay_evaluation_report_api(mock_request, 1)
+                        
+                        # Should not return method not allowed
+                        assert not isinstance(response, JsonResponse) or response.status_code != 405
 
+    @patch('orders.delay_evaluation_api.CELERY_AVAILABLE', False)
     @patch('orders.delay_evaluation_api.NumeroBonCommande.objects.select_related')
     @patch('orders.delay_evaluation_api.collect_delay_evaluation_context')
     @patch('orders.delay_evaluation_api.generate_delay_evaluation_report')
     def test_email_sent_async(self, mock_generate_report, mock_collect_context, mock_select_related, mock_request):
-        """Test que l'email est envoyé de façon asynchrone"""
-        mock_select_related.return_value.get.return_value = Mock()
+        """Test que l'email est envoyé de façon asynchrone (mode synchrone)"""
+        bon_commande = Mock()
+        bon_commande.numero = 'TEST123'
+        mock_select_related.return_value.get.return_value = bon_commande
         mock_collect_context.return_value = {}
         mock_pdf_buffer = Mock()
+        mock_pdf_buffer.getvalue.return_value = b'%PDF-1.4 fake pdf content'
         mock_generate_report.return_value = mock_pdf_buffer
 
         with patch('orders.delay_evaluation_api.send_penalty_notification') as mock_send_email:

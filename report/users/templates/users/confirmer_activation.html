@@ -27,7 +27,7 @@
                 class="auth-input spectrum-Textfield" 
                 id="new_password" 
                 name="new_password" 
-                placeholder="Minimum 8 caractères"
+                placeholder="Minimum 12 caractères"
                 required
                 autofocus
             >
@@ -105,11 +105,11 @@
         let strength = 0;
         let errors = [];
         const checks = {
-            length: { test: password.length >= 8, message: 'Au moins 8 caractères' },
+            length: { test: password.length >= 12, message: 'Au moins 12 caractères' },
             uppercase: { test: /[A-Z]/.test(password), message: 'Au moins une majuscule' },
             lowercase: { test: /[a-z]/.test(password), message: 'Au moins une minuscule' },
             number: { test: /[0-9]/.test(password), message: 'Au moins un chiffre' },
-            special: { test: /[!@#$%^&*(),.?":{}|<>]/.test(password), message: 'Au moins un caractère spécial (!@#$%^&*)' }
+            special: { test: /[*@!-_\/]/.test(password), message: 'Au moins un caractère spécial (* @ ! - _ /)' }
         };
         for (const [key, check] of Object.entries(checks)) {
             if (check.test) {
@@ -163,11 +163,11 @@
     function checkFormValidity() {
         const password = newPasswordInput.value;
         const confirm = confirmPasswordInput.value;
-        const isValid = password.length >= 8 &&
+        const isValid = password.length >= 12 &&
                        /[A-Z]/.test(password) &&
                        /[a-z]/.test(password) &&
                        /[0-9]/.test(password) &&
-                       /[!@#$%^&*(),.?":{}|<>]/.test(password) &&
+                       /[*@!-_\/]/.test(password) &&
                        password === confirm;
         submitBtn.disabled = !isValid;
     }

@@ -59,7 +59,7 @@ class UserManager(BaseUserManager):
         if not email:
             raise ValueError("L'adresse email est obligatoire")
         
-        email = self.normalize_email(email)
+        email = self.normalize_email(email).lower()
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
@@ -105,6 +105,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     - `activate_account()`: active le compte et purge les secrets temporaires.
     """
     
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._password_has_changed = False
+        self._original_password = None
+    
     # Informations de base
     email = models.EmailField(
         verbose_name="Adresse email",
@@ -148,6 +153,14 @@ class User(AbstractBaseUser, PermissionsMixin):
         default=False,
         help_text="Indique si le compte est activé"
     )
+    
+    # Champs pour la gestion de l'expiration des mots de passe
+    password_changed_at = models.DateTimeField(
+        verbose_name="Date du dernier changement de mot de passe",
+        default=timezone.now,
+        help_text="Date du dernier changement de mot de passe (pour expiration)"
+    )
+    
     is_staff = models.BooleanField(
         verbose_name="Membre du staff",
         default=False
@@ -194,6 +207,23 @@ class User(AbstractBaseUser, PermissionsMixin):
         verbose_name_plural = "Utilisateurs"
         ordering = ['-date_joined']
     
+    def save(self, *args, **kwargs):
+        """Normalise l'email et détecte les changements de mot de passe."""
+        # Détecter si le mot de passe a changé
+        if self.pk:
+            try:
+                old_instance = User.objects.get(pk=self.pk)
+                self._original_password = old_instance.password
+                if old_instance.password != self.password:
+                    self._password_has_changed = True
+            except User.DoesNotExist:
+                pass
+        
+        # Normaliser l'email en minuscules
+        if self.email:
+            self.email = self.email.lower().strip()
+        super().save(*args, **kwargs)
+    
     def __str__(self):
         return f"{self.get_full_name()} ({self.email})"
     
@@ -235,13 +265,30 @@ class User(AbstractBaseUser, PermissionsMixin):
         Sécurité:
         - Retourne la valeur en clair (à envoyer par canal sécurisé: email interne).
         - Ne stocke que le hash (`temporary_password`).
+        - Génère selon la nouvelle politique de sécurité (12+ caractères avec complexité).
 
         Retour:
-        - str: le mot de passe temporaire en clair (12 caractères).
+        - str: le mot de passe temporaire en clair (respectant les nouvelles règles).
         """
-        # Génère un mot de passe de 12 caractères avec lettres, chiffres et symboles
-        characters = string.ascii_letters + string.digits + "!@#$%"
-        temp_password = ''.join(secrets.choice(characters) for _ in range(12))
+        import random
+        
+        # Générer un mot de passe de 14 caractères avec complexité
+        # Au moins une majuscule, une minuscule, un chiffre, un spécial
+        uppercase = random.choice(string.ascii_uppercase)
+        lowercase = random.choice(string.ascii_lowercase)
+        digit = random.choice(string.digits)
+        special = random.choice("@!-_")
+        
+        # Compléter avec 10 caractères aléatoires pour atteindre 14
+        remaining_chars = ''.join(
+            secrets.choice(string.ascii_letters + string.digits + "@!-_") 
+            for _ in range(10)
+        )
+        
+        # Mélanger tous les caractères
+        all_chars = list(uppercase + lowercase + digit + special + remaining_chars)
+        random.shuffle(all_chars)
+        temp_password = ''.join(all_chars)
         
         # Hache le mot de passe avant de le stocker
         self.temporary_password = make_password(temp_password)

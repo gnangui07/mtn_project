@@ -672,16 +672,16 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
             Paragraph("PROJECT<br/>COORDINATOR", normal_style),
             Paragraph("PROJECT<br/>MANAGER", normal_style),
             Paragraph("SENIOR PM", normal_style),
-            Paragraph("GM EPMO", normal_style),
             Paragraph("MANAGER<br/>PORTFOLIO", normal_style),
+            Paragraph("GM EPMO", normal_style),
             Paragraph("VENDOR<br/>(Stamp/Cachet &<br/>Signature)", normal_style)
         ]
         names = [
             project_coordinator,
             project_manager,
             senior_pm,
-            gm_epmo,
             manager_portfolio,
+            gm_epmo,
             " "
         ]
         num_cols = 6
@@ -693,18 +693,18 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
             Paragraph("PROJECT<br/>COORDINATOR", normal_style),
             Paragraph("PROJECT<br/>MANAGER", normal_style),
             Paragraph("SENIOR PM", normal_style),
+            Paragraph("MANAGER<br/>PORTFOLIO", normal_style),
             Paragraph("GM EPMO", normal_style),
             Paragraph("SENIOR<br/>TECHNICAL LEAD", normal_style),
-            Paragraph("MANAGER<br/>PORTFOLIO", normal_style),
             Paragraph("VENDOR<br/>(Stamp/Cachet &<br/>Signature)", normal_style)
         ]
         names = [
             project_coordinator,
             project_manager,
             senior_pm,
+            manager_portfolio,
             gm_epmo,
             senior_technical_lead,
-            manager_portfolio,
             "N/A"
         ]
         num_cols = 7
@@ -735,16 +735,16 @@ def generate_msrn_report(bon_commande, report_number=None, msrn_report=None, use
             Paragraph("PROJECT<br/>COORDINATOR", normal_style),
             Paragraph("PROJECT<br/>MANAGER", normal_style),
             Paragraph("SENIOR PM", normal_style),
-            Paragraph("GM EPMO", normal_style),
             Paragraph("MANAGER<br/>PORTFOLIO", normal_style),
+            Paragraph("GM EPMO", normal_style),
             Paragraph("VENDOR<br/>(Stamp/Cachet &<br/>Signature)", normal_style)
         ]
         names = [
             project_coordinator,
             project_manager,
             senior_pm,
-            gm_epmo,
             manager_portfolio,
+            gm_epmo,
             " "
         ]
         num_cols = 6

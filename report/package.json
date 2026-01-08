@@ -14,7 +14,9 @@
     "tailwindcss": "^3.4.17"
   },
   "dependencies": {
+    "@spectrum-css/badge": "^6.2.0",
     "@spectrum-css/button": "^14.2.0",
+    "@spectrum-css/card": "^11.2.0",
     "@spectrum-css/commons": "^11.1.0",
     "@spectrum-css/fieldlabel": "^10.2.0",
     "@spectrum-css/form": "^1.2.0",

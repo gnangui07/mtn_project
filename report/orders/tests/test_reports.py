@@ -91,6 +91,9 @@ class TestReports(TestCase):
 
     def test_generate_msrn_report_with_receptions(self):
         """Test la génération avec des réceptions"""
+        # Nettoyer les lignes auto-créées avant d'ajouter la nôtre
+        self.fichier.lignes.all().delete()
+        
         # Ajouter une ligne de fichier pour avoir une description
         LigneFichier.objects.create(
             fichier=self.fichier,

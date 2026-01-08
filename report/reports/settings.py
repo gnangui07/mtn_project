@@ -27,7 +27,7 @@ if DJANGO_ENV == 'production':
     ALLOWED_HOSTS = ['ton-domaine.com', 'www.ton-domaine.com', '127.0.0.1']
     print("Mode PRODUCTION active")
 else:
-    ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '192.168.8.135']
+    ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '192.168.8.114', 'testserver']
     print("Mode DEVELOPPEMENT active")
 
 # ==================== APPLICATIONS ====================
@@ -58,6 +58,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'users.middleware.PasswordExpirationMiddleware',  # Middleware pour expiration mots de passe
     'core.middleware.UtilisateurActuelMiddleware',
     'core.middleware.NoCacheMiddleware',  # Anti-cache pour empêcher le retour après déconnexion
 ]
@@ -88,7 +89,7 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.environ.get('DB_NAME', 'report_db'),
-        'USER': os.environ.get('DB_USER', 'postgres'),
+        'USER': os.environ.get('DB_USER', 'msrn'),
         'PASSWORD': os.environ.get('DB_PASSWORD', 'aime'),
         'HOST': os.environ.get('DB_HOST', 'localhost'),
         'PORT': os.environ.get('DB_PORT', '5432'),
@@ -99,9 +100,27 @@ DATABASES = {
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator', 'OPTIONS': {'min_length': 12}},
     {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+    # Validateur personnalisé pour la complexité
+    {'NAME': 'users.validators.ComplexityValidator'},
+    # Validateur pour les mots de passe admin (14 caractères minimum)
+    {'NAME': 'users.validators.AdminPasswordValidator'},
+    # Validateur pour l'historique des mots de passe (24 derniers)
+    {'NAME': 'users.validators.PasswordHistoryValidator'},
+    # Validateur pour l'âge minimum du mot de passe (1 jour)
+    {'NAME': 'users.validators.PasswordAgeValidator'},
+]
+
+# ==================== HACHAGE DES MOTS DE PASSE ====================
+# Utiliser PBKDF2 avec SHA256 (défaut Django) - considéré comme sécurisé
+# Django génère automatiquement un sel unique pour chaque utilisateur
+PASSWORD_HASHERS = [
+    'django.contrib.auth.hashers.PBKDF2PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
+    'django.contrib.auth.hashers.Argon2PasswordHasher',
+    'django.contrib.auth.hashers.BCryptSHA256PasswordHasher',
 ]
 
 # ==================== INTERNATIONALISATION ====================
@@ -158,6 +177,7 @@ CACHE_MIDDLEWARE_SECONDS = 0
 # Configuration email unifiée pour dev et prod
 # Les emails seront envoyés via Gmail SMTP dans les deux cas
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Pour voir le lien dans la console
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
 EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 'yes')

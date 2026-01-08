@@ -125,7 +125,7 @@ class TestAccueilView(TestCase):
         response = self.client.get(self.url)
         
         self.assertIn('numeros_bons', response.context)
-        self.assertEqual(response.context['numeros_bons'].count(), 2)
+        self.assertEqual(len(response.context['numeros_bons']), 2)
 
     def test_template_utilise(self):
         """Test que le bon template est utilisé"""
@@ -1516,7 +1516,7 @@ class TestDownloadMSRNReportSuccess(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/pdf')
         self.assertIn('attachment', response['Content-Disposition'])
-        self.assertIn('MSRN-PDFTEST-PDF-BON.pdf', response['Content-Disposition'])
+        self.assertIn('PDFTEST-PDF-BON.pdf', response['Content-Disposition'])
         self.assertIn(b'%PDF', response.content)
 
 

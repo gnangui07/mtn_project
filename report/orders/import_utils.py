@@ -1,12 +1,21 @@
 import os
 import pandas as pd
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 from decimal import Decimal
 from django.utils import timezone
 from .models import (
     FichierImporte, LigneFichier, Reception, 
     NumeroBonCommande, InitialReceptionBusiness
 )
+from django.utils import timezone
+from .models import (
+    FichierImporte, LigneFichier, Reception, 
+    NumeroBonCommande, InitialReceptionBusiness
+)
 from .utils import round_decimal, normalize_business_id
+import tempfile
+from openpyxl import load_workbook
 
 def process_chunk(records, start_index, fichier_importe, po_cpu_map):
     """
@@ -332,9 +341,6 @@ def import_file_optimized(fichier_importe, file_path=None):
             target_path = fichier_importe.fichier.path
         except NotImplementedError:
             # Cas S3/Storage distant -> téléchargement temporaire
-            import tempfile
-            from django.core.files.storage import default_storage
-            
             ext = os.path.splitext(fichier_importe.fichier.name)[1]
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
             target_path = tmp.name
@@ -364,7 +370,6 @@ def import_file_optimized(fichier_importe, file_path=None):
         BATCH_SIZE = 5000
         
         if ext in ['xlsx', 'xlsm', 'xlsb']:
-            from openpyxl import load_workbook
             # Read-only mode for memory efficiency
             wb = load_workbook(target_path, read_only=True, data_only=True)
             try:
@@ -404,7 +409,7 @@ def import_file_optimized(fichier_importe, file_path=None):
         else:
             # CSV (Pandas)
             # Fallback for others to try csv default
-            for chunk_df in pd.read_csv(target_path, chunksize=BATCH_SIZE, dtype=str, keep_default_na=False):
+            for chunk_df in pd.read_csv(target_path, chunksize=BATCH_SIZE, dtype=str, keep_default_na=False, encoding='utf-8-sig'):
                 # Nettoyage NaN -> None
                 chunk_df = chunk_df.where(pd.notnull(chunk_df), None)
                 records = chunk_df.to_dict('records')
