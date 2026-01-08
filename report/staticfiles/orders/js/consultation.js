@@ -268,7 +268,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialiser Select2 avec chargement automatique au changement
     $(bonSelect).select2({
-        theme: 'bootstrap4',
         placeholder: 'Sélectionnez un bon de commande',
         allowClear: true,
         width: '100%'

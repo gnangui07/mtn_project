@@ -1,0 +1,210 @@
+@import "@spectrum-css/vars/css/scales/spectrum-medium.css";
+@import "@spectrum-css/vars/css/themes/spectrum-light.css";
+@import "@spectrum-css/vars/css/themes/spectrum-dark.css";
+@import "@spectrum-css/page/index.css";
+@import "@spectrum-css/form/index.css";
+@import "@spectrum-css/typography/index.css";
+@import "@spectrum-css/button/index.css";
+@import "@spectrum-css/textfield/index.css";
+@import "@spectrum-css/fieldlabel/index.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+.appearance-none {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+.auth-form {
+  width: 100%;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.spectrum--dark .auth-form {
+  background: transparent;
+  border-color: transparent;
+}
+
+.auth-form-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.auth-form-header img {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+}
+
+.auth-brand-title {
+  margin: 0;
+}
+
+.auth-brand-subtitle {
+  margin: 2px 0 0 0;
+  color: var(--spectrum-gray-600);
+}
+
+.auth-form .spectrum-Form-item {
+  margin-bottom: 16px;
+  width: 100%;
+  text-align: left;
+}
+
+.auth-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+.auth-label-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--spectrum-gray-700);
+}
+
+.spectrum--dark .auth-label-icon {
+  color: var(--spectrum-gray-400);
+}
+
+.auth-input {
+  width: 100%;
+  padding: 12px 14px;
+  border-top: 1px solid rgba(0, 0, 0, 0.15);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.15);
+  border-left: none;
+  border-right: none;
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.05s ease;
+}
+
+.spectrum--dark .auth-input {
+  background: rgba(17, 17, 17, 0.5);
+  color: var(--spectrum-white);
+  border-top-color: rgba(255, 255, 255, 0.3);
+  border-bottom-color: rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(8px);
+}
+
+.auth-input:focus {
+  outline: none;
+  border-color: #e6b800;
+  box-shadow: 0 0 0 3px rgba(255, 204, 0, 0.45);
+}
+
+.input-with-action {
+  position: relative;
+}
+
+.input-with-action .spectrum-Button {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+ 
+.auth-toggle-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--spectrum-gray-700);
+}
+
+.spectrum--dark .auth-toggle-icon {
+  color: var(--spectrum-gray-400);
+}
+
+.input-with-icon {
+  position: relative;
+}
+
+.auth-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  color: var(--spectrum-gray-700);
+}
+
+.spectrum--dark .auth-icon {
+  color: var(--spectrum-gray-400);
+}
+
+.auth-submit {
+  width: 100%;
+  border-radius: 10px;
+  padding: 12px 16px;
+  box-shadow: none;
+  transition: transform 0.05s ease;
+  background-color: #ffcc00;
+  color: #000000;
+  border: none;
+}
+
+.auth-submit:hover {
+  box-shadow: none;
+}
+
+.auth-submit:active {
+  transform: translateY(1px);
+}
+
+.auth-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.sidebar {
+  transition: width 0.2s ease;
+}
+.sidebar.collapsed {
+  width: 72px;
+}
+.sidebar .item-label {
+  transition: opacity 0.15s ease;
+}
+.sidebar.collapsed .item-label {
+  display: none;
+}
+.sidebar.collapsed a:hover::after {
+  content: attr(data-tip);
+  position: fixed;
+  left: 76px;
+  background: rgba(17, 17, 17, 0.95);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 6px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+  font-size: 12px;
+  transform: translateY(-4px);
+  pointer-events: none;
+}

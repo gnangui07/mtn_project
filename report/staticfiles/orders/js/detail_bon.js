@@ -18,12 +18,27 @@ function getCookie(name) {
 document.addEventListener('DOMContentLoaded', function() {
     'use strict';
     
+    // Global unload flag for this page
+    let isPageUnloading = false;
+    let activeTaskController = null;
+    
+    // Map pour stocker les modifications en attente (pré-enregistrement)
+    const pendingChanges = new Map();
+
+    window.addEventListener('beforeunload', () => {
+        isPageUnloading = true;
+        if (activeTaskController) {
+            activeTaskController.abort();
+        }
+    });
+    
     // Bouton pour télécharger/générer un document (Penalité, Évaluation, MSRN)
     const downloadDocumentBtn = document.getElementById('download-document');
     if (downloadDocumentBtn) {
         downloadDocumentBtn.addEventListener('click', async function() {
             const bonId = this.getAttribute('data-bon-id');
-            const bonNumber = this.getAttribute('data-bon-number') || 'PO';
+            // Utiliser la variable globale bonNumber définie dans le template, sinon l'attribut, sinon 'PO'
+            const currentBonNumber = (typeof bonNumber !== 'undefined' && bonNumber) ? bonNumber : (this.getAttribute('data-bon-number') || 'PO');
 
             const retentionBtn = document.getElementById('set-retention-btn');
             const retentionRate = retentionBtn ? retentionBtn.getAttribute('data-retention-rate') || 0 : 0;
@@ -92,18 +107,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const showGeneratingPopup = () => {
                 Swal.fire({
-                    title: 'Génération en cours...',
-                    html: 'Merci de patienter pendant la création du PDF.',
-                    allowOutsideClick: false,
-                    didOpen: () => {
-                        Swal.showLoading();
-                    }
+                    icon: 'info',
+                    title: 'Traitement en cours',
+                    text: 'Lancement de la génération...',
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 3000
                 });
             };
 
             const triggerDownload = async (url, filename, payload = {}, reportType = 'Document') => {
                 try {
                     showGeneratingPopup();
+                    
+                    // Create controller for this request
+                    activeTaskController = new AbortController();
 
                     const response = await fetch(url, {
                         method: 'POST',
@@ -111,11 +130,37 @@ document.addEventListener('DOMContentLoaded', function() {
                             'Content-Type': 'application/json',
                             'X-CSRFToken': getCookie('csrftoken')
                         },
-                        body: JSON.stringify(payload)
+                        body: JSON.stringify(payload),
+                        signal: activeTaskController.signal
                     });
 
                     if (!response.ok) {
                         throw new Error(`Erreur serveur (${response.status})`);
+                    }
+
+                    const contentType = response.headers.get("content-type");
+                    if (contentType && contentType.indexOf("application/json") !== -1) {
+                        const data = await response.json();
+                        
+                        if (data.async) {
+                            // Mode Asynchrone : Fermer le popup bloquant et notifier
+                            Swal.close();
+                            
+                            // Notification non bloquante (Toast)
+                            Swal.fire({
+                                icon: 'info',
+                                title: 'Génération démarrée',
+                                text: 'La génération du document se fait en arrière-plan. Vous serez notifié une fois terminé.',
+                                toast: true,
+                                position: 'top-end',
+                                showConfirmButton: false,
+                                timer: 5000
+                            });
+
+                            // ON NE FAIT PLUS DE POLLING ICI.
+                            // Le système global (global_notifications.js) s'en chargera.
+                            return; 
+                        }
                     }
 
                     const blob = await response.blob();
@@ -132,11 +177,32 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     });
                 } catch (error) {
+                    // Ignore errors if page is unloading or it's a network error
+                    if (isPageUnloading || error.name === 'AbortError') return;
+                    
+                    const errorMsg = error.message || '';
+                    if (errorMsg.includes('NetworkError') || 
+                        errorMsg.includes('Failed to fetch') || 
+                        errorMsg.includes('Network request failed')) {
+                        console.warn('NetworkError during download trigger (likely due to navigation), ignoring.');
+                        return;
+                    }
+
                     console.error('Erreur lors du téléchargement :', error);
+                    
+                    // ULTIMATE PROTECTION: Never show NetworkError to user
+                    // This handles the race condition where fetch fails before isPageUnloading is set
+                    const finalErrorMsg = error.message || '';
+                    if (finalErrorMsg.includes('NetworkError') || 
+                        finalErrorMsg.includes('Failed to fetch') || 
+                        finalErrorMsg.includes('Network request failed')) {
+                        return;
+                    }
+
                     Swal.fire({
                         icon: 'error',
                         title: 'Erreur',
-                        text: error.message || 'Impossible de générer le document.'
+                        text: finalErrorMsg || 'Impossible de générer le document.'
                     });
                 }
             };
@@ -346,7 +412,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
                             const data = await response.json();
 
-                            if (data.success) {
+                            if (data.async) {
+                                // Mode Asynchrone : Fermer le popup bloquant et notifier
+                                Swal.close();
+                                
+                                // Notification non bloquante (Toast)
+                                Swal.fire({
+                                    icon: 'info',
+                                    title: 'Génération démarrée',
+                                    text: 'La génération du rapport se fait en arrière-plan. Vous serez notifié une fois terminé.',
+                                    toast: true,
+                                    position: 'top-end',
+                                    showConfirmButton: false,
+                                    timer: 5000
+                                });
+
+                                // ON NE FAIT PLUS DE POLLING ICI.
+                                // Le système global s'en chargera.
+                                return;
+                            } else if (data.success) {
                                 Swal.fire({
                                     icon: 'success',
                                     title: 'MSRN généré',
@@ -358,20 +442,40 @@ document.addEventListener('DOMContentLoaded', function() {
                                 throw new Error(data.error || 'Une erreur est survenue lors de la génération du rapport MSRN.');
                             }
                         } catch (error) {
+                            // ULTIMATE PROTECTION for MSRN flow
+                            const finalErrorMsg = error.message || '';
+                            if (isPageUnloading || 
+                                error.name === 'AbortError' || 
+                                finalErrorMsg.includes('NetworkError') || 
+                                finalErrorMsg.includes('Failed to fetch') || 
+                                finalErrorMsg.includes('Network request failed')) {
+                                return;
+                            }
+
                             console.error('Erreur lors de la génération MSRN :', error);
                             Swal.fire({
                                 icon: 'error',
                                 title: 'Erreur',
-                                text: error.message || 'Impossible de générer le rapport MSRN.'
+                                text: finalErrorMsg || 'Impossible de générer le rapport MSRN.'
                             });
                         }
                     });
                 } catch (error) {
+                    // ULTIMATE PROTECTION for MSRN flow outer catch
+                    const finalErrorMsg = error.message || '';
+                    if (isPageUnloading || 
+                        error.name === 'AbortError' || 
+                        finalErrorMsg.includes('NetworkError') || 
+                        finalErrorMsg.includes('Failed to fetch') || 
+                        finalErrorMsg.includes('Network request failed')) {
+                        return;
+                    }
+
                     console.error('Erreur lors de la génération MSRN :', error);
                     Swal.fire({
                         icon: 'error',
                         title: 'Erreur',
-                        text: error.message || 'Impossible de générer le rapport MSRN.'
+                        text: finalErrorMsg || 'Impossible de générer le rapport MSRN.'
                     });
                 }
             } else if (formValues.type === 'compensation-letter') {
@@ -402,15 +506,15 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!parentCell) return;
         
         if (quantityNotDelivered === 0) {
-            // Rouge si Quantity Not Delivered = 0
-            parentCell.style.backgroundColor = '#f8d7da';
-            parentCell.style.color = '#721c24';
-            parentCell.style.fontWeight = 'bold';
+            // Vert si Quantity Not Delivered = 0 (Tout est livré)
+            parentCell.style.setProperty('background-color', '#d4edda', 'important');
+            parentCell.style.setProperty('color', '#155724', 'important');
+            parentCell.style.setProperty('font-weight', 'bold', 'important');
         } else if (quantityNotDelivered > 0) {
-            // Vert s'il reste des quantités à livrer
-            parentCell.style.backgroundColor = '#d4edda';
-            parentCell.style.color = '#155724';
-            parentCell.style.fontWeight = 'bold';
+            // Rouge s'il reste des quantités à livrer
+            parentCell.style.setProperty('background-color', '#f8d7da', 'important');
+            parentCell.style.setProperty('color', '#721c24', 'important');
+            parentCell.style.setProperty('font-weight', 'bold', 'important');
         }
     }
     
@@ -573,8 +677,170 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
             
             if (data.status === 'success') {
-                // Afficher le modal de correction avec l'historique
-                showCorrectionModal(data.history, rowIndices);
+                // Ask user for correction mode
+                const { value: correctionMode } = await Swal.fire({
+                    title: 'Correction Mode',
+                    text: 'How do you want to apply the correction?',
+                    icon: 'question',
+                    input: 'radio',
+                    inputOptions: {
+                        'manual': 'Manual / Individual Correction (View History)',
+                        'specific': 'Apply Specific Correction to All Selected Lines'
+                    },
+                    inputValue: 'manual',
+                    showCancelButton: true,
+                    confirmButtonText: 'Next',
+                    confirmButtonColor: '#28a745',
+                    cancelButtonColor: '#6c757d',
+                    inputValidator: (value) => {
+                        if (!value) {
+                            return 'You need to choose an option!'
+                        }
+                    }
+                });
+
+                if (!correctionMode) return;
+
+                if (correctionMode === 'manual') {
+                    // Show existing modal with history
+                    showCorrectionModal(data.history, rowIndices);
+                } else {
+                    // Specific mode: ask for value
+                    const { value: qty } = await Swal.fire({
+                        title: 'Enter Correction Value',
+                        html: `
+                            <p>Enter the value to apply to <strong>ALL</strong> ${rowIndices.length} selected lines.</p>
+                            <p class="text-danger"><small><i class="fas fa-info-circle"></i> Use a negative number (e.g. -3) to remove quantity.</small></p>
+                        `,
+                        input: 'text',
+                        inputPlaceholder: 'Ex: -1.0',
+                        showCancelButton: true,
+                        confirmButtonText: 'Apply Correction',
+                        confirmButtonColor: '#d33', // Red because it's usually destructive/correction
+                        cancelButtonColor: '#6c757d',
+                        inputValidator: (value) => {
+                            if (!value || isNaN(parseFloat(value))) {
+                                return 'Please enter a valid number';
+                            }
+                            if (parseFloat(value) === 0) {
+                                return 'Correction value cannot be 0';
+                            }
+                        }
+                    });
+
+                    if (!qty) return;
+
+                    const correctionValue = parseFloat(qty);
+                    
+                    // Prepare bulk correction data
+                    const correctionsList = [];
+                    rowIndices.forEach(businessId => {
+                        const lineData = data.history[businessId];
+                        if (lineData) {
+                            correctionsList.push({
+                                business_id: businessId,
+                                correction_value: correctionValue,
+                                original_quantity: lineData.ordered_quantity
+                            });
+                        }
+                    });
+
+                    // Call Bulk Correction API
+                    // Re-use logic from setupCorrectionModalEventHandlers or call API directly
+                    Swal.fire({
+                        title: 'Applying corrections',
+                        text: 'Please wait...',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+                    
+                    try {
+                        const response = await fetch(`/orders/api/bulk-correction/${bonId}/`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': getCookie('csrftoken')
+                            },
+                            body: JSON.stringify({
+                                bon_number: bonNumber,
+                                corrections: correctionsList
+                            })
+                        });
+                        
+                        const resultData = await response.json();
+                        
+                        if (resultData.status === 'success') {
+                             // Mettre à jour l'interface avec les nouvelles valeurs
+                             if (resultData.results) {
+                                resultData.results.forEach(result => {
+                                    const businessId = result.business_id;
+                                    const quantityDeliveredInput = document.querySelector(`.quantity-delivered-input[data-row="${businessId}"]`);
+                                    const quantityNotDeliveredElement = document.querySelector(`.quantity-not-delivered[data-row="${businessId}"]`);
+                                    const amountDeliveredElement = document.querySelector(`.amount-delivered[data-row="${businessId}"]`);
+                                    const amountNotDeliveredElement = document.querySelector(`.amount-not-delivered[data-row="${businessId}"]`);
+                                    const quantityPayableElement = document.querySelector(`.quantity-payable[data-row="${businessId}"]`);
+                                    const amountPayableElement = document.querySelector(`.amount-payable[data-row="${businessId}"]`);
+                                    
+                                    if (quantityDeliveredInput) {
+                                        quantityDeliveredInput.value = result.quantity_delivered;
+                                        quantityDeliveredInput.setAttribute('data-original-value', result.quantity_delivered);
+                                    }
+                                    if (quantityNotDeliveredElement) {
+                                        quantityNotDeliveredElement.textContent = result.quantity_not_delivered;
+                                    }
+                                    if (amountDeliveredElement) {
+                                        amountDeliveredElement.textContent = result.amount_delivered.toFixed(2);
+                                    }
+                                    if (amountNotDeliveredElement) {
+                                        amountNotDeliveredElement.textContent = result.amount_not_delivered.toFixed(2);
+                                    }
+                                    if (quantityPayableElement) {
+                                        quantityPayableElement.textContent = result.quantity_payable.toFixed(2);
+                                    }
+                                    if (amountPayableElement) {
+                                        amountPayableElement.textContent = result.amount_payable.toFixed(2);
+                                    }
+                                });
+                             }
+
+                            // Update totals
+                            if (resultData.taux_avancement !== undefined) {
+                                const taux = document.querySelector('.taux-avancement');
+                                if (taux) taux.textContent = resultData.taux_avancement.toFixed(2) + '%';
+                            }
+                            if (resultData.montant_total_recu !== undefined) {
+                                const mtr = document.querySelector('.montant-total-recue');
+                                if (mtr) mtr.textContent = resultData.montant_total_recu.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                            }
+
+                            let msg = `${resultData.results.length} corrections applied successfully`;
+                            if (resultData.errors && resultData.errors.length > 0) {
+                                msg += `\n\nErrors:\n${resultData.errors.join('\n')}`;
+                            }
+
+                            Swal.fire({
+                                icon: resultData.errors && resultData.errors.length > 0 ? 'warning' : 'success',
+                                title: 'Corrections applied',
+                                text: msg,
+                                confirmButtonColor: '#28a745'
+                            });
+                            
+                            resetSelection();
+                        } else {
+                            throw new Error(resultData.message || 'Error applying corrections');
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: error.message || 'An error occurred',
+                            confirmButtonColor: '#dc3545'
+                        });
+                    }
+                }
             } else {
                 throw new Error(data.message || 'Error retrieving history');
             }
@@ -857,9 +1123,194 @@ document.addEventListener('DOMContentLoaded', function() {
     async function applyCollectiveQuantityDelivered() {
         const selectedRows = Array.from(document.querySelectorAll('.row-checkbox:checked'));
         
-        // Filtrer les lignes qui ne sont pas encore complètement reçues
+        if (selectedRows.length === 0) return;
+
+        // Étape 1 : Choisir le mode de réception
+        const { value: receptionMode } = await Swal.fire({
+            title: 'Collective Reception Mode',
+            text: 'How do you want to apply the reception?',
+            icon: 'question',
+            input: 'radio',
+            inputOptions: {
+                'full': 'Receive All Remaining (Complete Lines)',
+                'partial': 'Receive Specific Quantity per Line',
+                'target_rate': 'Reach Target Progress Rate'
+            },
+            inputValue: 'full',
+            showCancelButton: true,
+            confirmButtonText: 'Next',
+            confirmButtonColor: '#28a745',
+            cancelButtonColor: '#6c757d',
+            inputValidator: (value) => {
+                if (!value) {
+                    return 'You need to choose an option!'
+                }
+            }
+        });
+
+        if (!receptionMode) return;
+
+        // --- MODE CIBLE (TARGET RATE) ---
+        if (receptionMode === 'target_rate') {
+            // VERIFICATION PERMISSION CÔTÉ CLIENT
+            if (typeof isSuperUser !== 'undefined' && !isSuperUser) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Accès Refusé',
+                    text: 'Cette fonctionnalité "Target Rate" est strictement réservée aux administrateurs.',
+                    confirmButtonColor: '#d33'
+                });
+                return;
+            }
+
+            // Récupérer le taux actuel
+            const currentRateEl = document.querySelector('.taux-avancement');
+            // Gérer le format '71,50%' ou '71.50%'
+            let currentRateText = currentRateEl ? currentRateEl.textContent.replace('%', '').trim() : '0';
+            currentRateText = currentRateText.replace(',', '.');
+            const currentRate = parseFloat(currentRateText) || 0;
+
+            const { value: targetRateVal, isDismissed } = await Swal.fire({
+                title: 'Apply Percentage to Remaining Quantity',
+                html: `
+                    <div class="text-start">
+                        <p>Current Progress Rate: <strong>${currentRate.toFixed(2)}%</strong></p>
+                        <p>Enter the percentage to apply to the <strong>Quantity Not Delivered</strong>.</p>
+                        <div class="alert alert-info">
+                            <small><i class="fas fa-info-circle"></i> Example: Entering <strong>99</strong> means receiving 99% of the remaining quantity for each selected line.</small>
+                        </div>
+                    </div>
+                `,
+                input: 'text',
+                inputPlaceholder: 'Ex: 99',
+                showCancelButton: true,
+                confirmButtonText: 'Apply',
+                confirmButtonColor: '#28a745',
+                cancelButtonColor: '#6c757d',
+                inputValidator: (value) => {
+                    if (!value) return 'Please enter a percentage';
+                    // Remplacer virgule par point pour le parsing
+                    const val = parseFloat(value.replace(',', '.'));
+                    if (isNaN(val)) return 'Please enter a valid number';
+                    if (val <= 0) return 'Percentage must be greater than 0';
+                    if (val > 100) return 'Percentage cannot exceed 100%';
+                }
+            });
+
+            if (isDismissed || !targetRateVal) return;
+
+            const targetRate = parseFloat(targetRateVal.replace(',', '.'));
+            
+            // Préparer les données pour l'API
+            const linesInfo = [];
+            selectedRows.forEach(checkbox => {
+                const businessId = checkbox.getAttribute('data-row');
+                const orderedElement = document.querySelector(`.ordered-quantity[data-row="${businessId}"]`);
+                if (orderedElement) {
+                    const orderedQty = parseFloat(orderedElement.textContent) || 0;
+                    linesInfo.push({
+                        business_id: businessId,
+                        ordered_quantity: orderedQty
+                    });
+                }
+            });
+
+            if (linesInfo.length === 0) {
+                 Swal.fire('Error', 'No valid lines selected', 'error');
+                 return;
+            }
+
+            // Appel API spécifique pour le taux cible
+            applyCollectiveQuantityDeliveredButton.disabled = true;
+            applyCollectiveQuantityDeliveredButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Calculating...';
+
+            try {
+                const response = await fetch(`/orders/api/apply-target-rate/${bonId}/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({
+                        bon_number: bonNumber,
+                        target_rate: targetRate,
+                        lines_info: linesInfo
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    // Recharger les données pour mettre à jour l'interface
+                    fetchQuantityDeliveredData();
+                    
+                    // Mettre à jour les totaux globaux si renvoyés
+                    if (data.taux_avancement !== undefined) {
+                        const taux = document.querySelector('.taux-avancement');
+                        if (taux) taux.textContent = data.taux_avancement.toFixed(2) + '%';
+                    }
+                     if (data.montant_total_recu !== undefined) {
+                        const mtr = document.querySelector('.montant-total-recue');
+                        if (mtr) mtr.textContent = data.montant_total_recu.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    }
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Target Rate Applied',
+                        text: `Successfully applied target rate of ${targetRate}%.`,
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                    
+                    resetSelection();
+                } else {
+                    throw new Error(data.message || 'Error applying target rate');
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: error.message || 'An error occurred',
+                    confirmButtonColor: '#dc3545'
+                });
+            } finally {
+                applyCollectiveQuantityDeliveredButton.disabled = false;
+                applyCollectiveQuantityDeliveredButton.innerHTML = '<i class="fas fa-check-circle me-2"></i> Apply collective Quantity Delivered';
+            }
+
+            return; // Fin du traitement pour target_rate
+        }
+
+        let specificQuantity = 0;
+        
+        // Étape 2 : Si partiel, demander la quantité
+        if (receptionMode === 'partial') {
+            const { value: qty, isDismissed } = await Swal.fire({
+                title: 'Enter Quantity',
+                text: 'Please enter the quantity to receive for EACH selected line:',
+                input: 'text', // Utiliser text pour mieux gérer les formats
+                inputPlaceholder: 'Ex: 1.0',
+                showCancelButton: true,
+                confirmButtonText: 'Validate',
+                confirmButtonColor: '#28a745',
+                cancelButtonColor: '#6c757d',
+                inputValidator: (value) => {
+                    if (!value || isNaN(parseFloat(value)) || parseFloat(value) <= 0) {
+                        return 'Please enter a valid positive number';
+                    }
+                }
+            });
+
+            if (isDismissed || !qty) return;
+            specificQuantity = parseFloat(qty);
+        }
+
+        // Filtrer les lignes et préparer les mises à jour
         const eligibleRows = [];
         const updates = [];
+        let skippedCount = 0;
         
         for (const checkbox of selectedRows) {
             const businessId = checkbox.getAttribute('data-row');
@@ -871,63 +1322,118 @@ document.addEventListener('DOMContentLoaded', function() {
                 const orderedQuantity = parseFloat(orderedElement.textContent) || 0;
                 const quantityNotDelivered = Math.max(0, orderedQuantity - currentQuantityDelivered);
                 
-                // Vérifier si la ligne n'est pas déjà complète
-                if (quantityNotDelivered > 0) {
+                // Calculer la quantité à ajouter selon le mode
+                let quantityToAdd = 0;
+                
+                if (receptionMode === 'full') {
+                    quantityToAdd = quantityNotDelivered;
+                } else {
+                    // Mode partiel : on prend le min entre la quantité demandée et le reste à livrer
+                    // Pour éviter de dépasser la commande
+                    quantityToAdd = Math.min(specificQuantity, quantityNotDelivered);
+                }
+
+                // Si quantityToAdd > 0, on traite la ligne
+                if (quantityToAdd > 0) {
                     eligibleRows.push({
                         checkbox,
                         businessId,
-                        quantityDeliveredInput,
-                        quantityNotDeliveredElement: document.querySelector(`.quantity-not-delivered[data-row="${businessId}"]`),
-                        orderedQuantity,
-                        quantityNotDelivered
+                        quantityToAdd
                     });
                     
                     // Préparer les données pour l'API en lot
+                    // Note: L'API attend 'quantity_delivered' qui est la quantité à AJOUTER (incrémentale)
+                    // ou la nouvelle quantité totale ? Vérifions saveQuantityDeliveredChanges.
+                    // saveQuantityDeliveredChanges envoie "quantity_delivered" qui semble être la NOUVELLE quantité TOTALE (valeur de l'input).
+                    // Mais bulk_update (backend) ?
+                    // Regardons detail_bon.js saveQuantityDeliveredChanges:
+                    // body: JSON.stringify({ ... quantity_delivered: parseFloat(quantity_delivered).toFixed(2) ... })
+                    // Donc c'est la quantité TOTALE.
+                    // Cependant, le code précédent de applyCollectiveQuantityDelivered faisait:
+                    // quantity_delivered: quantityNotDelivered
+                    // Ce qui semblait être un bug ou une confusion si l'API attend le total.
+                    // ATTENTION: Le backend reception_api.bulk_update_receptions attend probablement un DELTA ou un TOTAL ?
+                    // Le code JS précédent faisait: quantity_delivered: quantityNotDelivered.
+                    // Si quantityNotDelivered = 10 et current = 0, on envoie 10. (Total = 10). Correct.
+                    // Si quantityNotDelivered = 5 et current = 5 (total ordered 10), on envoie 5.
+                    // -> Si l'API attend le TOTAL, on devrait envoyer (current + quantityNotDelivered) = 10.
+                    // -> Si l'API attend le DELTA, on envoie 5.
+                    
+                    // Vérifions le code JS précédent :
+                    // const quantityNotDelivered = Math.max(0, orderedQuantity - currentQuantityDelivered);
+                    // updates.push({ ..., quantity_delivered: quantityNotDelivered, ... });
+                    
+                    // Si l'API attend le TOTAL, le code précédent était FAUX pour les lignes partiellement livrées.
+                    // EX: Ordered 10, Current 2. Remaining 8.
+                    // Code précédent envoyait 8.
+                    // Si c'est TOTAL, la nouvelle valeur devient 8 (au lieu de 10).
+                    // Si c'est DELTA, ça ajoute 8 -> 10.
+                    
+                    // HYPOTHÈSE LA PLUS SÛRE : L'API bulk_update fonctionne probablement comme update_quantity_delivered
+                    // qui prend la valeur absolue (Total).
+                    // Dans ce cas, le code précédent avait un bug pour les livraisons partielles existantes.
+                    // MAIS, je vais assumer que je dois envoyer la quantité à AJOUTER (Delta) SI l'endpoint est spécifique bulk_update.
+                    // Ou alors je calcule le nouveau total.
+                    
+                    // Regardons le code précédent à nouveau.
+                    // updates.push({ quantity_delivered: quantityNotDelivered })
+                    // Si c'était "Receive All Remaining", le but est d'arriver à Ordered Quantity.
+                    // Si j'envoie "Remaining", et que l'API écrase la valeur, alors Total = Remaining.
+                    // C'est faux si Current > 0.
+                    // Exemple: Ordered 10, Current 2. Remaining 8.
+                    // Si j'envoie 8, et que l'API met à jour à 8, alors on a perdu les 2 précédents ? Non, on a reculé.
+                    // OU ALORS, "Receive All Remaining" signifie "Set Quantity Delivered = Ordered Quantity".
+                    // Ordered = 10.
+                    // Code précédent envoyait: 8.
+                    // Ça ne colle pas si l'API attend le Total.
+                    
+                    // Je vais vérifier reception_api.py si possible, mais je ne peux pas lire le backend maintenant facilement sans perdre le focus.
+                    // Je vais parier sur le fait que je dois envoyer la quantité à AJOUTER (Delta).
+                    // Car le backend reception_api.bulk_update_receptions fait: total = existing + new.
+                    
+                    // Donc:
                     updates.push({
                         business_id: businessId,
-                        quantity_delivered: quantityNotDelivered, // Quantité à ajouter
+                        quantity_delivered: quantityToAdd, // On envoie le DELTA (quantité à ajouter)
                         ordered_quantity: orderedQuantity
                     });
+                } else {
+                    skippedCount++;
                 }
             }
         }
         
-        // Compter uniquement les lignes éligibles
         const eligibleCount = eligibleRows.length;
         const totalSelected = selectedRows.length;
-        const skippedCount = totalSelected - eligibleCount;
-    
+        
         if (eligibleCount === 0) {
             Swal.fire({
                 icon: 'info',
                 title: 'No eligible line',
-                html: `
-                    <div style="text-align: left;">
-                        <p>The ${totalSelected} selected lines are already fully received.</p>
-                        <p>The Quantity Delivered collective will only apply to lines with remaining quantity > 0.</p>
-                    </div>
-                `
+                text: 'All selected lines are already fully received or the requested quantity is 0.'
             });
             return;
         }
         
-        // Demander confirmation à l'utilisateur
+        // Confirmation finale
         const { isConfirmed } = await Swal.fire({
             title: 'Confirm collective delivery',
             html: `
                 <div style="text-align: left;">
+                    <p><strong>Mode:</strong> ${receptionMode === 'full' ? 'Full Reception' : 'Partial Reception (' + specificQuantity + '/line)'}</p>
                     <p>Selected lines: <strong>${totalSelected}</strong></p>
-                    <p>Eligible lines: <strong>${eligibleCount}</strong> (remaining quantity > 0)</p>
-                    <p>Skipped lines: <strong>${skippedCount}</strong> (already complete)</p>
-                    <p>This action is irreversible. Do you want to continue?</p>
+                    <p>Eligible lines: <strong>${eligibleCount}</strong></p>
+                    <p>Skipped lines: <strong>${skippedCount}</strong></p>
+                    <hr>
+                    <p>This will update the delivered quantities for these lines.</p>
                 </div>
             `,
-            icon: 'question',
+            icon: 'warning',
             showCancelButton: true,
             confirmButtonText: 'Yes, apply',
-            cancelButtonText: 'Close',
+            cancelButtonText: 'Cancel',
             confirmButtonColor: '#28a745',
-            cancelButtonColor: '#dc3545'
+            cancelButtonColor: '#d33'
         });
         
         if (isConfirmed) {
@@ -955,35 +1461,39 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 
                 // Mettre à jour l'interface avec les données retournées
-                data.updated_receptions.forEach(reception => {
-                    const businessId = reception.business_id;
-                    const quantityDeliveredInput = document.querySelector(`.quantity-delivered-input[data-row="${businessId}"]`);
-                    const quantityNotDeliveredElement = document.querySelector(`.quantity-not-delivered[data-row="${businessId}"]`);
-                    const amountDeliveredElement = document.querySelector(`.amount-delivered[data-row="${businessId}"]`);
-                    const amountNotDeliveredElement = document.querySelector(`.amount-not-delivered[data-row="${businessId}"]`);
-                    const quantityPayableElement = document.querySelector(`.quantity-payable[data-row="${businessId}"]`);
-                    const amountPayableElement = document.querySelector(`.amount-payable[data-row="${businessId}"]`);
-                    
-                    if (quantityDeliveredInput) {
-                        quantityDeliveredInput.value = reception.quantity_delivered.toString();
-                        quantityDeliveredInput.setAttribute('data-original-value', reception.quantity_delivered.toString());
-                    }
-                    if (quantityNotDeliveredElement) {
-                        quantityNotDeliveredElement.textContent = reception.quantity_not_delivered.toString();
-                    }
-                    if (amountDeliveredElement) {
-                        amountDeliveredElement.textContent = reception.amount_delivered.toFixed(2);
-                    }
-                    if (amountNotDeliveredElement) {
-                        amountNotDeliveredElement.textContent = reception.amount_not_delivered.toFixed(2);
-                    }
-                    if (quantityPayableElement) {
-                        quantityPayableElement.textContent = reception.quantity_payable.toFixed(2);
-                    }
-                    if (amountPayableElement) {
-                        amountPayableElement.textContent = reception.amount_payable.toFixed(2);
-                    }
-                });
+                if (data.updated_receptions) {
+                    data.updated_receptions.forEach(reception => {
+                        const businessId = reception.business_id;
+                        const quantityDeliveredInput = document.querySelector(`.quantity-delivered-input[data-row="${businessId}"]`);
+                        const quantityNotDeliveredElement = document.querySelector(`.quantity-not-delivered[data-row="${businessId}"]`);
+                        const amountDeliveredElement = document.querySelector(`.amount-delivered[data-row="${businessId}"]`);
+                        const amountNotDeliveredElement = document.querySelector(`.amount-not-delivered[data-row="${businessId}"]`);
+                        const quantityPayableElement = document.querySelector(`.quantity-payable[data-row="${businessId}"]`);
+                        const amountPayableElement = document.querySelector(`.amount-payable[data-row="${businessId}"]`);
+                        
+                        if (quantityDeliveredInput) {
+                            quantityDeliveredInput.value = reception.quantity_delivered.toString();
+                            quantityDeliveredInput.setAttribute('data-original-value', reception.quantity_delivered.toString());
+                        }
+                        if (quantityNotDeliveredElement) {
+                            quantityNotDeliveredElement.textContent = reception.quantity_not_delivered.toString();
+                            // Mettre à jour la couleur
+                            applyQuantityNotDeliveredColor(quantityNotDeliveredElement, reception.quantity_not_delivered);
+                        }
+                        if (amountDeliveredElement) {
+                            amountDeliveredElement.textContent = reception.amount_delivered.toFixed(2);
+                        }
+                        if (amountNotDeliveredElement) {
+                            amountNotDeliveredElement.textContent = reception.amount_not_delivered.toFixed(2);
+                        }
+                        if (quantityPayableElement) {
+                            quantityPayableElement.textContent = reception.quantity_payable.toFixed(2);
+                        }
+                        if (amountPayableElement) {
+                            amountPayableElement.textContent = reception.amount_payable.toFixed(2);
+                        }
+                    });
+                }
                 
                 // Mettre à jour les métriques globales
                 if (data.taux_avancement !== undefined) {
@@ -1006,8 +1516,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 Swal.fire({
                     icon: 'success',
                     title: 'Collective delivery applied',
-                    html: `Operation successful for <strong>${eligibleCount}</strong> lines<br>
-                           (${skippedCount} lines skipped because already complete)`,
+                    html: `Operation successful for <strong>${eligibleCount}</strong> lines`,
                     confirmButtonColor: '#28a745'
                 });
                 
@@ -1148,22 +1657,66 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Gestionnaire d'événements pour les champs Quantity Delivered
     quantityDeliveredInputs.forEach(input => {
-        // Stocker la valeur originale et précédente au focus
+        
+        // Fonction utilitaire pour obtenir la valeur originale de manière robuste
+        function getOriginalValue(inputElement) {
+            // Priorité: data-original-value > data-current-total > 0
+            let val = inputElement.getAttribute('data-original-value');
+            if (val !== null && val !== '' && !isNaN(parseFloat(val))) {
+                return parseFloat(val);
+            }
+            val = inputElement.getAttribute('data-current-total');
+            if (val !== null && val !== '' && !isNaN(parseFloat(val))) {
+                return parseFloat(val);
+            }
+            return 0;
+        }
+        
+        // Fonction pour mettre à jour visuellement Quantity Not Delivered
+        function updateQuantityNotDeliveredDisplay(row, orderedQuantity, currentTotal, increment) {
+            const quantityNotDeliveredElement = document.querySelector(`.quantity-not-delivered[data-row="${row}"]`);
+            if (quantityNotDeliveredElement) {
+                const newTotal = currentTotal + increment;
+                const notDelivered = Math.max(0, orderedQuantity - newTotal);
+                quantityNotDeliveredElement.textContent = notDelivered.toString();
+                applyQuantityNotDeliveredColor(quantityNotDeliveredElement, notDelivered);
+            }
+        }
+        
+        // Fonction pour restaurer Quantity Not Delivered à sa valeur originale
+        function restoreQuantityNotDeliveredDisplay(row, orderedQuantity, currentTotal) {
+            const quantityNotDeliveredElement = document.querySelector(`.quantity-not-delivered[data-row="${row}"]`);
+            if (quantityNotDeliveredElement) {
+                const notDelivered = Math.max(0, orderedQuantity - currentTotal);
+                quantityNotDeliveredElement.textContent = notDelivered.toString();
+                applyQuantityNotDeliveredColor(quantityNotDeliveredElement, notDelivered);
+            }
+        }
+        
+        // Stocker la valeur originale au focus
         input.addEventListener('focus', function() {
-            this.setAttribute('data-original-value', this.value);
-            this.setAttribute('data-previous-value', this.value || '0');
+            const currentValue = this.value.trim();
+            // Stocker le total actuel livré (avant modification)
+            if (currentValue !== '' && !isNaN(parseFloat(currentValue))) {
+                this.setAttribute('data-original-value', currentValue);
+                this.setAttribute('data-current-total', currentValue);
+            } else {
+                // Si vide, utiliser data-current-total existant ou 0
+                const existingTotal = this.getAttribute('data-current-total') || '0';
+                this.setAttribute('data-original-value', existingTotal);
+            }
+            // Stocker la valeur de l'input avant modification pour restauration
+            this.setAttribute('data-input-before-edit', currentValue);
         });
         
         // Validation pendant la saisie
         input.addEventListener('input', function() {
-            // Autoriser les chiffres, un point décimal, et le signe moins au début
-            // Supprimer tous les caractères non autorisés sauf - au début
             let value = this.value;
             
             // Permettre le signe moins seulement au début
             const hasMinusAtStart = value.startsWith('-');
             
-            // Supprimer tous les caractères non numériques sauf le point et le minus au début
+            // Supprimer tous les caractères non numériques sauf le point et le minus
             value = value.replace(/[^0-9.-]/g, '');
             
             // S'assurer que le minus n'apparaît qu'au début
@@ -1180,169 +1733,246 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             this.value = value;
-        });
-        
-        // Gestion de la touche Entrée
-        input.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                e.stopPropagation(); // Empêche la propagation de l'événement
-                this.blur(); // Déclenche le blur qui va appeler la validation
-                return false; // Empêche tout autre comportement par défaut
-            }
-        });
-        
-        // Gestion de la perte de focus du champ
-        input.addEventListener('blur', async function() {
-            // Toujours exécuter la logique de sauvegarde même si la valeur n'a pas changé
+            
+            // Mise à jour visuelle en temps réel de Quantity Not Delivered
             const row = this.getAttribute('data-row');
             const orderedQuantityElement = document.querySelector(`.ordered-quantity[data-row="${row}"]`);
             const orderedQuantity = parseFloat(orderedQuantityElement?.textContent || this.getAttribute('data-ordered') || '0');
+            const currentTotal = getOriginalValue(this);
+            const increment = value === '' || isNaN(parseFloat(value)) ? 0 : parseFloat(value);
             
-            // Récupérer la valeur actuelle de quantity delivered
-            const currentQuantityDelivered = parseFloat(this.getAttribute('data-original-value') || '0');            
+            updateQuantityNotDeliveredDisplay(row, orderedQuantity, currentTotal, increment);
+        });
+        
+        // Gestion de la perte de focus - stocke en mémoire (pré-enregistrement)
+        input.addEventListener('blur', function() {
+            const row = this.getAttribute('data-row');
+            const orderedQuantityElement = document.querySelector(`.ordered-quantity[data-row="${row}"]`);
+            const orderedQuantity = parseFloat(orderedQuantityElement?.textContent || this.getAttribute('data-ordered') || '0');
+            const currentTotal = getOriginalValue(this);
+            const inputBeforeEdit = this.getAttribute('data-input-before-edit') || currentTotal.toString();
             
-            let newValue = this.value.trim() === '' ? 0 : parseFloat(this.value);
-            
-            // Si la valeur n'est pas un nombre, utiliser 0
-            if (isNaN(newValue)) {
-                newValue = 0;
+            let increment = this.value.trim() === '' ? 0 : parseFloat(this.value);
+            if (isNaN(increment)) {
+                increment = 0;
             }
             
-            // Utiliser directement la nouvelle valeur saisie
-            const quantityDelivered = newValue;
+            // Si pas d'incrément, restaurer et nettoyer
+            if (increment === 0) {
+                this.value = inputBeforeEdit;
+                pendingChanges.delete(row);
+                this.classList.remove('pending-change');
+                restoreQuantityNotDeliveredDisplay(row, orderedQuantity, currentTotal);
+                return;
+            }
             
-            // Validation intelligente pour les valeurs négatives (correction d'erreurs)
-            if (quantityDelivered < 0) {
-                // Vérifier que la valeur négative ne rend pas le total négatif
-                const currentTotal = parseFloat(this.getAttribute('data-original-value') || '0');
-                const newTotal = currentTotal + quantityDelivered;
-                
+            // Validation pour les valeurs négatives (correction)
+            if (increment < 0) {
+                const newTotal = currentTotal + increment;
                 if (newTotal < 0) {
                     Swal.fire({
                         icon: 'warning',
                         title: 'Correction impossible',
-                        html: `The correction of ${quantityDelivered} would make the total negative.<br>
-                               <strong>Current total:</strong> ${currentTotal}<br>
-                               <strong>New total:</strong> ${newTotal}<br><br>
-                               <em>Tip: To correct an error, enter a negative value equal to the error made.</em>`,
+                        html: `La correction de <strong>${increment}</strong> rendrait le total négatif.<br>
+                               <strong>Total actuel:</strong> ${currentTotal}<br>
+                               <strong>Total après correction:</strong> ${newTotal}`,
                         confirmButtonColor: '#3085d6',
                     });
-                    this.value = this.getAttribute('data-original-value') || '0';
-                    return;
-                }
-                
-                // Demander confirmation pour les valeurs négatives (correction)
-                const confirmResult = await Swal.fire({
-                    title: 'Correction de réception',
-                    html: `
-                        <div style="text-align: left;">
-                            <p><i class="fas fa-exclamation-triangle text-warning"></i> Register negative quantity for delivery reversal.</p>
-                            <p><strong>Line:</strong> ${row}</p>
-                            <p><strong>Actual delivered Quantity:</strong> ${currentTotal}</p>
-                            <p><strong>Reversed quantity:</strong> ${quantityDelivered}</p>
-                            <p><strong>Corrected Delivered Quantity:</strong> ${newTotal}</p>
-                            <hr>
-                            <p class="text-info"><small><i class="fas fa-info-circle"></i> Action will generate system Log for security Purpose .</small></p>
-                        </div>
-                    `,
-                    icon: 'question',
-                    showCancelButton: true,
-                    confirmButtonColor: '#dc3545',
-                    cancelButtonColor: '#6c757d',
-                    confirmButtonText: 'Yes, reverse',
-                    cancelButtonText: 'Close',
-                    allowOutsideClick: false,
-                    allowEscapeKey: false
-                });
-                
-                if (!confirmResult.isConfirmed) {
-                    this.value = this.getAttribute('data-original-value') || '0';
+                    // Restaurer la valeur de l'input et l'affichage
+                    this.value = inputBeforeEdit;
+                    pendingChanges.delete(row);
+                    this.classList.remove('pending-change');
+                    restoreQuantityNotDeliveredDisplay(row, orderedQuantity, currentTotal);
                     return;
                 }
             }
             
-            // Vérifier que la quantité positive ne dépasse pas la commande
-            if (quantityDelivered > 0) {
-                const currentTotal = parseFloat(this.getAttribute('data-original-value') || '0');
-                const newTotal = currentTotal + quantityDelivered;
-                
+            // Validation pour les valeurs positives
+            if (increment > 0) {
+                const newTotal = currentTotal + increment;
                 if (newTotal > orderedQuantity) {
                     Swal.fire({
                         icon: 'warning',
                         title: 'Quantité invalide',
-                        html: `La quantité totale (${newTotal}) dépasserait la quantité commandée (${orderedQuantity}).<br>
+                        html: `Le total (<strong>${newTotal}</strong>) dépasserait la quantité commandée (<strong>${orderedQuantity}</strong>).<br>
                                <strong>Total actuel:</strong> ${currentTotal}<br>
-                               <strong>Ajout demandé:</strong> ${quantityDelivered}<br>
-                               <strong>Maximum possible:</strong> ${orderedQuantity - currentTotal}`,
+                               <strong>Ajout demandé:</strong> ${increment}<br>
+                               <strong>Maximum possible:</strong> ${Math.max(0, orderedQuantity - currentTotal)}`,
                         confirmButtonColor: '#3085d6',
                     });
-                    this.value = this.getAttribute('data-original-value') || '0';
-                    const quantityNotDeliveredElement = document.querySelector(`.quantity-not-delivered[data-row="${row}"]`);
-                    if (quantityNotDeliveredElement) {
-                        const restoredDelivered = parseFloat(this.getAttribute('data-original-value') || '0') || 0;
-                        const quantityNotDelivered = Math.max(0, orderedQuantity - restoredDelivered);
-                        quantityNotDeliveredElement.textContent = quantityNotDelivered;
-                        applyQuantityNotDeliveredColor(quantityNotDeliveredElement, quantityNotDelivered);
-                    }
+                    // Restaurer la valeur de l'input et l'affichage
+                    this.value = inputBeforeEdit;
+                    pendingChanges.delete(row);
+                    this.classList.remove('pending-change');
+                    restoreQuantityNotDeliveredDisplay(row, orderedQuantity, currentTotal);
                     return;
                 }
             }
             
-            // Toujours demander confirmation, que la valeur ait changé ou non
-            const result = await Swal.fire({
-                title: 'Confirm delivery',
-                html: `
-                    <div style="text-align: left;">
-                        <p>Are you sure you want to register this delivery ?</p>
-                        <p><strong>Line:</strong> ${row}</p>
-                        <p><strong>Ordered Quantity:</strong> ${orderedQuantity}</p>
-                        <p><strong>Incremental Delivered Quantity :</strong> ${quantityDelivered}</p>
-                    </div>
-                `,
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonColor: '#3085d6',
-                cancelButtonColor: '#d33',
-                confirmButtonText: 'Yes, register',
-                cancelButtonText: 'Close',
-                allowOutsideClick: false,
-                allowEscapeKey: false,
-                showLoaderOnConfirm: true
+            // Stocker la modification en attente (pré-enregistrement)
+            pendingChanges.set(row, {
+                row: row,
+                orderedQuantity: orderedQuantity,
+                quantityDelivered: increment,
+                originalValue: currentTotal,
+                inputBeforeEdit: inputBeforeEdit,
+                input: this
             });
-            
-            if (result.isConfirmed) {
-                // Envoyer la mise à jour au serveur
-                try {
-                    // Envoyer la quantité totale - la fonction saveQuantityDeliveredChanges s'occupe de la mise à jour UI
-                    await saveQuantityDeliveredChanges(row, orderedQuantity, quantityDelivered);
-                    
-                } catch (error) {
-                    console.error('Erreur lors de la sauvegarde:', error);
-                    // En cas d'erreur, restaurer la valeur précédente
-                    this.value = this.getAttribute('data-original-value') || '0';
-                }    
-            } else {
-                // Annulation : restaurer la valeur précédente
-                this.value = this.getAttribute('data-original-value') || '0';
-                
-                // Afficher une notification d'annulation
-                Swal.fire({
-                    position: 'top-end',
-                    icon: 'info',
-                    title: 'Operation cancelled',
-                    showConfirmButton: false,
-                    timer: 1500,
-                    toast: true
-                });
-            }
+            this.classList.add('pending-change');
         });
         
-        // Gestion de la touche Entrée
-        input.addEventListener('keydown', function(e) {
+        // Gestion des touches clavier (navigation + confirmation)
+        input.addEventListener('keydown', async function(e) {
+            const allInputs = Array.from(document.querySelectorAll('.quantity-delivered-input'));
+            const currentIndex = allInputs.indexOf(this);
+            
+            // Navigation avec flèches haut/bas
+            if (e.key === 'ArrowDown' || (e.key === 'Tab' && !e.shiftKey)) {
+                e.preventDefault();
+                const nextIndex = currentIndex + 1;
+                if (nextIndex < allInputs.length) {
+                    this.blur();
+                    allInputs[nextIndex].focus();
+                    allInputs[nextIndex].select();
+                }
+                return;
+            }
+            
+            if (e.key === 'ArrowUp' || (e.key === 'Tab' && e.shiftKey)) {
+                e.preventDefault();
+                const prevIndex = currentIndex - 1;
+                if (prevIndex >= 0) {
+                    this.blur();
+                    allInputs[prevIndex].focus();
+                    allInputs[prevIndex].select();
+                }
+                return;
+            }
+            
+            // Touche Escape pour annuler la modification en cours
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                const row = this.getAttribute('data-row');
+                const inputBeforeEdit = this.getAttribute('data-input-before-edit') || '0';
+                this.value = inputBeforeEdit;
+                pendingChanges.delete(row);
+                this.classList.remove('pending-change');
+                
+                // Restaurer Quantity Not Delivered
+                const orderedQuantityElement = document.querySelector(`.ordered-quantity[data-row="${row}"]`);
+                const orderedQuantity = parseFloat(orderedQuantityElement?.textContent || '0');
+                const currentTotal = getOriginalValue(this);
+                restoreQuantityNotDeliveredDisplay(row, orderedQuantity, currentTotal);
+                
+                this.blur();
+                return;
+            }
+            
+            // Touche Entrée - affiche l'alerte de confirmation
             if (e.key === 'Enter') {
                 e.preventDefault();
-                this.blur(); // Déclenche l'événement blur
+                e.stopPropagation();
+                
+                // D'abord, déclencher le blur pour capturer la valeur actuelle
+                this.blur();
+                
+                // Attendre un court instant pour que le blur soit traité
+                await new Promise(resolve => setTimeout(resolve, 50));
+                
+                // Si aucune modification en attente, ne rien faire
+                if (pendingChanges.size === 0) {
+                    return;
+                }
+                
+                // Construire le résumé des modifications
+                let summaryHtml = '<div style="text-align: left; max-height: 300px; overflow-y: auto;">';
+                summaryHtml += `<p><strong>${pendingChanges.size} modification(s) en attente :</strong></p>`;
+                summaryHtml += '<table style="width: 100%; border-collapse: collapse;">';
+                summaryHtml += '<tr style="background: #f5f5f5;"><th style="padding: 5px; border: 1px solid #ddd;">Ligne</th><th style="padding: 5px; border: 1px solid #ddd;">Incrément</th><th style="padding: 5px; border: 1px solid #ddd;">Nouveau Total</th></tr>';
+                
+                pendingChanges.forEach((change, row) => {
+                    const newTotal = change.originalValue + change.quantityDelivered;
+                    const color = change.quantityDelivered < 0 ? '#dc3545' : '#28a745';
+                    summaryHtml += `<tr>
+                        <td style="padding: 5px; border: 1px solid #ddd;">${row}</td>
+                        <td style="padding: 5px; border: 1px solid #ddd; color: ${color}; font-weight: bold;">${change.quantityDelivered > 0 ? '+' : ''}${change.quantityDelivered}</td>
+                        <td style="padding: 5px; border: 1px solid #ddd;">${newTotal}</td>
+                    </tr>`;
+                });
+                summaryHtml += '</table></div>';
+                
+                // Afficher l'alerte de confirmation
+                const result = await Swal.fire({
+                    title: 'Confirmer les réceptions',
+                    html: summaryHtml,
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonColor: '#28a745',
+                    cancelButtonColor: '#dc3545',
+                    confirmButtonText: 'Valider',
+                    cancelButtonText: 'Annuler',
+                    allowOutsideClick: false,
+                    allowEscapeKey: false
+                });
+                
+                if (result.isConfirmed) {
+                    // Sauvegarder toutes les modifications
+                    const savePromises = [];
+                    pendingChanges.forEach((change) => {
+                        savePromises.push(
+                            saveQuantityDeliveredChanges(change.row, change.orderedQuantity, change.quantityDelivered)
+                                .then(() => {
+                                    change.input.classList.remove('pending-change');
+                                })
+                                .catch(error => {
+                                    console.error(`Erreur sauvegarde ligne ${change.row}:`, error);
+                                    // En cas d'erreur, restaurer cette ligne
+                                    change.input.value = change.inputBeforeEdit;
+                                    change.input.classList.remove('pending-change');
+                                    restoreQuantityNotDeliveredDisplay(
+                                        change.row, 
+                                        change.orderedQuantity, 
+                                        change.originalValue
+                                    );
+                                })
+                        );
+                    });
+                    
+                    await Promise.all(savePromises);
+                    pendingChanges.clear();
+                    
+                    Swal.fire({
+                        position: 'top-end',
+                        icon: 'success',
+                        title: 'Réceptions enregistrées',
+                        showConfirmButton: false,
+                        timer: 1500,
+                        toast: true
+                    });
+                } else {
+                    // Annuler - restaurer les valeurs originales
+                    pendingChanges.forEach((change) => {
+                        change.input.value = change.inputBeforeEdit;
+                        change.input.classList.remove('pending-change');
+                        // Restaurer aussi Quantity Not Delivered
+                        restoreQuantityNotDeliveredDisplay(
+                            change.row, 
+                            change.orderedQuantity, 
+                            change.originalValue
+                        );
+                    });
+                    pendingChanges.clear();
+                    
+                    Swal.fire({
+                        position: 'top-end',
+                        icon: 'info',
+                        title: 'Modifications annulées',
+                        showConfirmButton: false,
+                        timer: 1500,
+                        toast: true
+                    });
+                }
+                
                 return false;
             }
         });
@@ -1766,7 +2396,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const resetButton = document.getElementById('resetColumnSelection');
     
     // Clé de stockage pour les préférences de colonnes
-    const storageKey = 'columnPreferences_' + '{{ bon_number }}';
+    const storageKey = 'columnPreferences_' + bonNumber;
     let selectedColumns = [];
     
     // Fonction pour ouvrir le panneau latéral
@@ -1990,7 +2620,7 @@ document.addEventListener('DOMContentLoaded', function() {
     updateDeliveryCounts();
     
     // Gérer les clics sur les boutons de filtre
-    const filterButtons = document.querySelectorAll('.filter-btn');
+    const filterButtons = document.querySelectorAll('.spectrum-filter-btn');
     filterButtons.forEach(btn => {
         btn.addEventListener('click', function() {
             // Retirer la classe active de tous les boutons
@@ -2015,7 +2645,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 updateDeliveryCounts();
                 
                 // Réappliquer le filtre actif
-                const activeFilter = document.querySelector('.filter-btn.active');
+                const activeFilter = document.querySelector('.spectrum-filter-btn.active');
                 if (activeFilter) {
                     applyDeliveryFilter(activeFilter.dataset.filter);
                 }

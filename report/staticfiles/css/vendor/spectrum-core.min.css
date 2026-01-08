@@ -1,0 +1,126 @@
+/* Spectrum CSS Minimal Fallback for MTN Design */
+:root {
+  --spectrum-global-color-gray-50: #fff;
+  --spectrum-global-color-gray-100: #f8f8f8;
+  --spectrum-global-color-gray-200: #e6e6e6;
+  --spectrum-global-color-gray-300: #d5d5d5;
+  --spectrum-global-color-gray-400: #b1b1b1;
+  --spectrum-global-color-gray-500: #909090;
+  --spectrum-global-color-gray-600: #6d6d6d;
+  --spectrum-global-color-gray-700: #464646;
+  --spectrum-global-color-gray-800: #000000; /* Modified to pure black for better contrast */
+  --spectrum-global-color-gray-900: #000000;
+  --spectrum-alias-background-color-default: var(--spectrum-global-color-gray-100);
+  --spectrum-alias-text-color: var(--spectrum-global-color-gray-800);
+  --spectrum-alias-border-color: var(--spectrum-global-color-gray-300);
+}
+
+.spectrum--light {
+  --spectrum-alias-text-color: #000000;
+  --spectrum-alias-heading-color: #000000;
+  --spectrum-global-color-gray-500: #707070; /* Darker grey for subtitles */
+  --spectrum-global-color-gray-600: #505050;
+  --spectrum-global-color-gray-700: #303030;
+  --spectrum-global-color-gray-800: #000000;
+  color: var(--spectrum-alias-text-color);
+  background-color: #f8f8f8; /* Explicitly set light background to prevent black screen issues */
+}
+
+body {
+  font-family: adobe-clean, "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: var(--spectrum-alias-text-color);
+  background-color: var(--spectrum-alias-background-color-default);
+}
+
+/* Headings */
+.spectrum-Heading {
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: var(--spectrum-global-color-gray-900);
+}
+.spectrum-Heading--sizeL { font-size: 28px; }
+.spectrum-Heading--sizeM { font-size: 24px; }
+.spectrum-Heading--sizeS { font-size: 20px; }
+
+/* Body Text */
+.spectrum-Body { font-size: 14px; line-height: 1.5; color: var(--spectrum-alias-text-color); }
+.spectrum-Body--sizeM { font-size: 14px; }
+.spectrum-Body--sizeS { font-size: 12px; }
+
+/* Buttons */
+.spectrum-Button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 0 14px;
+  min-height: 32px;
+  border-radius: 16px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+}
+.spectrum-Button--primary {
+  background-color: #FFCC00; /* MTN Yellow */
+  color: #000;
+  border-color: #FFCC00;
+}
+.spectrum-Button--primary:hover {
+  background-color: #E6B800;
+  border-color: #E6B800;
+}
+.spectrum-Button--secondary {
+  background-color: transparent;
+  color: #000000;
+  border-color: #464646;
+}
+.spectrum-Button--secondary:hover {
+  background-color: rgba(70, 70, 70, 0.1);
+  color: #000;
+  border-color: #222;
+}
+.spectrum-Button--cta {
+  background-color: #1473E6;
+  color: #fff;
+}
+
+/* Status Lights */
+.spectrum-StatusLight {
+  display: inline-flex;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--spectrum-alias-text-color);
+}
+.spectrum-StatusLight:before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+.spectrum-StatusLight--positive:before { background-color: #2D9D78; }
+.spectrum-StatusLight--negative:before { background-color: #E34850; }
+.spectrum-StatusLight--info:before { background-color: #2680EB; }
+.spectrum-StatusLight--neutral:before { background-color: #B1B1B1; }
+
+/* Tables */
+.spectrum-Table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.spectrum-Table-headCell {
+  text-align: left;
+  font-weight: 700;
+  padding: 10px;
+  border-bottom: 2px solid #e1e1e1;
+  color: #000;
+}
+.spectrum-Table-cell {
+  padding: 10px;
+  border-bottom: 1px solid #e1e1e1;
+  color: #000;
+}
