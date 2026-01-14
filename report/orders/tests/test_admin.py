@@ -170,6 +170,8 @@ class TestMSRNReportAdmin(TestCase):
             'senior_pm_column',
             'manager_portfolio_column',
             'gm_epmo_column',
+            'senior_tech_lead_column',
+            'vendor_column',
             'created_at', 
             'download_pdf',
             'edit_signatures_link',

@@ -197,6 +197,20 @@ class User(AbstractBaseUser, PermissionsMixin):
         null=True
     )
     
+    # Champs pour la gestion de la désactivation automatique
+    deactivation_reason = models.TextField(
+        verbose_name="Raison de la désactivation",
+        blank=True,
+        null=True,
+        help_text="Raison pour laquelle le compte a été désactivé (ex: inactivité, sécurité)"
+    )
+    deactivated_at = models.DateTimeField(
+        verbose_name="Date de désactivation",
+        blank=True,
+        null=True,
+        help_text="Date à laquelle le compte a été désactivé"
+    )
+    
     objects = UserManager()
     
     USERNAME_FIELD = 'email'

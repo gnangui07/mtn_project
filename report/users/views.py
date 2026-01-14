@@ -320,42 +320,73 @@ def login_view(request):
         email = request.POST.get('email', '').strip().lower()
         password = request.POST.get('password')
         
-        # Authentification
-        user = authenticate(request, username=email, password=password)
-        
-        if user is not None:
-            if user.is_active:
-                # Vider l'ancienne session si elle existe
-                request.session.flush()
-                
-                # Connecter l'utilisateur (crée une nouvelle session)
-                login(request, user)
-                
-                # Régénérer la clé de session pour sécurité
-                request.session.cycle_key()
-                
-                # Cache les permissions utilisateur via Celery (async)
-                try:
-                    cache_user_permissions.delay(user.id)
-                except Exception:
-                    # Celery non disponible, on continue sans cache
-                    pass
-                
-                messages.success(request, f"Bienvenue {user.get_full_name()} !")
-                
-                # Redirige vers la page demandée ou la page d'accueil
-                next_url = request.GET.get('next', 'core:accueil')
-                
-                # Créer la réponse avec anti-cache
-                response = redirect(next_url)
-                response['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
-                response['Pragma'] = 'no-cache'
-                response['Expires'] = '0'
-                
-                return response
+        # Vérifier d'abord si l'utilisateur existe en base de données
+        try:
+            existing_user = User.objects.get(email=email)
+            
+            # Vérifier si le compte est désactivé AVANT l'authentification
+            if not existing_user.is_active:
+                # Compte désactivé - afficher un message spécifique selon la raison
+                if hasattr(existing_user, 'deactivation_reason') and existing_user.deactivation_reason:
+                    if 'inactivité' in existing_user.deactivation_reason.lower():
+                        messages.error(
+                            request, 
+                            "Votre compte a été verrouillé pour cause d'inactivité. "
+                            "Veuillez contacter un administrateur (superuser) pour le réactiver."
+                        )
+                    elif 'manuelle' in existing_user.deactivation_reason.lower():
+                        messages.error(
+                            request, 
+                            "Votre compte a été désactivé par un administrateur. "
+                            "Veuillez contacter un administrateur pour plus d'informations."
+                        )
+                    else:
+                        messages.error(
+                            request, 
+                            f"Votre compte a été désactivé. Raison: {existing_user.deactivation_reason}. "
+                            "Veuillez contacter un administrateur."
+                        )
+                else:
+                    messages.error(request, "Votre compte n'est pas encore activé. Veuillez vérifier votre email.")
             else:
-                messages.error(request, "Votre compte n'est pas encore activé. Veuillez vérifier votre email.")
-        else:
+                # Compte actif - tenter l'authentification
+                user = authenticate(request, username=email, password=password)
+                
+                if user is not None:
+                    # Vider l'ancienne session si elle existe
+                    request.session.flush()
+                    
+                    # Connecter l'utilisateur (crée une nouvelle session)
+                    login(request, user)
+                    
+                    # Régénérer la clé de session pour sécurité
+                    request.session.cycle_key()
+                    
+                    # Cache les permissions utilisateur via Celery (async)
+                    try:
+                        cache_user_permissions.delay(user.id)
+                    except Exception:
+                        # Celery non disponible, on continue sans cache
+                        pass
+                    
+                    messages.success(request, f"Bienvenue {user.get_full_name()} !")
+                    
+                    # Redirige vers la page demandée ou la page d'accueil
+                    next_url = request.GET.get('next', 'core:accueil')
+                    
+                    # Créer la réponse avec anti-cache
+                    response = redirect(next_url)
+                    response['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+                    response['Pragma'] = 'no-cache'
+                    response['Expires'] = '0'
+                    
+                    return response
+                else:
+                    # Mot de passe incorrect
+                    messages.error(request, "Email ou mot de passe incorrect.")
+                    
+        except User.DoesNotExist:
+            # Email n'existe pas en base de données
             messages.error(request, "Email ou mot de passe incorrect.")
     
     # Ajouter anti-cache à la page de connexion aussi

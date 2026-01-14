@@ -1592,11 +1592,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const cause = (inputCause.value || '').trim();
 
             // Validation stricte
-            if (isNaN(rate) || rate < 0 || rate > 10) {
+            if (isNaN(rate) || rate < 0 || rate > 100) {
                 Swal.fire({
                     icon: 'warning',
                     title: 'Validation',
-                    text: 'The Payment Retention rate must be between 0 and 10%'
+                    text: 'The Payment Retention rate must be between 0 and 100%'
                 });
                 inputRate.focus();
                 return;
@@ -1623,7 +1623,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     retention_cause: cause
                 })
             })
-            .then(r => r.json())
+            .then(r => {
+                // DEBUG: Voir la réponse brute
+                return r.text().then(text => {
+                    console.log('Réponse brute du serveur:', text);
+                    try {
+                        return JSON.parse(text);
+                    } catch (e) {
+                        console.error('Erreur JSON.parse:', e);
+                        throw new Error(`Réserve invalide: ${text.substring(0, 200)}`);
+                    }
+                });
+            })
             .then(data => {
                 if (data.status !== 'success') throw new Error(data.message || 'Erreur API');
 

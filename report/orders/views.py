@@ -1799,20 +1799,38 @@ def vendor_ranking(request):
     if allowed_ids is not None:
         evaluations_qs = evaluations_qs.filter(bon_commande_id__in=allowed_ids)
     
-    # Grouper par supplier et calculer les statistiques
+    # Fonction pour normaliser les noms de fournisseurs (case-insensitive, sans accents)
+    def normalize_supplier_name(name):
+        import unicodedata
+        if not name:
+            return name
+        # Mettre en majuscules et enlever les accents
+        name = name.upper()
+        name = unicodedata.normalize('NFKD', name).encode('ASCII', 'ignore').decode('ASCII')
+        return name.strip()
+    
+    # Grouper par supplier normalisé pour éviter les doublons de casse/accents
     suppliers_data = {}
+    original_names = {}  # Pour garder le nom original à afficher
     
     for eval in evaluations_qs:
-        supplier = eval.supplier
-        if supplier not in suppliers_data:
-            suppliers_data[supplier] = {
-                'name': supplier,
+        # Utiliser le nom normalisé pour le regroupement
+        supplier_normalized = normalize_supplier_name(eval.supplier)
+        supplier_original = eval.supplier
+        
+        # Garder une trace du nom original (prendre le premier rencontré)
+        if supplier_normalized not in original_names:
+            original_names[supplier_normalized] = supplier_original
+        
+        if supplier_normalized not in suppliers_data:
+            suppliers_data[supplier_normalized] = {
+                'name': original_names[supplier_normalized],  # Nom original pour l'affichage
                 'evaluations': [],
                 'po_numbers': set(),
                 'po_ids': set(),  # Ajouter les IDs des PO
             }
         
-        suppliers_data[supplier]['evaluations'].append({
+        suppliers_data[supplier_normalized]['evaluations'].append({
             'delivery_compliance': eval.delivery_compliance,
             'delivery_timeline': eval.delivery_timeline,
             'advising_capability': eval.advising_capability,
@@ -1820,8 +1838,8 @@ def vendor_ranking(request):
             'vendor_relationship': eval.vendor_relationship,
             'vendor_final_rating': float(eval.vendor_final_rating),
         })
-        suppliers_data[supplier]['po_numbers'].add(eval.bon_commande.numero)
-        suppliers_data[supplier]['po_ids'].add(eval.bon_commande.id)
+        suppliers_data[supplier_normalized]['po_numbers'].add(eval.bon_commande.numero)
+        suppliers_data[supplier_normalized]['po_ids'].add(eval.bon_commande.id)
     
     # Pré-calculer le mapping supplier -> nombre de PO (une seule fois pour tous les suppliers)
     # Utiliser LigneFichier directement pour plus de performance
@@ -1830,7 +1848,7 @@ def vendor_ranking(request):
     # Récupérer toutes les lignes avec leurs fichiers et bons de commande en une seule requête
     lignes = LigneFichier.objects.select_related('fichier').prefetch_related('fichier__bons_commande').all()
     
-    # Créer un mapping: supplier -> set de numéros de PO
+    # Créer un mapping: supplier normalisé -> set de numéros de PO
     supplier_po_numbers = {}
     
     for ligne in lignes:
@@ -1848,6 +1866,9 @@ def vendor_ranking(request):
                 break
         
         if supplier_value and supplier_value != 'N/A':
+            # Normaliser le nom du fournisseur pour le regroupement
+            supplier_normalized = normalize_supplier_name(supplier_value)
+            
             # Récupérer le numéro de PO de cette ligne
             order_number = None
             for key, value in contenu.items():
@@ -1863,17 +1884,17 @@ def vendor_ranking(request):
                 # Limiter aux POs autorisés si nécessaire
                 if allowed_numbers is not None and order_number not in allowed_numbers:
                     continue
-                if supplier_value not in supplier_po_numbers:
-                    supplier_po_numbers[supplier_value] = set()
-                supplier_po_numbers[supplier_value].add(order_number)
+                if supplier_normalized not in supplier_po_numbers:
+                    supplier_po_numbers[supplier_normalized] = set()
+                supplier_po_numbers[supplier_normalized].add(order_number)
     
     # Convertir en comptage
     for supplier, po_set in supplier_po_numbers.items():
         supplier_po_count[supplier] = len(po_set)
     
-    # Calculer les moyennes et statistiques pour chaque supplier
+    # Calculer les moyennes et statistiques pour chaque supplier (avec noms normalisés)
     suppliers_stats = []
-    for supplier, data in suppliers_data.items():
+    for supplier_normalized, data in suppliers_data.items():
         evals = data['evaluations']
         num_evals = len(evals)
         
@@ -1884,11 +1905,11 @@ def vendor_ranking(request):
         avg_vendor_relationship = sum(e['vendor_relationship'] for e in evals) / num_evals
         avg_final_rating = sum(e['vendor_final_rating'] for e in evals) / num_evals
         
-        # Récupérer le nombre de PO depuis le cache pré-calculé
-        po_count = supplier_po_count.get(supplier, 0)
+        # Récupérer le nombre de PO depuis le cache pré-calculé (avec nom normalisé)
+        po_count = supplier_po_count.get(supplier_normalized, 0)
         
         suppliers_stats.append({
-            'name': supplier,
+            'name': data['name'],  # Nom original pour l'affichage
             'po_count': po_count,
             'num_evaluations': num_evals,
             'avg_delivery_compliance': round(avg_delivery_compliance, 2),
@@ -1904,17 +1925,24 @@ def vendor_ranking(request):
     for idx, supplier in enumerate(suppliers_stats, 1):
         supplier['rank'] = idx
     
-    # Top 10 meilleurs (les 10 premiers)
-    top_10_best = suppliers_stats[:10]
+    # Classification par plages de notes (nouvelle logique)
+    top_10_best = []      # Notes 8-10/10
+    to_observe = []       # Notes 6-8/10  
+    top_10_worst = []     # Notes 0-6/10
     
-    # Top 10 pires (les 10 derniers, inversés avec nouveaux rangs)
-    worst_suppliers = suppliers_stats[-10:]
-    worst_suppliers.sort(key=lambda x: x['avg_final_rating'])  # Tri croissant (du pire au moins pire)
-    top_10_worst = []
-    for idx, supplier in enumerate(worst_suppliers, 1):
-        worst_copy = supplier.copy()
-        worst_copy['worst_rank'] = idx  # Nouveau rang pour l'affichage (1 = le pire)
-        top_10_worst.append(worst_copy)
+    for supplier in suppliers_stats:
+        rating = supplier['avg_final_rating']
+        if rating >= 8.0:
+            top_10_best.append(supplier)
+        elif rating >= 6.0:
+            to_observe.append(supplier)
+        else:
+            top_10_worst.append(supplier)
+    
+    # Limiter à 10 par catégorie si nécessaire
+    top_10_best = top_10_best[:10]
+    to_observe = to_observe[:10]
+    top_10_worst = top_10_worst[:10]
     
     # Supplier sélectionné (si fourni dans la requête)
     selected_supplier = request.GET.get('supplier', '')
@@ -1922,17 +1950,29 @@ def vendor_ranking(request):
     yearly_stats_list = []
     
     if selected_supplier:
+        # Chercher le fournisseur avec normalisation (pour gérer les différences de casse/accents)
         selected_supplier_data = next(
-            (s for s in suppliers_stats if s['name'] == selected_supplier),
+            (s for s in suppliers_stats if normalize_supplier_name(s['name']) == normalize_supplier_name(selected_supplier)),
             None
         )
         
         # Récupérer les statistiques par année pour le fournisseur sélectionné
         if selected_supplier_data:
-            # Récupérer toutes les évaluations de ce fournisseur avec optimisation
-            supplier_evals = VendorEvaluation.objects.filter(
-                supplier=selected_supplier
-            ).select_related('bon_commande').prefetch_related('bon_commande__fichiers__lignes')
+            # Récupérer toutes les évaluations de ce fournisseur (avec normalisation)
+            supplier_evals = VendorEvaluation.objects.all()
+            
+            # Filtrer par service si nécessaire
+            if not request.user.is_superuser:
+                allowed_bons = filter_bons_by_user_service(NumeroBonCommande.objects.all(), request.user)
+                supplier_evals = supplier_evals.filter(bon_commande__in=allowed_bons)
+            
+            # Filtrer par fournisseur normalisé
+            filtered_evals = []
+            for eval in supplier_evals:
+                if normalize_supplier_name(eval.supplier) == normalize_supplier_name(selected_supplier):
+                    filtered_evals.append(eval)
+            
+            supplier_evals = filtered_evals
             
             # Grouper par année
             years_data = {}
@@ -1976,11 +2016,9 @@ def vendor_ranking(request):
                             ligne_supplier = ligne.contenu.get('Supplier')
                             ligne_year = ligne.contenu.get('Année')
                             
-                            # Vérifier le supplier (flexible)
+                            # Vérifier le supplier (avec normalisation)
                             if ligne_supplier and selected_supplier:
-                                if (ligne_supplier == selected_supplier or 
-                                    selected_supplier in ligne_supplier or 
-                                    ligne_supplier in selected_supplier):
+                                if normalize_supplier_name(ligne_supplier) == normalize_supplier_name(selected_supplier):
                                     # Trouvé !
                                     if ligne_year:
                                         year = ligne_year
@@ -2020,6 +2058,7 @@ def vendor_ranking(request):
     context = {
         'suppliers_stats': suppliers_stats,
         'top_10_best': top_10_best,
+        'to_observe': to_observe,
         'top_10_worst': top_10_worst,
         'selected_supplier': selected_supplier,
         'selected_supplier_data': selected_supplier_data,

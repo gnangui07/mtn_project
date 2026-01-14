@@ -384,7 +384,7 @@
             <form id="retentionForm" onsubmit="return false;">
                 <div class="mb-3">
                     <label for="retentionRate" class="form-label">Payment Retention rate (%)</label>
-                    <input type="number" class="form-control" id="retentionRate" min="0" max="10" step="0.01" value="{{ retention_rate|default:0 }}">
+                    <input type="number" class="form-control" id="retentionRate" min="0" max="100" step="0.01" value="{{ retention_rate|default:0 }}">
                 </div>
                 <div class="mb-3">
                     <label for="retentionCause" class="form-label">Cause of the retention</label>

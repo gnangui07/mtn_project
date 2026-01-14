@@ -110,11 +110,11 @@
       const cause = retentionCauseInput.value.trim();
       
       // Vérifier que le taux est entre 0 et 10
-      if (isNaN(rate) || rate < 0 || rate > 10) {
+      if (isNaN(rate) || rate < 0 || rate > 100) {
         Swal.fire({
           icon: 'error',
           title: 'Invalid retention rate',
-          text: 'The retention rate must be between 0 and 10%',
+          text: 'The retention rate must be between 0 and 100%',
           confirmButtonColor: '#3085d6'
         });
         return false;

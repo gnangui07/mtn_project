@@ -95,9 +95,9 @@ class TestMSRNAPI(TestCase):
 
     def test_generate_msrn_report_invalid_retention_rate(self):
         """Test la génération avec un taux de rétention invalide"""
-        # Taux trop élevé
+        # Taux trop élevé (>100%)
         data = {
-            'retention_rate': '15.0',
+            'retention_rate': '150.0',
             'retention_cause': 'Test retention cause'
         }
         

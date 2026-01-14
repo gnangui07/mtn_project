@@ -81,8 +81,8 @@ def generate_msrn_report_api(request, bon_id):
     retention_cause = data.get('retention_cause', bon_commande.retention_cause or '')
     
     # Valider le taux de rétention (0 à 10%)
-    if retention_rate < 0 or retention_rate > 10:
-        return JsonResponse({'success': False, 'error': 'Le taux de rétention doit être compris entre 0 et 10%'}, status=400)
+    if retention_rate < 0 or retention_rate > 100:
+        return JsonResponse({'success': False, 'error': 'Le taux de rétention doit être compris entre 0 et 100%'}, status=400)
             
     if retention_rate > 0 and not retention_cause:
         return JsonResponse({'success': False, 'error': 'La cause de la rétention est requise pour un taux supérieur à 0%'}, status=400)
@@ -189,8 +189,8 @@ def update_msrn_retention(request, msrn_id):
     retention_cause = data.get('retention_cause', '')
     
     # Valider le taux de rétention
-    if retention_rate < 0 or retention_rate > 10:
-        return JsonResponse({'success': False, 'error': 'Le taux de rétention doit être compris entre 0 et 10%'}, status=400)
+    if retention_rate < 0 or retention_rate > 100:
+        return JsonResponse({'success': False, 'error': 'Le taux de rétention doit être compris entre 0 et 100%'}, status=400)
             
     if retention_rate > 0 and not retention_cause:
         return JsonResponse({'success': False, 'error': 'La cause de la rétention est requise pour un taux supérieur à 0%'}, status=400)

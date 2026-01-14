@@ -3,6 +3,16 @@ import pytest
 from django.contrib.auth import get_user_model
 
 
+@pytest.fixture(autouse=True)
+def email_backend_and_notifications(settings):
+    """Neutralise l'envoi d'emails pendant les tests."""
+    settings.EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
+    try:
+        settings.ENABLE_EMAIL_NOTIFICATIONS = False
+    except Exception:
+        pass
+
+
 @pytest.fixture
 def user_active(db):
     """Fixture créant un utilisateur actif avec mot de passe utilisable."""

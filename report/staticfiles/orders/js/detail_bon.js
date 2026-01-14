@@ -1591,12 +1591,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const rate = parseFloat(inputRate.value);
             const cause = (inputCause.value || '').trim();
 
-            // Validation stricte
-            if (isNaN(rate) || rate < 0 || rate > 10) {
+            // Validation stricte - MODIFIÉ: anciennement rate > 10, maintenant rate > 100
+            if (isNaN(rate) || rate < 0 || rate > 100) {
                 Swal.fire({
                     icon: 'warning',
                     title: 'Validation',
-                    text: 'The Payment Retention rate must be between 0 and 10%'
+                    text: 'The Payment Retention rate must be between 0 and 100%'  // MODIFIÉ: message avant "0 and 10%"
                 });
                 inputRate.focus();
                 return;

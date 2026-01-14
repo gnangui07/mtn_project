@@ -285,6 +285,7 @@
                 {% for bon in numeros_bons %}
                     <option value="{{ bon.numero }}" 
                             data-fichier-id="{{ bon.fichier_id }}"
+                            data-bon-id="{{ bon.id }}"
                             data-cpu="{{ bon.cpu }}"
                             data-supplier="{{ bon.supplier }}">
                         {{ bon.numero }}
@@ -371,13 +372,21 @@
             const fichierId = $option.data('fichier-id');
             const poNumber = selectedData.id;
 
-            if (fichierId) {
+            if (fichierId && fichierId !== 'None' && fichierId !== '') {
                 // Rediriger vers la page de détails avec le fichier ID
                 window.location = '/orders/bons/' + fichierId + '/?selected_order_number=' + encodeURIComponent(poNumber);
             } else {
-                // Utiliser la recherche standard
-                $('#hidden-order-number').val(poNumber);
-                $('#form-bon-commande').submit();
+                // Afficher une alerte SweetAlert2 en mode toast (comme dans le projet)
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Bon sans fichier',
+                    text: `Le bon de commande ${poNumber} n'a pas de fichier associé. Veuillez d'abord importer un fichier.`,
+                    toast: true,
+                    position: 'top-end',
+                    timer: 5000,
+                    timerProgressBar: true,
+                    showConfirmButton: false
+                });
             }
         });
 

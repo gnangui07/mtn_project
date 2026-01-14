@@ -213,6 +213,12 @@ class NumeroBonCommande(models.Model):
         verbose_name="Cause de la rétention"
     )
     
+    def clean(self):
+        """Valide le taux de rétention."""
+        from django.core.exceptions import ValidationError
+        if self.retention_rate is not None and (self.retention_rate < 0 or self.retention_rate > 100):
+            raise ValidationError("retention_rate must be between 0 and 100")
+    
     class Meta:
         verbose_name = "Numéro de bon de commande"
         verbose_name_plural = "Numéros de bons de commande"
@@ -727,12 +733,12 @@ class NumeroBonCommande(models.Model):
         return total
 
     def save(self, *args, **kwargs):
-        # Validation du taux de rétention requise par les tests
+        # Validation du taux de rétention requise par les tests - MODIFIÉ: ancienne limite 10%, nouvelle limite 100%
         if self.retention_rate is None:
             raise TypeError("retention_rate cannot be None")
-        if self.retention_rate < 0 or self.retention_rate > 10:
+        if self.retention_rate < 0 or self.retention_rate > 100:
             from django.core.exceptions import ValidationError
-            raise ValidationError("retention_rate must be between 0 and 10")
+            raise ValidationError("retention_rate must be between 0 and 100")  # MODIFIÉ: message avant "0 and 10"
             
         super().save(*args, **kwargs)
         

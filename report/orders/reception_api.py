@@ -534,8 +534,8 @@ def update_retention(request, bon_id):
     except (InvalidOperation, TypeError):
         return JsonResponse({'status': 'error', 'message': 'Le taux de rétention doit être un nombre'}, status=400)
     
-    if retention_rate < 0 or retention_rate > 10:
-        return JsonResponse({'status': 'error', 'message': 'Le taux de rétention doit être entre 0 et 10%'}, status=400)
+    if retention_rate < 0 or retention_rate > 100:
+        return JsonResponse({'status': 'error', 'message': 'Le taux de rétention doit être entre 0 et 100%'}, status=400)
         
     if retention_rate > 0 and not retention_cause:
         return JsonResponse({'status': 'error', 'message': 'La cause de la rétention est requise pour un taux supérieur à 0%'}, status=400)
@@ -548,6 +548,13 @@ def update_retention(request, bon_id):
     # Champ optionnel selon modèle
     if hasattr(bon_commande, 'retention_cause'):
         bon_commande.retention_cause = retention_cause
+    
+    # Valider avant de sauvegarder
+    try:
+        bon_commande.full_clean()
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    
     bon_commande.save()
     
     # Forcer la mise à jour des réceptions avec la même logique que download_msrn_report

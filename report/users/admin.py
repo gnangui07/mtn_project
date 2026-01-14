@@ -18,7 +18,10 @@ from django.core.mail import send_mail
 import random
 import string
 import unicodedata
+import logging
 from .models import User
+
+logger = logging.getLogger(__name__)
 
 # Import de la tâche Celery pour l'envoi asynchrone d'emails
 try:
@@ -150,7 +153,7 @@ class UserAdmin(admin.ModelAdmin):
     readonly_fields = ['date_joined', 'last_login', 'activation_token', 'token_created_at', 'temporary_password']
     
     # Actions disponibles dans l'admin
-    actions = ['resend_activation_token']
+    actions = ['resend_activation_token', 'reactivate_inactive_accounts', 'activer_utilisateurs', 'desactiver_utilisateurs']
     
     def activation_status(self, obj):
         """Affiche le statut d'activation sous forme d'icône colorée.
@@ -423,3 +426,274 @@ class UserAdmin(admin.ModelAdmin):
             self.message_user(request, "Aucune action effectuée", level='info')
     
     resend_activation_token.short_description = "Renvoyer le token d'activation"
+    
+    def reactivate_inactive_accounts(self, request, queryset):
+        """
+        Action admin pour réactiver manuellement les comptes désactivés pour inactivité.
+        
+        Cette action permet à un superuser de :
+        - Réactiver les comptes utilisateurs standards désactivés
+        - Effacer la raison de désactivation et la date
+        - Envoyer une notification par email (optionnel)
+        
+        Restrictions:
+        - Seuls les superusers peuvent effectuer cette action
+        - Les comptes déjà actifs sont ignorés
+        """
+        if not request.user.is_superuser:
+            self.message_user(
+                request,
+                "Seuls les superusers peuvent réactiver des comptes.",
+                level='error'
+            )
+            return
+        
+        reactivated_count = 0
+        already_active_count = 0
+        error_count = 0
+        
+        for user in queryset:
+            try:
+                # Vérifier si le compte est déjà actif
+                if user.is_active:
+                    already_active_count += 1
+                    continue
+                
+                # Réactiver le compte
+                user.is_active = True
+                user.deactivation_reason = None
+                user.deactivated_at = None
+                user.save(update_fields=['is_active', 'deactivation_reason', 'deactivated_at'])
+                
+                reactivated_count += 1
+                
+                # Logger l'action
+                logger.info(
+                    f"Compte réactivé manuellement par {request.user.email}: {user.email}"
+                )
+                
+                # Optionnel: Envoyer un email de notification à l'utilisateur
+                try:
+                    subject = "Votre compte a été réactivé"
+                    message = f"""
+                    Bonjour {user.first_name} {user.last_name},
+                    
+                    Votre compte sur la plateforme CAPEX Works Valuation Tool a été réactivé par un administrateur.
+                    
+                    Vous pouvez maintenant vous reconnecter avec vos identifiants habituels.
+                    
+                    Si vous avez oublié votre mot de passe, vous pouvez utiliser la fonction de réinitialisation.
+                    
+                    Cordialement,
+                    L'équipe MTN CI
+                    """
+                    
+                    send_mail(
+                        subject=subject,
+                        message=message,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[user.email],
+                        fail_silently=True,  # Ne pas bloquer si l'email échoue
+                    )
+                except Exception as e:
+                    # L'échec d'envoi d'email ne doit pas empêcher la réactivation
+                    logger.warning(f"Échec d'envoi d'email de réactivation pour {user.email}: {str(e)}")
+                    
+            except Exception as e:
+                error_count += 1
+                logger.error(f"Erreur lors de la réactivation de {user.email}: {str(e)}")
+        
+        # Messages de retour à l'administrateur
+        messages_list = []
+        
+        if reactivated_count > 0:
+            messages_list.append(f"{reactivated_count} compte(s) réactivé(s) avec succès")
+        
+        if already_active_count > 0:
+            messages_list.append(f"{already_active_count} compte(s) déjà actif(s) (ignoré(s))")
+        
+        if error_count > 0:
+            messages_list.append(f"{error_count} erreur(s) lors de la réactivation")
+        
+        if messages_list:
+            message = " | ".join(messages_list)
+            if error_count > 0:
+                self.message_user(request, message, level='warning')
+            else:
+                self.message_user(request, message, level='success')
+        else:
+            self.message_user(request, "Aucune action effectuée", level='info')
+    
+    reactivate_inactive_accounts.short_description = "Réactiver les comptes désactivés pour inactivité"
+    
+    def activer_utilisateurs(self, request, queryset):
+        """
+        Action admin pour activer manuellement des comptes utilisateurs.
+        
+        Cette action permet à un superuser de :
+        - Activer n'importe quel compte utilisateur (actif ou inactif)
+        - Effacer la raison de désactivation et la date si elles existent
+        - Envoyer une notification par email (optionnel)
+        
+        Restrictions:
+        - Seuls les superusers peuvent effectuer cette action
+        """
+        if not request.user.is_superuser:
+            self.message_user(
+                request,
+                "Seuls les superusers peuvent activer des comptes.",
+                level='error'
+            )
+            return
+        
+        activated_count = 0
+        already_active_count = 0
+        error_count = 0
+        
+        for user in queryset:
+            try:
+                # Vérifier si le compte est déjà actif
+                if user.is_active:
+                    already_active_count += 1
+                    continue
+                
+                # Activer le compte
+                user.is_active = True
+                user.deactivation_reason = None
+                user.deactivated_at = None
+                user.save(update_fields=['is_active', 'deactivation_reason', 'deactivated_at'])
+                
+                activated_count += 1
+                
+                # Logger l'action
+                logger.info(
+                    f"Compte activé manuellement par {request.user.email}: {user.email}"
+                )
+                
+                # Optionnel: Envoyer un email de notification
+                try:
+                    subject = "Votre compte a été activé"
+                    message = f"""
+                    Bonjour {user.first_name} {user.last_name},
+                    
+                    Votre compte sur la plateforme CAPEX Works Valuation Tool a été activé par un administrateur.
+                    
+                    Vous pouvez maintenant vous connecter avec vos identifiants.
+                    
+                    Cordialement,
+                    L'équipe MTN CI
+                    """
+                    
+                    send_mail(
+                        subject=subject,
+                        message=message,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[user.email],
+                        fail_silently=True,
+                    )
+                except Exception as e:
+                    logger.warning(f"Échec d'envoi d'email d'activation pour {user.email}: {str(e)}")
+                    
+            except Exception as e:
+                error_count += 1
+                logger.error(f"Erreur lors de l'activation de {user.email}: {str(e)}")
+        
+        # Messages de retour
+        messages_list = []
+        
+        if activated_count > 0:
+            messages_list.append(f"{activated_count} compte(s) activé(s) avec succès")
+        
+        if already_active_count > 0:
+            messages_list.append(f"{already_active_count} compte(s) déjà actif(s)")
+        
+        if error_count > 0:
+            messages_list.append(f"{error_count} erreur(s)")
+        
+        if messages_list:
+            message = " | ".join(messages_list)
+            level = 'warning' if error_count > 0 else 'success'
+            self.message_user(request, message, level=level)
+        else:
+            self.message_user(request, "Aucune action effectuée", level='info')
+    
+    activer_utilisateurs.short_description = "✅ Activer les comptes sélectionnés"
+    
+    def desactiver_utilisateurs(self, request, queryset):
+        """
+        Action admin pour désactiver manuellement des comptes utilisateurs.
+        
+        Cette action permet à un superuser de :
+        - Désactiver n'importe quel compte utilisateur (actif ou inactif)
+        - Enregistrer la raison de désactivation (manuelle par admin)
+        - Enregistrer la date de désactivation
+        
+        Restrictions:
+        - Seuls les superusers peuvent effectuer cette action
+        - Les superusers ne peuvent pas se désactiver eux-mêmes
+        """
+        if not request.user.is_superuser:
+            self.message_user(
+                request,
+                "Seuls les superusers peuvent désactiver des comptes.",
+                level='error'
+            )
+            return
+        
+        deactivated_count = 0
+        already_inactive_count = 0
+        error_count = 0
+        self_deactivation_attempt = 0
+        
+        for user in queryset:
+            try:
+                # Empêcher un superuser de se désactiver lui-même
+                if user.id == request.user.id:
+                    self_deactivation_attempt += 1
+                    continue
+                
+                # Vérifier si le compte est déjà inactif
+                if not user.is_active:
+                    already_inactive_count += 1
+                    continue
+                
+                # Désactiver le compte
+                user.is_active = False
+                user.deactivation_reason = f"Désactivation manuelle par {request.user.email}"
+                user.deactivated_at = timezone.now()
+                user.save(update_fields=['is_active', 'deactivation_reason', 'deactivated_at'])
+                
+                deactivated_count += 1
+                
+                # Logger l'action
+                logger.warning(
+                    f"Compte désactivé manuellement par {request.user.email}: {user.email}"
+                )
+                
+            except Exception as e:
+                error_count += 1
+                logger.error(f"Erreur lors de la désactivation de {user.email}: {str(e)}")
+        
+        # Messages de retour
+        messages_list = []
+        
+        if deactivated_count > 0:
+            messages_list.append(f"{deactivated_count} compte(s) désactivé(s) avec succès")
+        
+        if already_inactive_count > 0:
+            messages_list.append(f"{already_inactive_count} compte(s) déjà inactif(s)")
+        
+        if self_deactivation_attempt > 0:
+            messages_list.append(f"Impossible de vous désactiver vous-même")
+        
+        if error_count > 0:
+            messages_list.append(f"{error_count} erreur(s)")
+        
+        if messages_list:
+            message = " | ".join(messages_list)
+            level = 'warning' if error_count > 0 or self_deactivation_attempt > 0 else 'success'
+            self.message_user(request, message, level=level)
+        else:
+            self.message_user(request, "Aucune action effectuée", level='info')
+    
+    desactiver_utilisateurs.short_description = "❌ Désactiver les comptes sélectionnés"

@@ -1950,12 +1950,12 @@ class TestNumeroBonCommandeUncovered(TestCase):
         # Test avec taux négatif
         bon.retention_rate = Decimal('-1.0')
         with self.assertRaises(Exception):
-            bon.save()
+            bon.full_clean()
         
-        # Test avec taux > 10
-        bon.retention_rate = Decimal('15.0')
+        # Test avec taux > 100
+        bon.retention_rate = Decimal('150.0')
         with self.assertRaises(Exception):
-            bon.save()
+            bon.full_clean()
     
     def test_save_recalculates_receptions(self):
         """Test que save() recalcule les réceptions"""

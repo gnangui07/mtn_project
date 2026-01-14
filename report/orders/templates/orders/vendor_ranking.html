@@ -663,12 +663,12 @@
             </div>
             {% endif %}
 
-            <!-- Top 10 meilleurs et pires -->
+            <!-- Top 10 Best, To Observe, et Top Flop -->
             <div class="row g-4">
-                <div class="col-lg-6">
+                <div class="col-lg-4">
                     <div class="card border-3 h-100" style="border-color: #FFCC00;">
                         <div class="card-header card-header-yellow py-3">
-                            <h5 class="mb-0 text-uppercase"><i class="fas fa-medal me-2"></i>Top 10 Best Performers</h5>
+                            <h5 class="mb-0 text-uppercase"><i class="fas fa-medal me-2"></i>Top Best (8-10/10)</h5>
                         </div>
                         <div class="card-body p-3">
                             <div class="top-list">
@@ -681,7 +681,7 @@
                                             </div>
                                             <div>
                                                 <h6 class="mb-1 fw-bold">{{ supplier.name }}</h6>
-                                                <small style="color: #666;">{{ supplier.po_count }} PO(s) | {{ supplier.num_evaluations }} evaluation(s)</small>
+                                                <small style="color: #666;">{{ supplier.po_count }} PO(s) | {{ supplier.num_evaluations }} eval(s)</small>
                                             </div>
                                         </div>
                                         <span class="badge fs-5 fw-bold" style="background-color: #000000; color: #FFCC00; padding: 8px 15px;">{{ supplier.avg_final_rating }}/10</span>
@@ -689,7 +689,7 @@
                                 </div>
                                 {% empty %}
                                 <div class="text-center text-muted py-4">
-                                    No suppliers found
+                                    No suppliers in this range
                                 </div>
                                 {% endfor %}
                             </div>
@@ -697,10 +697,42 @@
                     </div>
                 </div>
 
-                <div class="col-lg-6">
+                <div class="col-lg-4">
+                    <div class="card border-3 h-100" style="border-color: #FF9900;">
+                        <div class="card-header text-white py-3" style="background: linear-gradient(135deg, #FF9900 0%, #FFB366 100%);">
+                            <h5 class="mb-0 text-uppercase"><i class="fas fa-eye me-2"></i>Under Review (6-8/10)</h5>
+                        </div>
+                        <div class="card-body p-3">
+                            <div class="top-list">
+                                {% for supplier in to_observe %}
+                                <div class="list-item">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="d-flex align-items-center">
+                                            <div class="rank-badge me-3" style="width: 45px; height: 45px; font-size: 1.3rem; background-color: #FF9900;">
+                                                {{ supplier.rank }}
+                                            </div>
+                                            <div>
+                                                <h6 class="mb-1 fw-bold">{{ supplier.name }}</h6>
+                                                <small style="color: #666;">{{ supplier.po_count }} PO(s) | {{ supplier.num_evaluations }} eval(s)</small>
+                                            </div>
+                                        </div>
+                                        <span class="badge fs-5 fw-bold" style="background-color: #FF9900; color: #000000; padding: 8px 15px;">{{ supplier.avg_final_rating }}/10</span>
+                                    </div>
+                                </div>
+                                {% empty %}
+                                <div class="text-center text-muted py-4">
+                                    No suppliers in this range
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
                     <div class="card border-3 h-100" style="border-color: #000000;">
                         <div class="card-header card-header-black py-3">
-                            <h5 class="mb-0 text-uppercase"><i class="fas fa-exclamation-triangle me-2"></i>Top 10 Flop</h5>
+                            <h5 class="mb-0 text-uppercase"><i class="fas fa-exclamation-triangle me-2"></i>Top Flop (0-6/10)</h5>
                         </div>
                         <div class="card-body p-3">
                             <div class="worst-list">
@@ -709,11 +741,11 @@
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div class="d-flex align-items-center">
                                             <div class="rank-badge me-3" style="width: 45px; height: 45px; font-size: 1.3rem;">
-                                                {{ supplier.worst_rank }}
+                                                {{ supplier.rank }}
                                             </div>
                                             <div>
                                                 <h6 class="mb-1 fw-bold">{{ supplier.name }}</h6>
-                                                <small style="color: #666;">{{ supplier.po_count }} PO(s) | {{ supplier.num_evaluations }} evaluation(s)</small>
+                                                <small style="color: #666;">{{ supplier.po_count }} PO(s) | {{ supplier.num_evaluations }} eval(s)</small>
                                             </div>
                                         </div>
                                         <span class="badge fs-5 fw-bold" style="background-color: #000000; color: #FFCC00; padding: 8px 15px;">{{ supplier.avg_final_rating }}/10</span>
@@ -721,7 +753,7 @@
                                 </div>
                                 {% empty %}
                                 <div class="text-center text-muted py-4">
-                                    No suppliers found
+                                    No suppliers in this range
                                 </div>
                                 {% endfor %}
                             </div>

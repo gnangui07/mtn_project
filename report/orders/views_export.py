@@ -1303,31 +1303,27 @@ def export_vendor_ranking(request):
         from decimal import Decimal
         from django.http import HttpResponse
         
-        # Récupérer les bons de commande
-        bons_commande_qs = NumeroBonCommande.objects.prefetch_related(
-            'fichiers__lignes'
-        ).all()
-
-        # Filtrer par service/CPU (Option A) pour les non-superusers
-        if not request.user.is_superuser:
-            from .views import filter_bons_by_user_service
-            bons_commande_qs = filter_bons_by_user_service(bons_commande_qs, request.user)
-
-        bons_commande = bons_commande_qs
-        
-        if not bons_commande.exists():
-            messages.warning(request, "Aucun bon de commande disponible pour l'export.")
-            return redirect('orders:vendor_ranking')
-        
-        # Créer un dictionnaire des évaluations par bon de commande
-        evaluations_dict = {}
+        # Récupérer uniquement les POs qui ont des évaluations
         evaluations = VendorEvaluation.objects.select_related('bon_commande', 'evaluator').all()
-
-        # Filtrer les évaluations par POs autorisés (Option A)
+        
+        # Filtrer les évaluations par POs autorisés (Option A) pour les non-superusers
         if not request.user.is_superuser:
             from .views import filter_bons_by_user_service
             allowed_bons = filter_bons_by_user_service(NumeroBonCommande.objects.all(), request.user)
             evaluations = evaluations.filter(bon_commande__in=allowed_bons)
+        
+        # Extraire les bons de commande qui ont des évaluations
+        bons_commande_ids = evaluations.values_list('bon_commande_id', flat=True).distinct()
+        bons_commande = NumeroBonCommande.objects.filter(id__in=bons_commande_ids).prefetch_related(
+            'fichiers__lignes'
+        )
+        
+        if not bons_commande.exists():
+            messages.warning(request, "Aucun bon de commande avec évaluation disponible pour l'export.")
+            return redirect('orders:vendor_ranking')
+        
+        # Créer un dictionnaire des évaluations par bon de commande
+        evaluations_dict = {}
         for evaluation in evaluations:
             evaluations_dict[evaluation.bon_commande.numero] = evaluation
         

@@ -27,7 +27,7 @@ if DJANGO_ENV == 'production':
     ALLOWED_HOSTS = ['ton-domaine.com', 'www.ton-domaine.com', '127.0.0.1']
     print("Mode PRODUCTION active")
 else:
-    ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '192.168.8.114', 'testserver']
+    ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '192.168.8.101', 'testserver']
     print("Mode DEVELOPPEMENT active")
 
 # ==================== APPLICATIONS ====================
@@ -59,6 +59,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'users.middleware.PasswordExpirationMiddleware',  # Middleware pour expiration mots de passe
+    'users.middleware_inactivity.InactivityDeactivationMiddleware',  # Middleware pour désactivation automatique après 90 jours d'inactivité
     'core.middleware.UtilisateurActuelMiddleware',
     'core.middleware.NoCacheMiddleware',  # Anti-cache pour empêcher le retour après déconnexion
 ]
@@ -192,11 +193,16 @@ if DJANGO_ENV == 'development':
 
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'msrn-notifications@mtn-ci.com')
 
-# URL du site (pour les liens dans les emails)
 SITE_URL = os.environ.get('SITE_URL', 'http://localhost:8000')
 
 # Activer/désactiver les notifications email
 ENABLE_EMAIL_NOTIFICATIONS = os.environ.get('ENABLE_EMAIL_NOTIFICATIONS', 'True').lower() in ('true', '1', 'yes')
+
+# ==================== CONFIGURATION INACTIVITÉ UTILISATEURS ====================
+
+# Nombre de jours d'inactivité avant désactivation automatique des comptes
+# Modifiez cette valeur pour ajuster la durée (ex: 1 pour test, 90 pour production)
+INACTIVITY_DAYS = int(os.environ.get('INACTIVITY_DAYS', 90))
 
 # ==================== SÉCURITÉ PRODUCTION ====================
 

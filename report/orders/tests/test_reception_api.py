@@ -324,7 +324,7 @@ class TestReceptionAPI(TestCase):
     def test_update_retention_invalid_rate(self):
         """Test la mise à jour avec un taux de rétention invalide"""
         data = {
-            'retention_rate': '15.0',  # Trop élevé
+            'retention_rate': '150.0',  # Trop élevé (>100%)
             'retention_cause': 'Test cause'
         }
         
