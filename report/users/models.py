@@ -155,10 +155,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     )
     
     # Champs pour la gestion de l'expiration des mots de passe
+    # NOTE: default=None pour éviter que PasswordAgeValidator bloque lors de la première activation
     password_changed_at = models.DateTimeField(
         verbose_name="Date du dernier changement de mot de passe",
-        default=timezone.now,
-        help_text="Date du dernier changement de mot de passe (pour expiration)"
+        null=True,
+        blank=True,
+        default=None,
+        help_text="Date du dernier changement de mot de passe (pour expiration). NULL = premier mot de passe pas encore défini."
     )
     
     is_staff = models.BooleanField(

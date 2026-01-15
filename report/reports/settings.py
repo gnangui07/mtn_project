@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.sites',
     'django.contrib.humanize',
     'widget_tweaks',
+    'axes',  # Protection contre les attaques par force brute
     'users.apps.UsersConfig',
     'orders.apps.OrdersConfig',
     'core.apps.CoreConfig',
@@ -58,6 +59,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'axes.middleware.AxesMiddleware',  # Protection contre les attaques par force brute (DOIT être après AuthenticationMiddleware)
     'users.middleware.PasswordExpirationMiddleware',  # Middleware pour expiration mots de passe
     'users.middleware_inactivity.InactivityDeactivationMiddleware',  # Middleware pour désactivation automatique après 90 jours d'inactivité
     'core.middleware.UtilisateurActuelMiddleware',
@@ -275,4 +277,68 @@ CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes max par tâche
 
 # Application django-celery-results
+
+# ==================== CONFIGURATION DJANGO-AXES (PROTECTION FORCE BRUTE) ====================
+
+# Backend d'authentification pour django-axes
+AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesStandaloneBackend',  # AxesStandaloneBackend doit être en premier
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+# Nombre maximum de tentatives de connexion échouées avant verrouillage
+AXES_FAILURE_LIMIT = 4
+
+# Durée du verrouillage (30 minutes)
+from datetime import timedelta
+AXES_COOLOFF_TIME = timedelta(minutes=30)
+
+# Verrouiller par combinaison username + IP (plus sécurisé)
+AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
+
+# Activer le verrouillage
+AXES_ENABLE_ACCESS_FAILURE_LOG = True
+
+# Réinitialiser les tentatives après une connexion réussie
+AXES_RESET_ON_SUCCESS = True
+
+# Utiliser le cache pour les performances (Redis si disponible, sinon DB)
+AXES_CACHE = 'default'
+
+# Message de verrouillage personnalisé en français
+AXES_VERBOSE = True
+
+# Ne pas verrouiller les superusers (pour éviter de se bloquer soi-même)
+AXES_NEVER_LOCKOUT_WHITELIST = True
+AXES_NEVER_LOCKOUT_GET = True
+
+# IP à ne jamais verrouiller (localhost pour le développement)
+AXES_NEVER_LOCKOUT_IP_ADDRESSES = ['127.0.0.1', 'localhost'] if DEBUG else []
+
+# Utiliser le nom d'utilisateur (email dans notre cas) pour le verrouillage
+AXES_USERNAME_FORM_FIELD = 'email'
+
+# Fonction callable pour extraire l'email depuis la requête
+# NOTE: django-axes utilise le terme "username" mais dans notre système c'est l'EMAIL
+def axes_username_callable(request, credentials=None):
+    """Extrait l'EMAIL depuis request.POST ou credentials pour axes.
+    
+    Dans notre système, les utilisateurs s'identifient avec leur email (pas de username).
+    Django-axes utilise 'username' comme terme générique pour l'identifiant.
+    """
+    # D'abord essayer depuis credentials (si fourni par authenticate())
+    # Note: on passe credentials={'username': email} dans login_view
+    if credentials and isinstance(credentials, dict):
+        email = credentials.get('username')  # C'est l'email, pas un vrai username
+        if email:
+            return email
+    # Sinon extraire depuis request.POST (champ 'email' du formulaire)
+    if request and request.method == 'POST':
+        return request.POST.get('email', None)
+    return None
+
+AXES_USERNAME_CALLABLE = 'reports.settings.axes_username_callable'
+
+# Réinitialiser automatiquement après la période de cooldown
+AXES_RESET_COOL_OFF = True
 INSTALLED_APPS += ['django_celery_results']

@@ -287,7 +287,8 @@ def confirm_password(request, token):
         
         # Définit le nouveau mot de passe et active le compte
         user.set_password(new_password)
-        user.password_changed_at = timezone.now()  # Enregistrer la date de changement
+        # NE PAS définir password_changed_at lors de la première activation
+        # pour éviter que PasswordAgeValidator bloque immédiatement
         user.activate_account()
         
         messages.success(request, "Votre compte a été activé avec succès ! Vous pouvez maintenant vous connecter.")
@@ -304,21 +305,72 @@ def login_view(request):
     Méthodes:
     - GET: affiche la page `users/connexion.html` (avec anti-cache renforcé).
     - POST: tente d'authentifier via `authenticate(username=email, password=...)`.
+    Protection: django-axes vérifie automatiquement les tentatives échouées et
+    verrouille après 10 tentatives pendant 30 minutes.
     Succès:
     - Vide l'ancienne session, connecte l'utilisateur, régénère la clé de session
       (sécurité), ajoute un message de bienvenue et redirige vers `next` ou
       `core:accueil`.
     Échec:
-    - Affiche des messages d'erreur (compte inactif, identifiants invalides).
+    - Affiche des messages d'erreur (compte inactif, identifiants invalides, verrouillage).
     Sorties: HTML (GET) ou Redirect (POST). En-têtes anti-cache ajoutés dans
     tous les cas pour éviter l'historique de pages sensibles.
     """
+    from axes.handlers.proxy import AxesProxyHandler
+    from axes.models import AccessAttempt
+    from django.conf import settings
+    from datetime import timedelta
+    
+    # Récupérer la limite de tentatives depuis settings
+    max_attempts = getattr(settings, 'AXES_FAILURE_LIMIT', 4)
+    cooloff_setting = getattr(settings, 'AXES_COOLOFF_TIME', timedelta(minutes=30))
+    # Convertir en minutes (gérer timedelta ou entier)
+    if isinstance(cooloff_setting, timedelta):
+        cooloff_time = int(cooloff_setting.total_seconds() // 60)
+    else:
+        cooloff_time = cooloff_setting // 60
+    
     if request.user.is_authenticated:
         return redirect('core:accueil')
     
     if request.method == 'POST':
         email = request.POST.get('email', '').strip().lower()
         password = request.POST.get('password')
+        ip_address = request.META.get('REMOTE_ADDR', '')
+        
+        # Vérifier si le compte est verrouillé par django-axes
+        if AxesProxyHandler.is_locked(request, credentials={'username': email}):
+            messages.error(
+                request,
+                f"🔒 Votre compte a été temporairement verrouillé pour des raisons de sécurité "
+                f"en raison d'un trop grand nombre de tentatives de connexion échouées ({max_attempts} tentatives maximum). "
+                f"Veuillez réessayer dans {cooloff_time} minutes ou contacter un administrateur."
+            )
+            response = render(request, 'users/connexion.html')
+            response['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+            response['Pragma'] = 'no-cache'
+            response['Expires'] = '0'
+            return response
+        
+        # Fonction helper pour obtenir le nombre de tentatives échouées
+        def get_failed_attempts_count():
+            """Récupère le nombre de tentatives échouées pour cet email/IP."""
+            try:
+                # Chercher par username (email) ou par IP
+                attempt = AccessAttempt.objects.filter(
+                    username=email
+                ).first()
+                if attempt:
+                    return attempt.failures_since_start
+                # Si pas trouvé par email, chercher par IP
+                attempt = AccessAttempt.objects.filter(
+                    ip_address=ip_address
+                ).first()
+                if attempt:
+                    return attempt.failures_since_start
+            except Exception:
+                pass
+            return 0
         
         # Vérifier d'abord si l'utilisateur existe en base de données
         try:
@@ -382,12 +434,40 @@ def login_view(request):
                     
                     return response
                 else:
-                    # Mot de passe incorrect
-                    messages.error(request, "Email ou mot de passe incorrect.")
+                    # Mot de passe incorrect - afficher le nombre de tentatives restantes
+                    failed_count = get_failed_attempts_count() + 1  # +1 car cette tentative vient d'échouer
+                    remaining = max_attempts - failed_count
+                    
+                    if remaining > 0:
+                        messages.error(
+                            request, 
+                            f"⚠️ Email ou mot de passe incorrect. "
+                            f"Il vous reste {remaining} tentative(s) avant le verrouillage du compte."
+                        )
+                    else:
+                        messages.error(
+                            request,
+                            f"🔒 Votre compte a été verrouillé après {max_attempts} tentatives échouées. "
+                            f"Veuillez réessayer dans {cooloff_time} minutes ou contacter un administrateur."
+                        )
                     
         except User.DoesNotExist:
-            # Email n'existe pas en base de données
-            messages.error(request, "Email ou mot de passe incorrect.")
+            # Email n'existe pas - afficher le nombre de tentatives restantes
+            failed_count = get_failed_attempts_count() + 1
+            remaining = max_attempts - failed_count
+            
+            if remaining > 0:
+                messages.error(
+                    request, 
+                    f"⚠️ Email ou mot de passe incorrect. "
+                    f"Il vous reste {remaining} tentative(s) avant le verrouillage du compte."
+                )
+            else:
+                messages.error(
+                    request,
+                    f"🔒 Votre compte a été verrouillé après {max_attempts} tentatives échouées. "
+                    f"Veuillez réessayer dans {cooloff_time} minutes ou contacter un administrateur."
+                )
     
     # Ajouter anti-cache à la page de connexion aussi
     response = render(request, 'users/connexion.html')

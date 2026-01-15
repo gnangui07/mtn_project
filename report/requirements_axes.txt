@@ -1,0 +1,2 @@
+# Protection contre les attaques par force brute
+django-axes==6.1.1
